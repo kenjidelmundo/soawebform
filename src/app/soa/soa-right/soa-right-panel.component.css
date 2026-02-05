@@ -60,7 +60,8 @@
 /* OP preview */
 .opBar{
   margin-top: 10px;
-  width: 500px;         /* ✅ */
+  width: 500px;
+  margin-right: 10px;
   height: 26px;
   background: var(--peach);
   border: 1px solid var(--line);

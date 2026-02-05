@@ -26,21 +26,49 @@
   box-sizing: border-box;
 }
 
-/* Payee select same look as inputs */
-.val select.payeeSel{
-  width: 100%;
+.val.payeeWrap{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.payeeSearch{
   height: 18px;
   padding: 0 6px;
   font-weight: bold;
   font-size: 11px;
+  border: 1px solid var(--line);
   box-sizing: border-box;
+}
 
+.payeeSel{
+  width: 100%;
+  height: 18px;
+  padding: 0 26px 0 6px; /* space for arrow */
+  font-weight: bold;
+  font-size: 11px;
+  border: 1px solid var(--line);
   background: #fff;
-  outline: 0;
+  box-sizing: border-box;
 
   appearance: none;
   -webkit-appearance: none;
+  -moz-appearance: none;
 }
+
+/* arrow */
+.val.payeeWrap{
+  position: relative;
+}
+.val.payeeWrap::after{
+  content: "▼";
+  position: absolute;
+  right: 10px;
+  bottom: 3px;  /* aligns with select */
+  font-size: 10px;
+  pointer-events: none;
+}
+
 
 
 /* default input style (DATE/NAME/ADDRESS/PARTICULARS) */
