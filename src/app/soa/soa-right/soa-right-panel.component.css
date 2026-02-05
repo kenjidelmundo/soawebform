@@ -151,7 +151,7 @@
 
 .opBtn{
   border: 0;
-  font-size: 14px;
+  font-size: 14px;  
   background: transparent;
   font-weight: bold;
   cursor: pointer;
@@ -197,7 +197,7 @@
   margin-top: 0;
   display: grid;
   gap: 6px;
-  font-size: 12px;
+  font-size: 14px;
   box-sizing: border-box;
 
   width: 500px;
@@ -237,7 +237,7 @@
 .opTitle{
   color: #d40000;
   font-weight: bold;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .opSeriesIn{
