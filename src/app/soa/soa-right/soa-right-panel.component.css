@@ -1,74 +1,153 @@
-.rp{ width: 500px; }  /* ✅ match right column width */
+/* =========================
+   RIGHT PANEL (rp) - FINAL
+   - remarks under controls and right aligned
+   - OP section under remarks and right aligned
+   - no extra blank 1fr gap
+   ========================= */
 
-.topRow{
+.rp{
+  width: 100%;
+  box-sizing: border-box;
+
+  /* ✅ make rp an alignment container */
   display: grid;
-  grid-template-columns: 210px 180px 1fr;
-  gap: 10px;
-  align-items: start;
+  grid-auto-rows: max-content;
+  row-gap: 10px;
 }
 
+/* =========================
+   TOP ROW
+   - remove the 1fr column that creates the big empty space
+   - 2 columns only: chkBox (left) + buttons (right)
+   - remarks sits under buttons (right end)
+   ========================= */
+.topRow{
+  display: grid;
+  grid-template-columns: 290px 180px; /* ✅ no 1fr */
+  grid-template-rows: auto auto;      /* ✅ 2 rows */
+  column-gap: 50px;
+  row-gap: 5px;
+  align-items: start;
+  margin-left: 100px;
+
+  /* ✅ keep whole block on the right side of rp if there is extra space */
+  justify-self: auto;
+}
+
+/* checkbox container */
 .chkBox{
   background: var(--rightBlue);
   border: 1px solid var(--line);
-  padding: 6px 8px;
+  padding: 12px 9px;
   display: grid;
+  border-radius: 3%;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  font-size: 12px;
+  font-size: 14px;
+  box-sizing: border-box;
 }
 
 .col{ display: grid; gap: 2px; }
+
 .col label{
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-weight: bold;
 }
+
 .othersIn{
   height: 18px;
   border: 1px solid var(--line);
   background: #fff;
   margin-top: 2px;
+  padding: 0 6px;
+  box-sizing: border-box;
 }
 
+/* buttons */
 .btnCol{ display: grid; gap: 6px; }
+
 .btn{
   height: 28px;
   border: 1px solid var(--line);
   font-weight: bold;
   cursor: pointer;
+  box-sizing: border-box;
 }
+
 .btn.save{ background: var(--btnGreen); }
 .btn.new{ background: var(--btnGreen); }
 .btn.soa{ background: var(--btnBlue); }
 .btn.assess{ background: var(--btnAssess); color:#fff; }
 
-.remarks{ width: 180px; }
+/* remarks (UNDER controls, right end) */
+/* ✅ Controls for remarks position + size */
+.rp{
+  --remarks-x: 0px;        /* + right, - left */
+  --remarks-y: 0px;        /* + down,  - up   */
+  --remarks-w: 180px;      /* width */
+  --remarks-h: 120px;      /* textarea height */
+  --remarks-title: 16px;   /* title font size */
+}
+
+/* ✅ remarks block (still in grid, but adjustable) */
+.remarks{
+  grid-column: 1;     /* under buttons column */
+  grid-row: 2;
+  margin-left: 50px;
+  width: var(--remarks-w);
+
+  /* adjustable position */
+  transform: translate(var(--remarks-x), var(--remarks-y));
+  justify-self: auto;  /* stays right by default */
+}
+
+/* title */
 .rt{
   font-weight: bold;
-  font-size: 16px;
+  font-size: var(--remarks-title);
   color: #666;
   margin-bottom: 4px;
 }
+
+/* textarea size */
 .remarks textarea{
-  width: 180px;
+  width: 100%;
+  height: var(--remarks-h);
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 6px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.remarks textarea{
+  width: 350px;
   height: 120px;
   border: 1px solid var(--line);
   background: #fff;
+  padding: 6px;
+  box-sizing: border-box;
+  resize: none;
 }
 
-/* OP preview */
+/* =========================
+   OP PREVIEW BAR (RIGHT END)
+   ========================= */
 .opBar{
-  margin-top: 10px;
   width: 500px;
-  margin-right: 10px;
   height: 26px;
   background: var(--peach);
   border: 1px solid var(--line);
   display: grid;
   align-items: center;
   justify-items: center;
+  box-sizing: border-box;
+
+  justify-self: end; /* ✅ ALWAYS right end (rp is grid) */
 }
+
 .opBtn{
   border: 0;
   background: transparent;
@@ -76,70 +155,113 @@
   cursor: pointer;
 }
 
+/* =========================
+   OP BOX (RIGHT END)
+   ========================= */
 .opBox{
-  width: 500px;         /* ✅ */
+  width: 500px;
   background: var(--rightBlue);
   border: 1px solid var(--line);
   padding: 10px 12px;
   font-size: 12px;
+  box-sizing: border-box;
+
+  justify-self: end; /* ✅ ALWAYS right end */
 }
+
 .opBox label{
   display: block;
   margin-bottom: 6px;
 }
+
 .note{ margin-top: 2px; }
+
 .noteIn{
   width: 100%;
   height: 20px;
   margin-top: 4px;
   background: #f6d9c6;
   padding: 0 6px;
+  border: 1px solid var(--line);
+  box-sizing: border-box;
 }
+
 .foot{ margin-top: 8px; }
 
+/* =========================
+   PA (RIGHT END)
+   ========================= */
 .pa{
-  margin-top: 10px;
+  margin-top: 0;
   display: grid;
   gap: 6px;
   font-size: 12px;
+  box-sizing: border-box;
+
+  width: 500px;
+  justify-self: end; /* ✅ right */
 }
+
 .paRow{
   display: grid;
   grid-template-columns: 90px 1fr;
   gap: 8px;
   align-items: center;
 }
+
 .paRow .lbl{ font-weight: bold; }
+
 .paRow select{
   height: 22px;
   padding: 0 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  box-sizing: border-box;
 }
 
+/* =========================
+   OP SERIES (RIGHT END)
+   ========================= */
 .opSeries{
-  margin-top: 14px;
+  margin-top: 4px;
   display: grid;
   justify-items: center;
   gap: 6px;
+
+  width: 500px;
+  justify-self: end; /* ✅ right */
 }
+
 .opTitle{
   color: #d40000;
   font-weight: bold;
   font-size: 12px;
 }
+
 .opSeriesIn{
   width: 260px;
   height: 22px;
   text-align: right;
   font-weight: bold;
   padding: 0 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  box-sizing: border-box;
 }
 
+/* =========================
+   OR BLOCK (RIGHT END)
+   ========================= */
 .orBlock{
-  margin-top: 10px;
+  margin-top: 0;
   display: grid;
   gap: 8px;
   justify-items: center;
+
+  width: 500px;
+  justify-self: end; /* ✅ right */
 }
+
 .orRow{
   width: 300px;
   display: grid;
@@ -147,8 +269,13 @@
   gap: 10px;
   align-items: center;
 }
+
 .orLbl{ font-weight: bold; }
+
 .orRow input{
   height: 20px;
   padding: 0 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  box-sizing: border-box;
 }
