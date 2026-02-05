@@ -4,9 +4,15 @@
     <div class="val"><input type="text" formControlName="date"></div>
   </div>
   <div class="row">
-    <div class="lbl">Name of Payor:</div>
-    <div class="val"><input type="text" formControlName="payorName"></div>
+  <div class="lbl">Name of Payee:</div>
+  <div class="val">
+    <select class="payeeSel" formControlName="payeeName">
+      <option value="">-- Select Payee --</option>
+      <option *ngFor="let p of payees" [value]="p">{{ p }}</option>
+    </select>
   </div>
+</div>
+
   <div class="row">
     <div class="lbl">Address</div>
     <div class="val"><input type="text" formControlName="address"></div>

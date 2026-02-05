@@ -11,4 +11,10 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 })
 export class SoaLeftFormComponent {
   @Input() form!: FormGroup;
+  payees: string[] = [
+  'Engr. Francis T. M. Alfanta',
+  'Engr. William Ramon Luber',
+  'KHATYLIN B. RAÑA',
+];
+
 }
