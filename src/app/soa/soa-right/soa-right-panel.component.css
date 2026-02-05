@@ -137,6 +137,7 @@
    ========================= */
 .opBar{
   width: 500px;
+  
   height: 26px;
   background: var(--peach);
   border: 1px solid var(--line);
@@ -150,6 +151,7 @@
 
 .opBtn{
   border: 0;
+  font-size: 14px;
   background: transparent;
   font-weight: bold;
   cursor: pointer;
@@ -163,7 +165,7 @@
   background: var(--rightBlue);
   border: 1px solid var(--line);
   padding: 10px 12px;
-  font-size: 12px;
+  font-size: 14px;
   box-sizing: border-box;
 
   justify-self: end; /* ✅ ALWAYS right end */
