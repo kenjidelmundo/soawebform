@@ -111,50 +111,74 @@ export class SoaPageComponent {
   }
 
   // ✅ SAVE button from right panel -> calls this
-  save(): void {
-    const v = this.form.value;
+save(): void {
+  const v = this.form.value;
 
-    const payload: TechSOAHeaderCreateDto = {
-      dateIssued: v.date ?? null,
-      licensee: v.payeeName ?? null,
-      address: v.address ?? null,
-      particulars: v.particulars ?? null,
-      periodFrom: v.periodFrom ?? null,
-      periodTo: v.periodTo ?? null,
-      periodYears:
-        v.periodYears === '' || v.periodYears === null || v.periodYears === undefined
-          ? null
-          : Number(v.periodYears),
-    };
+  // Convert to safe ISO dates for .NET DateTime? (or null)
+  const toIsoDate = (x: any): string | null => {
+    if (x === null || x === undefined || x === '') return null;
 
-    this.saving = true;
+    // If already YYYY-MM-DD (from <input type="date">), keep it
+    if (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)) return x;
 
-    this.soaService.createHeader(payload).subscribe({
-      next: (res) => {
-        this.savedHeaderId = res?.id ?? res?.ID ?? null;
-        this.saving = false;
-        console.log('✅ Saved header:', res);
-        alert(`✅ Saved! ID: ${this.savedHeaderId ?? 'N/A'}`);
-      },
-      error: (err) => {
-        this.saving = false;
-        console.error('❌ Save failed FULL:', err);
+    // If it's a Date object or other string, try parsing
+    const d = new Date(x);
+    if (isNaN(d.getTime())) return null;
 
-        const status = err?.status;
-        const url = err?.url;
-        const msg = err?.message;
-        const serverMsg = err?.error;
+    // For DateTime? in .NET, ISO is safest
+    return d.toISOString();
+  };
 
-        alert(
-          `❌ Save failed\n\n` +
-          `Status: ${status}\n` +
-          `URL: ${url}\n` +
-          `Message: ${msg}\n` +
-          `Server: ${typeof serverMsg === 'string' ? serverMsg : JSON.stringify(serverMsg)}`
-        );
-      }
-    });
+  const dateIssuedIso = toIsoDate(v.date);
+
+  // ✅ If user typed invalid text in DATE, stop and show message
+  if (v.date && !dateIssuedIso) {
+    alert('Invalid DATE. Please select a valid date (use the date picker).');
+    return;
   }
+
+  const payload: TechSOAHeaderCreateDto = {
+    dateIssued: dateIssuedIso,
+    licensee: (v.payeeName ?? '') === '' ? null : v.payeeName,
+    address: (v.address ?? '') === '' ? null : v.address,
+    particulars: (v.particulars ?? '') === '' ? null : v.particulars,
+    periodFrom: toIsoDate(v.periodFrom),
+    periodTo: toIsoDate(v.periodTo),
+    periodYears:
+      v.periodYears === '' || v.periodYears === null || v.periodYears === undefined
+        ? null
+        : Number(v.periodYears),
+  };
+
+  this.saving = true;
+
+  this.soaService.createHeader(payload).subscribe({
+    next: (res) => {
+      this.savedHeaderId = res?.id ?? res?.ID ?? null;
+      this.saving = false;
+      console.log('✅ Saved header:', res);
+      alert(`✅ Saved! ID: ${this.savedHeaderId ?? 'N/A'}`);
+    },
+    error: (err) => {
+      this.saving = false;
+      console.error('❌ Save failed FULL:', err);
+
+      const status = err?.status;
+      const url = err?.url;
+      const msg = err?.message;
+      const serverMsg = err?.error;
+
+      alert(
+        `❌ Save failed\n\n` +
+        `Status: ${status}\n` +
+        `URL: ${url}\n` +
+        `Message: ${msg}\n` +
+        `Server: ${typeof serverMsg === 'string' ? serverMsg : JSON.stringify(serverMsg)}`
+      );
+    }
+  });
+}
+
 
   newRecord(): void {
     this.form.reset({

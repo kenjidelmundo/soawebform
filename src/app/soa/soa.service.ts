@@ -14,19 +14,25 @@ export interface TechSOAHeaderCreateDto {
 
 @Injectable({ providedIn: 'root' })
 export class SoaService {
-  // ✅ CHANGE to your IIS base (where swagger opens)
-  // Example: http://localhost/LicensingAPI
   private iisBase = 'http://localhost:8080';
 
-  private baseUrl = `${this.iisBase}/api/TechSOA`;
+  // ✅ Swagger says controller is AccessSOA
+  private baseUrl = `${this.iisBase}/api/AccessSOA`;
 
   constructor(private http: HttpClient) {}
 
+  // ✅ POST /api/AccessSOA/header
   createHeader(payload: TechSOAHeaderCreateDto): Observable<any> {
     return this.http.post(`${this.baseUrl}/header`, payload);
   }
 
-  getHeaderById(id: number): Observable<any> {
-    return this.http.get(`${this.baseUrl}/header/${id}`);
+  // ✅ GET /api/AccessSOA/{id}
+  getById(id: number): Observable<any> {
+    return this.http.get(`${this.baseUrl}/${id}`);
+  }
+
+  // (optional) ✅ PUT /api/AccessSOA/{id}/header  (based on swagger)
+  updateHeader(id: number, payload: TechSOAHeaderCreateDto): Observable<any> {
+    return this.http.put(`${this.baseUrl}/${id}/header`, payload);
   }
 }
