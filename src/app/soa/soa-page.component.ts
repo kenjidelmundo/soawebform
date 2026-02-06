@@ -180,7 +180,7 @@ save(): void {
 }
 
 
-  newRecord(): void {
+  newRecord(): void {  
     this.form.reset({
       periodYears: 0,
       txnNew: false,
