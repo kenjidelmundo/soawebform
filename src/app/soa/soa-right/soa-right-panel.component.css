@@ -91,7 +91,7 @@
   grid-column: 1 / -1;
   grid-row: 2;
 
-  width: 500px;
+  width: 520px;
   height: 26px;
   background: var(--peach);
   border: 1px solid var(--line);
@@ -116,7 +116,7 @@
   grid-column: 1 / -1;
   grid-row: 3;
 
-  width: 500px;
+  width: 520px;
   background: var(--rightBlue);
   border: 1px solid var(--line);
   padding: 10px 12px;
@@ -150,7 +150,7 @@
   grid-column: 1 / -1;
   grid-row: 4;
 
-  width: 500px;
+  width: 520px;
   display: grid;
   gap: 6px;
   font-size: 14px;

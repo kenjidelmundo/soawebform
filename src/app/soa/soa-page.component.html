@@ -1,14 +1,11 @@
 <div class="canvas" [formGroup]="form">
   <app-soa-header [form]="form"></app-soa-header>
 
-  <!-- Reference layout: info spans 2 cols, right spans both rows -->
   <div class="grid">
-    <!-- TOP LEFT (spans col1+col2) -->
     <div class="infoSpan">
       <app-soa-left-form [form]="form"></app-soa-left-form>
     </div>
 
-    <!-- RIGHT (spans two rows) -->
     <div class="rightSpan">
       <app-soa-right-panel
         [form]="form"
@@ -20,7 +17,6 @@
       ></app-soa-right-panel>
     </div>
 
-    <!-- BOTTOM LEFT -->
     <div class="feesLeft">
       <app-soa-fees [form]="form" mode="left"></app-soa-fees>
 
@@ -36,7 +32,6 @@
       </div>
     </div>
 
-    <!-- BOTTOM MID -->
     <div class="feesMid">
       <app-soa-fees [form]="form" mode="mid"></app-soa-fees>
     </div>
