@@ -37,6 +37,13 @@ export class SoaPageComponent {
 
   constructor(private fb: FormBuilder, private soaService: SoaService) {
     this.form = this.fb.group({
+
+      // ✅ HEADER CONTROLS (fix missing control errors)
+    id: [''],                // (optional but recommended because you display it)
+    isMobileLicensing: [false],
+    seriesNumber: [''],
+    soaSeries: [''],
+
       // ===========================
       // LEFT HEADER (SAVE NOW)
       // ===========================

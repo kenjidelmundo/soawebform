@@ -1,8 +1,3 @@
-<div #printAreaEl>
-  <!-- your SOA content here -->
-</div>  
-
-
 <div class="rp" [formGroup]="form">
   <div class="topRow">
     <div class="chkBox">
@@ -27,9 +22,9 @@
       <button class="btn save" type="button" (click)="onSave.emit()">SAVE</button>
       <button class="btn new" type="button" (click)="onNewRecord.emit()">NEW RECORD</button>
       <button class="btn soa" type="button" (click)="onPrintSOA.emit()">(SOA) &nbsp;Print Preview</button>
+
+      <!-- ✅ THIS IS THE ONE YOU MEANT -->
       <button class="btn assess" type="button" (click)="onAssessment.emit()">Assessment Only</button>
-
-
     </div>
 
     <div class="remarks">
@@ -45,6 +40,7 @@
   <div class="opBox">
     <label><input type="checkbox" formControlName="opAssessmentOnly"> <b>For Assessment Only:</b></label>
     <label><input type="checkbox" formControlName="opEndorsedForPayment"> <b>Endorsed for Payment</b></label>
+
     <div class="note"><b>Note:</b> To be paid on or before</div>
     <input class="noteIn" type="text" formControlName="opNotePayOnOrBefore" />
     <div class="foot"><b>otherwise subject to reassessment.</b></div>
@@ -75,10 +71,10 @@
       <div class="orLbl">OR NUMBER</div>
       <input type="text" formControlName="orNumber" />
     </div>
-   <div class="orRow">
-  <div class="orLbl">Date Paid:</div>
-  <input type="date" formControlName="datePaid" />
-</div>
 
+    <div class="orRow">
+      <div class="orLbl">Date Paid:</div>
+      <input type="date" formControlName="datePaid" />
+    </div>
   </div>
 </div>
