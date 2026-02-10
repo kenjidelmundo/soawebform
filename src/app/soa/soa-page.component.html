@@ -7,15 +7,31 @@
     </div>
 
     <div class="rightSpan">
-      <app-soa-right-panel
-        [form]="form"
-        (onSave)="save()"
-        (onNewRecord)="newRecord()"
-        (onPrintSOA)="printSoa()"
-        (onAssessment)="assessmentOnly()"
-        (onPrintOP)="printOp()"
-      ></app-soa-right-panel>
-    </div>
+
+  <!-- ✅ Hidden Assessment component (used only for PDF export) -->
+  <div style="
+  position: fixed;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+">
+    <app-assessment #assess></app-assessment>
+  </div>
+
+  <app-soa-right-panel
+    [form]="form"
+    (onSave)="save()"
+    (onNewRecord)="newRecord()"
+    (onPrintSOA)="printSoa()"
+    (onAssessment)="assess.exportPDF()"
+    (onPrintOP)="printOp()"
+  ></app-soa-right-panel>
+
+</div>
+
+
 
     <div class="feesLeft">
       <app-soa-fees [form]="form" mode="left"></app-soa-fees>
@@ -37,3 +53,4 @@
     </div>
   </div>
 </div>
+

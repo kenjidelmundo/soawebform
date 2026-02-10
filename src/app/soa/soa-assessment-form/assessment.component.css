@@ -1,0 +1,172 @@
+.print-btn {
+  margin-bottom: 10px;
+}
+
+/* A4 Landscape */
+.a4-landscape {
+  width: 1123px;
+  height: 794px;
+  display: flex;
+  box-sizing: border-box;
+}
+
+/* Half page */
+.soa-half {
+  width: 50%;
+  padding: 8px;
+  box-sizing: border-box;
+  border-right: 1px dashed #999;
+}
+
+.soa-half:last-child {
+  border-right: none;
+}
+
+/* Scaled SOA */
+.soa-page {
+  width: 100%;
+  min-height: 100%;
+  padding: 20px 22px;
+  font-family: "Times New Roman", serif;
+  font-size: 9pt;
+  color: #000;
+}
+
+/* HEADER */
+.header {
+  text-align: center;
+  line-height: 1.2;
+}
+
+.title {
+  font-weight: bold;
+}
+
+.subtitle {
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+/* TOP INFO */
+.top-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.left {
+  width: 52%;
+}
+
+.right {
+  width: 44%;
+  font-size: 9pt;
+}
+
+.checks {
+  margin-top: 4px;
+}
+
+.u {
+  text-decoration: underline;
+}
+
+.box {
+  border: 1px solid #000;
+  margin-top: 4px;
+}
+
+.small-box {
+  height: 34px;
+  padding: 3px;
+}
+
+.note {
+  margin-top: 10px;
+}
+
+.link {
+  color: blue;
+  text-decoration: underline;
+}
+
+.period {
+  margin: 8px 0 4px;
+}
+
+/* TABLE + REMARKS */
+.table-wrap {
+  display: flex;
+  gap: 10px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 62%;
+}
+
+th, td {
+  border: 1px solid #000;
+  padding: 2px 4px;
+  vertical-align: top;
+}
+
+th {
+  font-weight: bold;
+}
+
+.code {
+  width: 14%;
+}
+
+.amt {
+  width: 18%;
+  text-align: right;
+}
+
+.section td {
+  font-weight: bold;
+}
+
+.total td {
+  font-weight: bold;
+}
+
+.remarks {
+  width: 36%;
+}
+
+.remarks-title {
+  font-weight: bold;
+  border: 1px solid #000;
+  border-bottom: none;
+  padding: 2px 4px;
+}
+
+.remarks-box {
+  border: 1px solid #000;
+  height: 220px;
+}
+
+/* SIGNATURES */
+.signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+
+.small {
+  font-size: 8pt;
+}
+
+/* FOOTER */
+.footer {
+  font-size: 8pt;
+  margin-top: 6px;
+}
+
+/* PRINT */
+@media print {
+  .print-btn {
+    display: none;
+  }
+}
