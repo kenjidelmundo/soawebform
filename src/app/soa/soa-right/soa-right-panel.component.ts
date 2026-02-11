@@ -21,19 +21,75 @@ export class SoaRightPanelComponent {
 
   constructor(private soaPdf: SoaPdfService) {}
 
-printSOAPreview(): void {
-  const v = this.form?.value;
+  printSOAPreview(): void {
+    const v: any = this.form?.value ?? {};
 
-  this.soaPdf.generatePDF({
-    soaNo: v?.soaNo ?? '',
-    date: v?.dateIssued ?? v?.date ?? '',
-    name: v?.payeeName ?? v?.name ?? '',
-    address: v?.address ?? '',
-    type: v?.type ?? 'New',
-    particulars: v?.particulars ?? '',
-    periodCovered: v?.periodCovered ?? '',
-    sections: [], 
-  } as any);
-}
+    // ✅ Debug (optional)
+    console.log('FORM VALUE:', v);
 
+    const soaData: any = {
+      soaNo: v.soaNo ?? '',
+      date: v.dateIssued ?? v.date ?? '',
+      name: v.payeeName ?? v.name ?? '',
+      address: v.address ?? '',
+      type: v.type ?? 'New',
+      particulars: v.particulars ?? '',
+      periodCovered: v.periodCovered ?? '',
+
+      sections: [
+        {
+          title: 'FOR LICENSES',
+          rows: [
+            ['Permit to Purchase', Number(v.licPermitToPurchase || 0)],
+            ['Filing Fee', Number(v.licFilingFee || 0)],
+            ['Permit to Possess / Storage', Number(v.licPermitToPossess || 0)],
+            ['Construction Permit Fee', Number(v.licConstructionPermitFee || 0)],
+            ['Radio Station License', Number(v.licRadioStationLicense || 0)],
+            ['Inspection Fee', Number(v.licInspectionFee || 0)],
+            ['Spectrum User’s Fee (SUF)', Number(v.licSpectrumUsersFee || 0)],
+            ['Surcharges', Number(v.licSurcharges || 0)],
+            ['Fines and Penalties', Number(v.licFinesPenalties || 0)],
+          ]
+        },
+        {
+          title: 'FOR PERMITS',
+          rows: [
+            ['Permit (Dealer / Reseller / Service Center)', Number(v.permitDealerReseller || 0)],
+            ['Inspection Fee', Number(v.permitInspectionFee || 0)],
+            ['Filing Fee', Number(v.permitFilingFee || 0)],
+            ['Surcharges', Number(v.permitSurcharges || 0)],
+          ]
+        },
+        {
+          title: 'FOR AMATEUR AND ROC',
+          rows: [
+            ['Radio Station License', Number(v.amRadioStationLicense || 0)],
+            ["Radio Operator’s Certificate", Number(v.amRoc || 0)],
+            ['Application Fee', Number(v.amApplicationFee || 0)],
+            ['Filing Fee', Number(v.amFilingFee || 0)],
+            ['Seminar Fee', Number(v.amSeminarFee || 0)],
+            ['Surcharges', Number(v.amSurcharges || 0)],
+          ]
+        },
+        {
+          title: 'OTHER APPLICATION',
+          rows: [
+            ['Registration Fee', Number(v.otherRegistrationFee || 0)],
+            ['Supervision / Regulation Fee', Number(v.otherSupervisionFee || 0)],
+            ['Verification / Authentication Fee', Number(v.otherVerificationFee || 0)],
+            ['Examination Fee', Number(v.otherExaminationFee || 0)],
+            ['Clearance / Certification Fee (Special)', Number(v.otherClearanceFee || 0)],
+            ['Modification Fee', Number(v.otherModificationFee || 0)],
+            ['Miscellaneous Income', Number(v.otherMiscIncome || 0)],
+            ['Documentary Stamp Tax (DST)', Number(v.otherDst || 0)],
+            ['Others', Number(v.otherOthers || 0)],
+          ]
+        }
+      ]
+    };
+
+    console.log('SOA TO PRINT:', soaData);
+
+    this.soaPdf.generatePDF(soaData);
+  }
 }
