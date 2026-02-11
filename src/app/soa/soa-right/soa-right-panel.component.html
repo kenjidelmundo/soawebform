@@ -21,9 +21,7 @@
     <div class="btnCol">
       <button class="btn save" type="button" (click)="onSave.emit()">SAVE</button>
       <button class="btn new" type="button" (click)="onNewRecord.emit()">NEW RECORD</button>
-      <button class="btn soa" type="button" (click)="onPrintSOA.emit()">(SOA) &nbsp;Print Preview</button>
-
-      <!-- ✅ THIS IS THE ONE YOU MEANT -->
+      <button class="btn soa" type="button" (click)="printSOAPreview()">(SOA) &nbsp;Print Preview</button>
       <button class="btn assess" type="button" (click)="onAssessment.emit()">Assessment Only</button>
     </div>
 
@@ -34,7 +32,7 @@
   </div>
 
   <div class="opBar">
-    <button class="opBtn" type="button" (click)="onPrintOP.emit()">🖨️(OP) &nbsp;Print Preview</button>
+    <button class="opBtn" type="button" (click)="onPrintOP.emit()">(OP) &nbsp;Print Preview</button>
   </div>
 
   <div class="opBox">
