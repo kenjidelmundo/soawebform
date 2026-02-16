@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-export interface TechSOAHeaderCreateDto {
+export type TechSOAHeaderCreateDto = {
   dateIssued: string | null;
   licensee: string | null;
   address: string | null;
@@ -10,29 +10,27 @@ export interface TechSOAHeaderCreateDto {
   periodFrom: string | null;
   periodTo: string | null;
   periodYears: number | null;
-}
+};
 
 @Injectable({ providedIn: 'root' })
 export class SoaService {
-  private iisBase = 'http://localhost:8080';
-
-  // ✅ Swagger says controller is AccessSOA
-  private baseUrl = `${this.iisBase}/api/AccessSOA`;
+  // ✅ use proxy, so Angular will call /api/... and proxy will forward to your backend
+  private baseUrl = '/api/TechSOA';
 
   constructor(private http: HttpClient) {}
 
-  // ✅ POST /api/AccessSOA/header
-  createHeader(payload: TechSOAHeaderCreateDto): Observable<any> {
-    return this.http.post(`${this.baseUrl}/header`, payload);
+  // ✅ DROPDOWN PAYEES (from accessSOA.LICENSEE)
+  getPayeeNames(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.baseUrl}/payees`);
   }
 
-  // ✅ GET /api/AccessSOA/{id}
-  getById(id: number): Observable<any> {
-    return this.http.get(`${this.baseUrl}/${id}`);
+  // ✅ save header (your controller has POST /api/TechSOA/header)
+  createHeader(dto: TechSOAHeaderCreateDto): Observable<any> {
+    return this.http.post(`${this.baseUrl}/header`, dto);
   }
 
-  // (optional) ✅ PUT /api/AccessSOA/{id}/header  (based on swagger)
-  updateHeader(id: number, payload: TechSOAHeaderCreateDto): Observable<any> {
-    return this.http.put(`${this.baseUrl}/${id}/header`, payload);
+  // optional test
+  ping(): Observable<string> {
+    return this.http.get(`${this.baseUrl}/ping`, { responseType: 'text' });
   }
 }
