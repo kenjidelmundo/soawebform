@@ -2,14 +2,12 @@ import { Component, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 
-import { SoaService, TechSOAHeaderCreateDto } from './soa.service';
+import { SoaService } from './soa.service';
 
 import { SoaHeaderComponent } from './header/soa-header.component';
 import { SoaFeesComponent } from './fees/soa-fees.component';
 import { SoaLeftFormComponent } from './soa-left/soa-left-form.component';
 import { SoaRightPanelComponent } from './soa-right/soa-right-panel.component';
-
-// ✅ ADDED: import AssessmentComponent (Assessment Only PDF)
 import { AssessmentComponent } from './soa-assessment-form/assessment.component';
 
 @Component({
@@ -29,24 +27,19 @@ import { AssessmentComponent } from './soa-assessment-form/assessment.component'
 })
 export class SoaPageComponent {
   form: FormGroup;
-
   saving = false;
-  savedHeaderId: number | null = null;
 
   @ViewChild('assess') assess!: AssessmentComponent;
 
   constructor(private fb: FormBuilder, private soaService: SoaService) {
     this.form = this.fb.group({
+      // ===== Header/basic
+      id: [''],
+      isMobileLicensing: [false],
+      seriesNumber: [''],
+      soaSeries: [''],
 
-      // ✅ HEADER CONTROLS (fix missing control errors)
-    id: [''],                // (optional but recommended because you display it)
-    isMobileLicensing: [false],
-    seriesNumber: [''],
-    soaSeries: [''],
-
-      // ===========================
-      // LEFT HEADER (SAVE NOW)
-      // ===========================
+      // ===== Header UI
       date: [null],
       payeeName: [''],
       address: [''],
@@ -54,140 +47,234 @@ export class SoaPageComponent {
       periodFrom: [null],
       periodTo: [null],
       periodYears: [0],
+      periodCovered: [''],
 
-      // ===========================
-      // RIGHT PANEL (buttons)
-      // ===========================
+      // ===== Right panel
       txnNew: [false],
       txnRenew: [false],
       txnModification: [false],
       txnCO: [false],
       txnCV: [false],
-
       catROC: [false],
       catMS: [false],
       catMA: [false],
       catOTHERS: [false],
-
       remarks: [''],
-
       opAssessmentOnly: [false],
       opEndorsedForPayment: [false],
       opNotePayOnOrBefore: [''],
-
       preparedBy: ['Engr. Francis T. M. Alfanta'],
       approvedBy: ['Engr. William Ramon Luber'],
-
       opSeries: [''],
       orNumber: [''],
       datePaid: [null],
-
-      // ===========================
-      // Accounting fields
-      // ===========================
       accounting: [''],
       accountingPosition: [''],
 
-      // ===========================
-      // FEES placeholders (para hindi mag crash)
-      // If may kulang na controlName sa fees html mo, add dito.
-      // ===========================
-      isPurchase: [0],
-      isFilingFee: [0],
-      isPossess: [0],
-      rslConstruction: [0],
-      rslRadioStation: [0],
-      rslInspection: [0],
-      rslSUF: [0],
-      amnestyFine: [0],
-      rslSurcharge: [0],
-      permitPermitFees: [0],
-      permitInspection: [0],
-      permitFillingFee: [0],
-      permitSurcharge: [0],
-      rocRadioStation: [0],
-      rocOperatorFee: [0],
-      rocFilingFee: [0],
-      rocSeminarFee: [0],
-      rocSurcharge: [0],
-      otherRegistration: [0],
-      otherSRF: [0],
-      otherVerification: [0],
-      otherExam: [0],
-      otherClearanceandCertFee: [0],
-      otherModification: [0],
-      otherMiscIncome: [0],
+      // ===== LEFT (LICENSES)
+      licPermitToPurchase: [0],
+      licFilingFee: [0],
+      licPermitToPossess: [0],
+      licConstructionPermitFee: [0],
+      licRadioStationLicense: [0],
+      licInspectionFee: [0],
+      licSUF: [0],
+      licFinesPenalties: [0],
+      licSurcharges: [0],
+
+      // ===== LEFT OTHER APPLICATION
+      appRegistrationFee: [0],
+      appSupervisionRegulationFee: [0],
+      appVerificationAuthFee: [0],
+      appExaminationFee: [0],
+      appClearanceCertificationFee: [0],
+      appModificationFee: [0],
+      appMiscIncome: [0],
+      appOthers: [0],
+
+      // ===== MID PERMITS
+      perPermitFees: [0],
+      perInspectionFee: [0],
+      perFilingFee: [0],
+      perSurcharges: [0],
+
+      // ===== MID ROC
+      amRadioStationLicense: [0],
+      amRadioOperatorsCert: [0],
+      amApplicationFee: [0],
+      amFilingFee: [0],
+      amSeminarFee: [0],
+      amSurcharges: [0],
+
+      // DST + TOTAL
       dst: [0],
-      otherOthers: [0],
-      totalAmount: [0]
+      totalAmount: [0],
     });
   }
 
-  // ✅ SAVE button from right panel -> calls this
-  save(): void {
-    const v = this.form.value;
+  // -------------------------
+  // Helpers
+  // -------------------------
+  private toIsoDate(x: any): string | null {
+    if (x === null || x === undefined || x === '') return null;
+    if (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)) return x;
+    const d = new Date(x);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString();
+  }
 
-    // Convert to safe ISO dates for .NET DateTime? (or null)
-    const toIsoDate = (x: any): string | null => {
-      if (x === null || x === undefined || x === '') return null;
+  private toYmd(iso: any): string | null {
+    if (!iso) return null;
+    if (typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}/.test(iso)) return iso.substring(0, 10);
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
 
-      // If already YYYY-MM-DD (from <input type="date">), keep it
-      if (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)) return x;
-
-      // If it's a Date object or other string, try parsing
-      const d = new Date(x);
-      if (isNaN(d.getTime())) return null;
-
-      // For DateTime? in .NET, ISO is safest
-      return d.toISOString();
-    };
-
-    const dateIssuedIso = toIsoDate(v.date);
-
-    // ✅ If user typed invalid text in DATE, stop and show message
-    if (v.date && !dateIssuedIso) {
-      alert('Invalid date. Please select a valid date (use the date picker).');
+  // -------------------------
+  // LOAD header first (by ID)
+  // -------------------------
+  loadHeader(id: number): void {
+    if (!id || id <= 0) {
+      alert('Enter a valid ID.');
       return;
     }
 
-    const payload: TechSOAHeaderCreateDto = {
-      dateIssued: dateIssuedIso,
+    this.soaService.getById(id).subscribe({
+      next: (data: any) => {
+        // Patch header first (like you want)
+        this.form.patchValue({
+          id: data.id ?? id,
+          date: this.toYmd(data.dateIssued),
+          payeeName: data.licensee ?? '',
+          address: data.address ?? '',
+          particulars: data.particulars ?? '',
+          periodFrom: this.toYmd(data.periodFrom),
+          periodTo: this.toYmd(data.periodTo),
+          periodYears: data.periodYears ?? 0,
+          periodCovered: data.periodCovered ?? '',
+
+          // optional: also load fees if you want them shown
+          licPermitToPurchase: data.rslPurchase ?? 0,
+          licFilingFee: data.rslFillingFee ?? 0,
+          licPermitToPossess: data.rslPossess ?? 0,
+          licConstructionPermitFee: data.rslConstruction ?? 0,
+          licRadioStationLicense: data.rslRadioStation ?? 0,
+          licInspectionFee: data.rslInspection ?? 0,
+          licSUF: data.rslSUF ?? 0,
+          licSurcharges: data.rslSurcharge ?? 0,
+
+          perPermitFees: data.permitPermitFees ?? 0,
+          perInspectionFee: data.permitInspection ?? 0,
+          perFilingFee: data.permitFillingFee ?? 0,
+          perSurcharges: data.permitSurcharge ?? 0,
+
+          amRadioStationLicense: data.rocRadioStation ?? 0,
+          amRadioOperatorsCert: data.rocOperatorFee ?? 0,
+          amApplicationFee: data.rocApplicationFee ?? 0,
+          amFilingFee: data.rocFillingFee ?? 0,
+          amSeminarFee: data.rocSeminarFee ?? 0,
+          amSurcharges: data.rocSurcharge ?? 0,
+
+          appRegistrationFee: data.otherRegistration ?? 0,
+          appSupervisionRegulationFee: data.otherSupervisionRegulation ?? 0,
+          appVerificationAuthFee: data.otherVerificationAuthentication ?? 0,
+          appExaminationFee: data.otherExamination ?? 0,
+          appClearanceCertificationFee: data.otherClearanceCertification ?? 0,
+          appModificationFee: data.otherModification ?? 0,
+          appMiscIncome: data.otherMiscIncome ?? 0,
+          appOthers: data.otherOthers ?? 0,
+
+          dst: data.dst ?? 0,
+          totalAmount: data.totalAmount ?? 0,
+        }, { emitEvent: false });
+
+        console.log('✅ Loaded:', data);
+      },
+      error: (err) => {
+        console.error('❌ Load failed:', err);
+        alert(`❌ Load failed: ${err?.status} ${err?.statusText}`);
+      }
+    });
+  }
+
+  // -------------------------
+  // SAVE (UPDATE existing)
+  // -------------------------
+  save(): void {
+    const v: any = this.form.value;
+    const id = Number(v.id || 0);
+
+    if (!id || id <= 0) {
+      alert('❌ No ID found. Load an existing record first.');
+      return;
+    }
+
+    // Backend field names MUST match Swagger
+    const payload: any = {
+      // header
+      dateIssued: this.toIsoDate(v.date),
       licensee: (v.payeeName ?? '') === '' ? null : v.payeeName,
       address: (v.address ?? '') === '' ? null : v.address,
       particulars: (v.particulars ?? '') === '' ? null : v.particulars,
-      periodFrom: toIsoDate(v.periodFrom),
-      periodTo: toIsoDate(v.periodTo),
-      periodYears:
-        v.periodYears === '' || v.periodYears === null || v.periodYears === undefined
-          ? null
-          : Number(v.periodYears),
+      periodFrom: this.toIsoDate(v.periodFrom),
+      periodTo: this.toIsoDate(v.periodTo),
+      periodYears: Number(v.periodYears || 0),
+      periodCovered: (v.periodCovered ?? '') === '' ? null : v.periodCovered,
+
+      // rsl*
+      rslPurchase: Number(v.licPermitToPurchase || 0),
+      rslFillingFee: Number(v.licFilingFee || 0),
+      rslPossess: Number(v.licPermitToPossess || 0),
+      rslConstruction: Number(v.licConstructionPermitFee || 0),
+      rslRadioStation: Number(v.licRadioStationLicense || 0),
+      rslInspection: Number(v.licInspectionFee || 0),
+      rslSUF: Number(v.licSUF || 0),
+      rslSurcharge: Number(v.licSurcharges || 0),
+
+      // permit*
+      permitPermitFees: Number(v.perPermitFees || 0),
+      permitInspection: Number(v.perInspectionFee || 0),
+      permitFillingFee: Number(v.perFilingFee || 0),
+      permitSurcharge: Number(v.perSurcharges || 0),
+
+      // roc*
+      rocRadioStation: Number(v.amRadioStationLicense || 0),
+      rocOperatorFee: Number(v.amRadioOperatorsCert || 0),
+      rocApplicationFee: Number(v.amApplicationFee || 0),
+      rocFillingFee: Number(v.amFilingFee || 0),
+      rocSeminarFee: Number(v.amSeminarFee || 0),
+      rocSurcharge: Number(v.amSurcharges || 0),
+
+      // other*
+      otherRegistration: Number(v.appRegistrationFee || 0),
+      otherSupervisionRegulation: Number(v.appSupervisionRegulationFee || 0),
+      otherVerificationAuthentication: Number(v.appVerificationAuthFee || 0),
+      otherExamination: Number(v.appExaminationFee || 0),
+      otherClearanceCertification: Number(v.appClearanceCertificationFee || 0),
+      otherModification: Number(v.appModificationFee || 0),
+      otherMiscIncome: Number(v.appMiscIncome || 0),
+      otherOthers: Number(v.appOthers || 0),
+
+      dst: Number(v.dst || 0),
+      totalAmount: Number(v.totalAmount || 0),
     };
 
     this.saving = true;
 
-    this.soaService.createHeader(payload).subscribe({
-      next: (res) => {
-        this.savedHeaderId = res?.id ?? res?.ID ?? null;
+    this.soaService.update(id, payload).subscribe({
+      next: (res: any) => {
         this.saving = false;
-        console.log('✅ Saved header:', res);
-        alert(`✅ Saved! ID: ${this.savedHeaderId ?? 'N/A'}`);
+        console.log('✅ Updated:', res);
+        alert(`✅ Updated record ID: ${id}`);
       },
-      error: (err) => {
+      error: (err: any) => {
         this.saving = false;
-        console.error('❌ Save failed FULL:', err);
-
-        const status = err?.status;
-        const url = err?.url;
-        const msg = err?.message;
-        const serverMsg = err?.error;
-
-        alert(
-          `❌ Save failed\n\n` +
-          `Status: ${status}\n` +
-          `URL: ${url}\n` +
-          `Message: ${msg}\n` +
-          `Server: ${typeof serverMsg === 'string' ? serverMsg : JSON.stringify(serverMsg)}`
-        );
+        console.error('❌ Update failed:', err);
+        alert(`❌ Update failed\nStatus: ${err?.status}\n${err?.message}`);
       }
     });
   }
@@ -206,22 +293,18 @@ export class SoaPageComponent {
       catOTHERS: false,
       preparedBy: 'Engr. Francis T. M. Alfanta',
       approvedBy: 'Engr. William Ramon Luber',
-      totalAmount: 0
+      totalAmount: 0,
     });
-    this.savedHeaderId = null;
   }
 
   printSoa(): void { console.log('printSoa'); }
   printOp(): void { console.log('printOp'); }
 
-
-  // ✅ UPDATED (added export call; keeps your old log)
   assessmentOnly(): void {
-  if (!this.assess) {
-    alert('Assessment component not found. Check <app-assessment #assess> in soa-page.component.html');
-    return;
+    if (!this.assess) {
+      alert('Assessment component not found.');
+      return;
+    }
+    this.assess.exportPDF();
   }
-  this.assess.exportPDF();
-}
-
 }

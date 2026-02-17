@@ -1,9 +1,9 @@
 import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { SoaService, TechSOAUpsertDto } from '../soa.service';
-import { Subject, combineLatest, of } from 'rxjs';
-import { startWith, takeUntil, debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
+import { SoaService } from '../soa.service';
+import { Subject, combineLatest } from 'rxjs';
+import { startWith, takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-soa-left-form',
@@ -22,8 +22,8 @@ export class SoaLeftFormComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadPayees();
-    this.setupYearsAndPeriodCovered();
-    this.setupAutoFillByLicensee();
+    this.setupPeriodCovered();
+    this.setupPayeeSelectionAutoFill();
   }
 
   ngOnDestroy(): void {
@@ -32,34 +32,90 @@ export class SoaLeftFormComponent implements OnInit, OnDestroy {
   }
 
   // =========================
-  // DROPDOWN: load Licensee names
+  // DROPDOWN PAYEES
   // =========================
   private loadPayees(): void {
-    this.soaService.getPayeeNames()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (rows: string[]) => {
-          const cleaned = (rows ?? [])
-            .map(x => (x ?? '').toString().trim())
-            .filter(x => x.length > 0);
+    this.soaService.getPayeeNames().subscribe({
+      next: (rows) => {
+        const cleaned = (rows ?? [])
+          .map(x => (x ?? '').trim())
+          .filter(x => x.length > 0);
 
-          this.payees = Array.from(new Set(cleaned)).sort((a, b) => a.localeCompare(b));
-        },
-        error: (err: any) => {
-          console.error('❌ Failed to load licensees:', err);
-          this.payees = [];
-        },
-      });
+        this.payees = Array.from(new Set(cleaned)).sort((a, b) => a.localeCompare(b));
+      },
+      error: (err) => {
+        console.error('❌ Failed to load licensees:', err);
+        this.payees = [];
+      },
+    });
   }
 
   // =========================
-  // COMPUTE: periodYears + periodCovered(year number)
+  // AUTO-FILL WHEN PAYEE CHANGES
   // =========================
-  private setupYearsAndPeriodCovered(): void {
+  private setupPayeeSelectionAutoFill(): void {
+    const payeeCtrl = this.form.get('payeeName');
+    if (!payeeCtrl) return;
+
+    payeeCtrl.valueChanges
+      .pipe(startWith(payeeCtrl.value), takeUntil(this.destroy$))
+      .subscribe((name: string) => {
+        const n = (name ?? '').trim();
+        if (!n) return;
+
+        this.soaService.getByLicensee(n).subscribe({
+          next: (dto: any) => {
+            // patch safe fields only
+            this.form.patchValue(
+              {
+                address: dto?.address ?? '',
+                particulars: dto?.particulars ?? '',
+                date: dto?.dateIssued ? dto.dateIssued.slice(0, 10) : this.form.get('date')?.value,
+
+                // derive PeriodFrom/To from PeriodCovered "YYYY-YYYY"
+                ...(this.periodCoveredToDates(dto?.periodCovered)),
+              },
+              { emitEvent: false }
+            );
+
+            // recompute years + covered after setting dates
+            this.form.get('periodFrom')?.updateValueAndValidity({ emitEvent: true });
+            this.form.get('periodTo')?.updateValueAndValidity({ emitEvent: true });
+          },
+          error: (err) => console.warn('⚠️ No details found for licensee:', n, err),
+        });
+      });
+  }
+
+  private periodCoveredToDates(periodCovered: any): { periodFrom?: string; periodTo?: string } {
+    const s = (periodCovered ?? '').toString().trim();
+    // expect "2024-2025"
+    const m = /^(\d{4})-(\d{4})$/.exec(s);
+    if (!m) return {};
+
+    const y1 = Number(m[1]);
+    const y2 = Number(m[2]);
+    if (!y1 || !y2) return {};
+
+    // default Jan 1 and Dec 31
+    const from = `${y1}-01-01`;
+    const to = `${y2}-12-31`;
+    return { periodFrom: from, periodTo: to };
+  }
+
+  // =========================
+  // PERIOD COVERED COMPUTATION
+  // periodYears = display
+  // periodCovered = store "YYYY-YYYY"
+  // =========================
+  private setupPeriodCovered(): void {
     const fromCtrl = this.form.get('periodFrom');
     const toCtrl = this.form.get('periodTo');
     const yearsCtrl = this.form.get('periodYears');
-    const coveredCtrl = this.form.get('periodCovered'); // number
+
+    // NOTE: even if you don't have formControlName="periodCovered" in HTML,
+    // we can still keep the control in the FormGroup for saving.
+    const coveredCtrl = this.form.get('periodCovered');
 
     if (!fromCtrl || !toCtrl || !yearsCtrl || !coveredCtrl) return;
 
@@ -67,19 +123,20 @@ export class SoaLeftFormComponent implements OnInit, OnDestroy {
       fromCtrl.valueChanges.pipe(startWith(fromCtrl.value)),
       toCtrl.valueChanges.pipe(startWith(toCtrl.value)),
     ])
-    .pipe(takeUntil(this.destroy$))
-    .subscribe(([from, to]) => {
-      yearsCtrl.setValue(this.computeYears(from, to), { emitEvent: false });
-
-      // ✅ store start year as number (or null)
-      coveredCtrl.setValue(this.extractYear(from), { emitEvent: false });
-    });
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(([from, to]) => {
+        yearsCtrl.setValue(this.computeYears(from, to), { emitEvent: false });
+        coveredCtrl.setValue(this.computeYearRange(from, to), { emitEvent: false });
+      });
   }
 
-  private extractYear(v: any): number | null {
-    if (!v) return null;
-    const d = new Date(v);
-    return isNaN(d.getTime()) ? null : d.getFullYear();
+  private computeYearRange(from: any, to: any): string {
+    if (!from || !to) return '';
+    const f = new Date(from);
+    const t = new Date(to);
+    if (isNaN(f.getTime()) || isNaN(t.getTime())) return '';
+    if (t < f) return '';
+    return `${f.getFullYear()}-${t.getFullYear()}`;
   }
 
   private computeYears(from: any, to: any): number {
@@ -91,65 +148,7 @@ export class SoaLeftFormComponent implements OnInit, OnDestroy {
 
     const diffMs = t.getTime() - f.getTime();
     const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    return Number((diffDays / 365.25).toFixed(2));
-  }
-
-  // =========================
-  // AUTOFILL: select licensee -> fill date/address/particulars/period
-  // =========================
-  private setupAutoFillByLicensee(): void {
-    const licenseeCtrl = this.form.get('payeeName');
-    if (!licenseeCtrl) return;
-
-    licenseeCtrl.valueChanges
-      .pipe(
-        startWith(licenseeCtrl.value),
-        debounceTime(200),
-        distinctUntilChanged(),
-        switchMap((name) => {
-          const n = (name ?? '').toString().trim();
-          if (!n) return of(null);
-
-          return this.soaService.getByLicensee(n).pipe(
-            catchError((err: any) => {
-              console.error('❌ Failed to fetch licensee details:', err);
-              return of(null);
-            })
-          );
-        }),
-        takeUntil(this.destroy$)
-      )
-      .subscribe((dto: TechSOAUpsertDto | null) => {
-        if (!dto) return;
-
-        const dateOnly = dto.dateIssued ? dto.dateIssued.slice(0, 10) : '';
-
-        // API can send periodFrom/periodTo, but if not, derive from year number
-        const from = dto.periodFrom ? dto.periodFrom.slice(0, 10) : this.yearToFrom(dto.periodCovered ?? null);
-        const to   = dto.periodTo   ? dto.periodTo.slice(0, 10)   : this.yearToTo(dto.periodCovered ?? null);
-
-        this.form.patchValue(
-          {
-            date: dateOnly,
-            address: dto.address ?? '',
-            particulars: dto.particulars ?? '',
-
-            periodFrom: from,
-            periodTo: to,
-
-            // keep year as number
-            periodCovered: dto.periodCovered ?? null,
-          },
-          { emitEvent: true } // ✅ triggers years computation
-        );
-      });
-  }
-
-  private yearToFrom(year: number | null): string {
-    return year ? `${year}-01-01` : '';
-  }
-
-  private yearToTo(year: number | null): string {
-    return year ? `${year}-12-31` : '';
+    const years = diffDays / 365.25;
+    return Number(years.toFixed(2));
   }
 }

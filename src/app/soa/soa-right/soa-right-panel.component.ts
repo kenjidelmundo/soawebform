@@ -21,6 +21,28 @@ export class SoaRightPanelComponent {
 
   constructor(private soaPdf: SoaPdfService) {}
 
+  // ✅ ADDED: SAVE function (does not touch anything else)
+  // NOTE: This will only run if your HTML calls (click)="save()".
+  // If your HTML still uses (click)="onSave.emit()", parent save still works,
+  // but this method will not be used.
+  save(): void {
+    const v: any = this.form?.value ?? {};
+    const id = Number(v.id || 0);
+
+    if (!this.form) {
+      alert('Form not found.');
+      return;
+    }
+
+    // If you want UPDATE-only behavior, require an ID:
+    if (!id || id <= 0) {
+      alert('No ID found. Load an existing record first.');
+      return;
+    }
+
+    this.onSave.emit();
+  }
+
   printSOAPreview(): void {
     const v: any = this.form?.value ?? {};
 
