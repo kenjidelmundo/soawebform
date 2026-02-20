@@ -20,10 +20,10 @@ import { AssessmentComponent } from './soa-assessment-form/assessment.component'
     SoaLeftFormComponent,
     SoaRightPanelComponent,
     SoaFeesComponent,
-    AssessmentComponent
+    AssessmentComponent,
   ],
   templateUrl: './soa-page.component.html',
-  styleUrls: ['./soa-page.component.css']
+  styleUrls: ['./soa-page.component.css'],
 })
 export class SoaPageComponent {
   form: FormGroup;
@@ -34,14 +34,20 @@ export class SoaPageComponent {
   constructor(private fb: FormBuilder, private soaService: SoaService) {
     this.form = this.fb.group({
       // ===== Header/basic
-      id: [''],
+      id: [0], // optional display only
       isMobileLicensing: [false],
       seriesNumber: [''],
       soaSeries: [''],
 
       // ===== Header UI
       date: [null],
+
+      // ✅ payeeName holds SELECTED DB ID (dropdown value = p.id)
       payeeName: [''],
+
+      // ✅ store string licensee for backend payload
+      licensee: [''],
+
       address: [''],
       particulars: [''],
       periodFrom: [null],
@@ -123,107 +129,32 @@ export class SoaPageComponent {
     return d.toISOString();
   }
 
-  private toYmd(iso: any): string | null {
-    if (!iso) return null;
-    if (typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}/.test(iso)) return iso.substring(0, 10);
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return null;
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
   // -------------------------
-  // LOAD header first (by ID)
-  // -------------------------
-  loadHeader(id: number): void {
-    if (!id || id <= 0) {
-      alert('Enter a valid ID.');
-      return;
-    }
-
-    this.soaService.getById(id).subscribe({
-      next: (data: any) => {
-        // Patch header first (like you want)
-        this.form.patchValue({
-          id: data.id ?? id,
-          date: this.toYmd(data.dateIssued),
-          payeeName: data.licensee ?? '',
-          address: data.address ?? '',
-          particulars: data.particulars ?? '',
-          periodFrom: this.toYmd(data.periodFrom),
-          periodTo: this.toYmd(data.periodTo),
-          periodYears: data.periodYears ?? 0,
-          periodCovered: data.periodCovered ?? '',
-
-          // optional: also load fees if you want them shown
-          licPermitToPurchase: data.rslPurchase ?? 0,
-          licFilingFee: data.rslFillingFee ?? 0,
-          licPermitToPossess: data.rslPossess ?? 0,
-          licConstructionPermitFee: data.rslConstruction ?? 0,
-          licRadioStationLicense: data.rslRadioStation ?? 0,
-          licInspectionFee: data.rslInspection ?? 0,
-          licSUF: data.rslSUF ?? 0,
-          licSurcharges: data.rslSurcharge ?? 0,
-
-          perPermitFees: data.permitPermitFees ?? 0,
-          perInspectionFee: data.permitInspection ?? 0,
-          perFilingFee: data.permitFillingFee ?? 0,
-          perSurcharges: data.permitSurcharge ?? 0,
-
-          amRadioStationLicense: data.rocRadioStation ?? 0,
-          amRadioOperatorsCert: data.rocOperatorFee ?? 0,
-          amApplicationFee: data.rocApplicationFee ?? 0,
-          amFilingFee: data.rocFillingFee ?? 0,
-          amSeminarFee: data.rocSeminarFee ?? 0,
-          amSurcharges: data.rocSurcharge ?? 0,
-
-          appRegistrationFee: data.otherRegistration ?? 0,
-          appSupervisionRegulationFee: data.otherSupervisionRegulation ?? 0,
-          appVerificationAuthFee: data.otherVerificationAuthentication ?? 0,
-          appExaminationFee: data.otherExamination ?? 0,
-          appClearanceCertificationFee: data.otherClearanceCertification ?? 0,
-          appModificationFee: data.otherModification ?? 0,
-          appMiscIncome: data.otherMiscIncome ?? 0,
-          appOthers: data.otherOthers ?? 0,
-
-          dst: data.dst ?? 0,
-          totalAmount: data.totalAmount ?? 0,
-        }, { emitEvent: false });
-
-        console.log('✅ Loaded:', data);
-      },
-      error: (err) => {
-        console.error('❌ Load failed:', err);
-        alert(`❌ Load failed: ${err?.status} ${err?.statusText}`);
-      }
-    });
-  }
-
-  // -------------------------
-  // SAVE (UPDATE existing)
+  // SAVE = UPDATE ONLY
+  // updates the SELECTED record id from dropdown (payeeName)
   // -------------------------
   save(): void {
-    const v: any = this.form.value;
-    const id = Number(v.id || 0);
+    const v: any = this.form.value ?? {};
+    const selectedId = Number(v.payeeName || 0);
 
-    if (!id || id <= 0) {
-      alert('❌ No ID found. Load an existing record first.');
+    if (!selectedId || selectedId <= 0) {
+      alert('❌ Select a record first (Name of Payee).');
       return;
     }
 
-    // Backend field names MUST match Swagger
     const payload: any = {
-      // header
       dateIssued: this.toIsoDate(v.date),
-      licensee: (v.payeeName ?? '') === '' ? null : v.payeeName,
-      address: (v.address ?? '') === '' ? null : v.address,
-      particulars: (v.particulars ?? '') === '' ? null : v.particulars,
+
+      // ✅ backend expects string licensee
+      licensee: (v.licensee ?? '') === '' ? null : String(v.licensee),
+
+      address: (v.address ?? '') === '' ? null : String(v.address),
+      particulars: (v.particulars ?? '') === '' ? null : String(v.particulars),
+
       periodFrom: this.toIsoDate(v.periodFrom),
       periodTo: this.toIsoDate(v.periodTo),
       periodYears: Number(v.periodYears || 0),
-      periodCovered: (v.periodCovered ?? '') === '' ? null : v.periodCovered,
+      periodCovered: (v.periodCovered ?? '') === '' ? null : String(v.periodCovered),
 
       // rsl*
       rslPurchase: Number(v.licPermitToPurchase || 0),
@@ -238,14 +169,14 @@ export class SoaPageComponent {
       // permit*
       permitPermitFees: Number(v.perPermitFees || 0),
       permitInspection: Number(v.perInspectionFee || 0),
-      permitFillingFee: Number(v.perFilingFee || 0),
+      permitFilingFee: Number(v.perFilingFee || 0),
       permitSurcharge: Number(v.perSurcharges || 0),
 
       // roc*
       rocRadioStation: Number(v.amRadioStationLicense || 0),
       rocOperatorFee: Number(v.amRadioOperatorsCert || 0),
       rocApplicationFee: Number(v.amApplicationFee || 0),
-      rocFillingFee: Number(v.amFilingFee || 0),
+      rocFilingFee: Number(v.amFilingFee || 0),
       rocSeminarFee: Number(v.amSeminarFee || 0),
       rocSurcharge: Number(v.amSurcharges || 0),
 
@@ -265,36 +196,103 @@ export class SoaPageComponent {
 
     this.saving = true;
 
-    this.soaService.update(id, payload).subscribe({
-      next: (res: any) => {
+    // ✅ ONLY PUT — NEVER POST
+    this.soaService.update(selectedId, payload).subscribe({
+      next: () => {
         this.saving = false;
-        console.log('✅ Updated:', res);
-        alert(`✅ Updated record ID: ${id}`);
+        alert(`✅ Updated record ID: ${selectedId}`);
       },
       error: (err: any) => {
         this.saving = false;
         console.error('❌ Update failed:', err);
         alert(`❌ Update failed\nStatus: ${err?.status}\n${err?.message}`);
-      }
+      },
     });
   }
 
+  // -------------------------
+  // NEW RECORD = CLEAN FORM (NO CREATE)
+  // keeps dropdown list; user can select another record after
+  // -------------------------
   newRecord(): void {
-    this.form.reset({
-      periodYears: 0,
-      txnNew: false,
-      txnRenew: false,
-      txnModification: false,
-      txnCO: false,
-      txnCV: false,
-      catROC: false,
-      catMS: false,
-      catMA: false,
-      catOTHERS: false,
-      preparedBy: 'Engr. Francis T. M. Alfanta',
-      approvedBy: 'Engr. William Ramon Luber',
-      totalAmount: 0,
-    });
+    this.form.reset(
+      {
+        id: 0,
+        isMobileLicensing: false,
+        seriesNumber: '',
+        soaSeries: '',
+
+        date: null,
+        payeeName: '',   // ✅ clear selected record
+        licensee: '',    // ✅ clear name string
+        address: '',
+        particulars: '',
+
+        periodFrom: null,
+        periodTo: null,
+        periodYears: 0,
+        periodCovered: '',
+
+        txnNew: false,
+        txnRenew: false,
+        txnModification: false,
+        txnCO: false,
+        txnCV: false,
+        catROC: false,
+        catMS: false,
+        catMA: false,
+        catOTHERS: false,
+        remarks: '',
+        opAssessmentOnly: false,
+        opEndorsedForPayment: false,
+        opNotePayOnOrBefore: '',
+        preparedBy: 'Engr. Francis T. M. Alfanta',
+        approvedBy: 'Engr. William Ramon Luber',
+        opSeries: '',
+        orNumber: '',
+        datePaid: null,
+        accounting: '',
+        accountingPosition: '',
+
+        licPermitToPurchase: 0,
+        licFilingFee: 0,
+        licPermitToPossess: 0,
+        licConstructionPermitFee: 0,
+        licRadioStationLicense: 0,
+        licInspectionFee: 0,
+        licSUF: 0,
+        licFinesPenalties: 0,
+        licSurcharges: 0,
+
+        appRegistrationFee: 0,
+        appSupervisionRegulationFee: 0,
+        appVerificationAuthFee: 0,
+        appExaminationFee: 0,
+        appClearanceCertificationFee: 0,
+        appModificationFee: 0,
+        appMiscIncome: 0,
+        appOthers: 0,
+
+        perPermitFees: 0,
+        perInspectionFee: 0,
+        perFilingFee: 0,
+        perSurcharges: 0,
+
+        amRadioStationLicense: 0,
+        amRadioOperatorsCert: 0,
+        amApplicationFee: 0,
+        amFilingFee: 0,
+        amSeminarFee: 0,
+        amSurcharges: 0,
+
+        dst: 0,
+        totalAmount: 0,
+      },
+      { emitEvent: false }
+    );
+
+    // allow selecting another record and triggering auto-fill
+    this.form.get('payeeName')?.updateValueAndValidity({ emitEvent: true });
   }
 
   printSoa(): void { console.log('printSoa'); }

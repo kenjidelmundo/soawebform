@@ -1,7 +1,7 @@
 <div class="hdr" [formGroup]="form">
   <div class="idArea">
   <div class="idLbl">ID:</div>
-  <div class="idDisp">{{ form.get('id')?.value }}</div>
+  <div class="idDisp">{{ form.get('payeeName')?.value || 0 }}</div>
   </div>
 
 

@@ -18,6 +18,8 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { AddressDialogComponent, AddressProvince } from './address-dialog.component';
 import { ParticularsDialogComponent } from './particulars-dialog.component';
 
+type PayeeItem = { id: number; name: string };
+
 @Component({
   selector: 'app-soa-left-form',
   standalone: true,
@@ -28,14 +30,16 @@ import { ParticularsDialogComponent } from './particulars-dialog.component';
 export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   @Input() form!: FormGroup;
 
-  payees: string[] = [];
+  // ✅ CHANGED: dropdown now uses objects {id,name}
+  payees: PayeeItem[] = [];
+
   private destroy$ = new Subject<void>();
 
   // ✅ listeners
   private unlistenAddressClick?: () => void;
   private unlistenPartClick?: () => void;
 
-  // ✅ prevent re-open loop (open while already open)
+  // ✅ prevent re-open loop
   private addressDialogOpen = false;
   private particularsDialogOpen = false;
 
@@ -63,9 +67,9 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.loadPayees();
+    this.loadPayees();                  // ✅ GET /api/TechSOA -> dropdown list
     this.setupPeriodCovered();
-    this.setupPayeeSelectionAutoFill();
+    this.setupPayeeSelectionAutoFill(); // ✅ Selected ID -> GET /api/TechSOA/{id}
   }
 
   // ✅ CLICK ONLY to open dialogs
@@ -82,10 +86,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       this.unlistenAddressClick = this.renderer.listen(addressInput, 'click', (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-
-        // ✅ ignore clicks during cooldown
         if (Date.now() < this.addressCoolDownUntil) return;
-
         this.openAddressDialog();
       });
     }
@@ -102,10 +103,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       this.unlistenPartClick = this.renderer.listen(partInput, 'click', (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-
-        // ✅ ignore clicks during cooldown
         if (Date.now() < this.particularsCoolDownUntil) return;
-
         this.openParticularsDialog();
       });
     }
@@ -120,42 +118,131 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // =========================
+  // PAYEES (GET ALL)
+  // ✅ keeps selected record visible even after update
+  // =========================
+  private loadPayees(): void {
+    // ✅ preserve current selected id
+    const selectedId = Number(this.form?.get('payeeName')?.value || 0);
+
+    this.soaService.getAll().subscribe({
+      next: (rows: any[]) => {
+        const list: PayeeItem[] = (rows ?? [])
+          .map((r) => {
+            const id = Number(r?.id ?? r?.ID ?? r?.Id);
+            const name = String(r?.licensee ?? r?.Licensee ?? r?.LICENSEE ?? '').trim();
+            return { id, name };
+          })
+          .filter((x) => x.id > 0 && x.name.length > 0);
+
+        // ✅ unique by id (IMPORTANT: do not unique by name, to avoid “disappearing”)
+        const uniq = new Map<number, PayeeItem>();
+        for (const item of list) {
+          if (!uniq.has(item.id)) uniq.set(item.id, item);
+        }
+
+        // ✅ sort by name
+        this.payees = Array.from(uniq.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+        // ✅ keep selection if still exists
+        if (selectedId > 0) {
+          const stillExists = this.payees.some(p => p.id === selectedId);
+          if (stillExists) {
+            this.form.get('payeeName')?.setValue(selectedId, { emitEvent: false });
+          }
+        }
+      },
+      error: (err) => {
+        console.error('❌ Failed to load payees from GET /api/TechSOA:', err);
+        this.payees = [];
+      },
+    });
+  }
+
+  // =========================
+  // AUTO-FILL WHEN PAYEE CHANGES
+  // ✅ payeeName is ID now
+  // =========================
+  private setupPayeeSelectionAutoFill(): void {
+    const payeeCtrl = this.form.get('payeeName');
+    if (!payeeCtrl) return;
+
+    payeeCtrl.valueChanges
+      .pipe(startWith(payeeCtrl.value), takeUntil(this.destroy$))
+      .subscribe((val: any) => {
+        const id = Number(val || 0);
+        if (!id || id <= 0) return;
+
+        this.soaService.getById(id).subscribe({
+          next: (dto: any) => {
+            // ✅ store id for display/debug if you still show form.id somewhere
+            const realId = Number(dto?.id ?? dto?.ID ?? dto?.Id ?? id);
+
+            this.form.patchValue(
+              {
+                id: realId, // optional
+
+                // ✅ IMPORTANT: keep string licensee in separate control (used by SAVE payload)
+                licensee: String(dto?.licensee ?? dto?.Licensee ?? ''),
+
+                address: String(dto?.address ?? dto?.Address ?? ''),
+                particulars: String(dto?.particulars ?? dto?.Particulars ?? ''),
+
+                date: (dto?.dateIssued ?? dto?.DateIssued)
+                  ? String(dto?.dateIssued ?? dto?.DateIssued).slice(0, 10)
+                  : this.form.get('date')?.value,
+
+                ...(this.periodCoveredToDates(dto?.periodCovered ?? dto?.PeriodCovered)),
+              },
+              { emitEvent: false }
+            );
+
+            this.form.get('periodFrom')?.updateValueAndValidity({ emitEvent: true });
+            this.form.get('periodTo')?.updateValueAndValidity({ emitEvent: true });
+          },
+          error: (err) => console.warn('⚠️ No details found for id:', id, err),
+        });
+      });
+  }
+
+  private periodCoveredToDates(periodCovered: any): { periodFrom?: string; periodTo?: string } {
+    const s = (periodCovered ?? '').toString().trim();
+    const m = /^(\d{4})-(\d{4})$/.exec(s);
+    if (!m) return {};
+    const y1 = Number(m[1]);
+    const y2 = Number(m[2]);
+    if (!y1 || !y2) return {};
+    return { periodFrom: `${y1}-01-01`, periodTo: `${y2}-12-31` };
+  }
+
+  // =========================
   // ADDRESS DIALOG
   // =========================
   private openAddressDialog(): void {
-    // ✅ already open? do nothing
     if (this.addressDialogOpen) return;
     this.addressDialogOpen = true;
 
     const ref = this.dialog.open(AddressDialogComponent, {
       width: '560px',
       disableClose: true,
-
-      // ✅ VERY IMPORTANT (prevents focus bounce)
       autoFocus: false,
       restoreFocus: false,
-
       data: { provinces: this.addressData },
     });
 
     ref.afterClosed().subscribe((res) => {
-      // ✅ set cooldown first, then release open flag
       this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
       this.addressDialogOpen = false;
 
-      // ✅ BLUR the address input so it won't trigger weird focus/click chains
       const addressInput = this.el.nativeElement.querySelector(
         'input[formControlName="address"]'
       ) as HTMLInputElement | null;
       addressInput?.blur();
 
-      // Cancel => close only
       if (!res) return;
 
-      // Selected => patch value
       this.form.patchValue({ address: res.fullAddress }, { emitEvent: true });
 
-      // OPTIONAL extra controls if you have them in formGroup
       this.patchIfExists('province', res.province);
       this.patchIfExists('townCity', res.townCity);
       this.patchIfExists('brgy', res.brgy);
@@ -173,8 +260,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const ref = this.dialog.open(ParticularsDialogComponent, {
       width: '460px',
       disableClose: true,
-
-      // ✅ VERY IMPORTANT (prevents focus bounce)
       autoFocus: false,
       restoreFocus: false,
     });
@@ -183,16 +268,13 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       this.particularsCoolDownUntil = Date.now() + this.COOLDOWN_MS;
       this.particularsDialogOpen = false;
 
-      // ✅ blur input so it won’t immediately re-open
       const partInput = this.el.nativeElement.querySelector(
         'input[formControlName="particulars"]'
       ) as HTMLInputElement | null;
       partInput?.blur();
 
-      // Cancel => close only
       if (!res) return;
 
-      // Button clicked => patch particulars then close (dialog already closed)
       this.form.patchValue({ particulars: res.value }, { emitEvent: true });
     });
   }
@@ -200,73 +282,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private patchIfExists(ctrlName: string, value: any): void {
     const c = this.form.get(ctrlName);
     if (c) c.setValue(value, { emitEvent: false });
-  }
-
-  // =========================
-  // DROPDOWN PAYEES
-  // =========================
-  private loadPayees(): void {
-    this.soaService.getPayeeNames().subscribe({
-      next: (rows) => {
-        const cleaned = (rows ?? [])
-          .map((x) => (x ?? '').trim())
-          .filter((x) => x.length > 0);
-
-        this.payees = Array.from(new Set(cleaned)).sort((a, b) => a.localeCompare(b));
-      },
-      error: (err) => {
-        console.error('❌ Failed to load licensees:', err);
-        this.payees = [];
-      },
-    });
-  }
-
-  // =========================
-  // AUTO-FILL WHEN PAYEE CHANGES
-  // =========================
-  private setupPayeeSelectionAutoFill(): void {
-    const payeeCtrl = this.form.get('payeeName');
-    if (!payeeCtrl) return;
-
-    payeeCtrl.valueChanges
-      .pipe(startWith(payeeCtrl.value), takeUntil(this.destroy$))
-      .subscribe((name: string) => {
-        const n = (name ?? '').trim();
-        if (!n) return;
-
-        this.soaService.getByLicensee(n).subscribe({
-          next: (dto: any) => {
-            this.form.patchValue(
-              {
-                address: dto?.address ?? '',
-                particulars: dto?.particulars ?? '',
-                date: dto?.dateIssued
-                  ? dto.dateIssued.slice(0, 10)
-                  : this.form.get('date')?.value,
-
-                ...(this.periodCoveredToDates(dto?.periodCovered)),
-              },
-              { emitEvent: false }
-            );
-
-            this.form.get('periodFrom')?.updateValueAndValidity({ emitEvent: true });
-            this.form.get('periodTo')?.updateValueAndValidity({ emitEvent: true });
-          },
-          error: (err) => console.warn('⚠️ No details found for licensee:', n, err),
-        });
-      });
-  }
-
-  private periodCoveredToDates(periodCovered: any): { periodFrom?: string; periodTo?: string } {
-    const s = (periodCovered ?? '').toString().trim();
-    const m = /^(\d{4})-(\d{4})$/.exec(s);
-    if (!m) return {};
-
-    const y1 = Number(m[1]);
-    const y2 = Number(m[2]);
-    if (!y1 || !y2) return {};
-
-    return { periodFrom: `${y1}-01-01`, periodTo: `${y2}-12-31` };
   }
 
   // =========================
