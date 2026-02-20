@@ -30,7 +30,7 @@ type PayeeItem = { id: number; name: string };
 export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   @Input() form!: FormGroup;
 
-  // ✅ CHANGED: dropdown now uses objects {id,name}
+  // ✅ dropdown now uses objects {id,name}
   payees: PayeeItem[] = [];
 
   private destroy$ = new Subject<void>();
@@ -67,14 +67,12 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.loadPayees();                  // ✅ GET /api/TechSOA -> dropdown list
+    this.loadPayees();                  // ✅ load dropdown list
     this.setupPeriodCovered();
-    this.setupPayeeSelectionAutoFill(); // ✅ Selected ID -> GET /api/TechSOA/{id}
+    this.setupPayeeSelectionAutoFill(); // ✅ selected id -> GET by id
   }
 
-  // ✅ CLICK ONLY to open dialogs
   ngAfterViewInit(): void {
-    // ADDRESS input
     const addressInput = this.el.nativeElement.querySelector(
       'input[formControlName="address"]'
     ) as HTMLInputElement | null;
@@ -91,7 +89,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }
 
-    // PARTICULARS input
     const partInput = this.el.nativeElement.querySelector(
       'input[formControlName="particulars"]'
     ) as HTMLInputElement | null;
@@ -112,17 +109,15 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.unlistenAddressClick?.();
     this.unlistenPartClick?.();
-
     this.destroy$.next();
     this.destroy$.complete();
   }
 
   // =========================
   // PAYEES (GET ALL)
-  // ✅ keeps selected record visible even after update
+  // ✅ keep selected ID visible even after update
   // =========================
   private loadPayees(): void {
-    // ✅ preserve current selected id
     const selectedId = Number(this.form?.get('payeeName')?.value || 0);
 
     this.soaService.getAll().subscribe({
@@ -135,25 +130,21 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           })
           .filter((x) => x.id > 0 && x.name.length > 0);
 
-        // ✅ unique by id (IMPORTANT: do not unique by name, to avoid “disappearing”)
+        // ✅ unique by id
         const uniq = new Map<number, PayeeItem>();
         for (const item of list) {
           if (!uniq.has(item.id)) uniq.set(item.id, item);
         }
 
-        // ✅ sort by name
         this.payees = Array.from(uniq.values()).sort((a, b) => a.name.localeCompare(b.name));
 
-        // ✅ keep selection if still exists
-        if (selectedId > 0) {
-          const stillExists = this.payees.some(p => p.id === selectedId);
-          if (stillExists) {
-            this.form.get('payeeName')?.setValue(selectedId, { emitEvent: false });
-          }
+        // ✅ re-apply selection if still exists
+        if (selectedId > 0 && this.payees.some(p => p.id === selectedId)) {
+          this.form.get('payeeName')?.setValue(selectedId, { emitEvent: false });
         }
       },
       error: (err) => {
-        console.error('❌ Failed to load payees from GET /api/TechSOA:', err);
+        console.error('❌ Failed to load payees:', err);
         this.payees = [];
       },
     });
@@ -161,7 +152,8 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // =========================
   // AUTO-FILL WHEN PAYEE CHANGES
-  // ✅ payeeName is ID now
+  // ✅ payeeName is ID ONLY
+  // ✅ DO NOT overwrite payeeName with string
   // =========================
   private setupPayeeSelectionAutoFill(): void {
     const payeeCtrl = this.form.get('payeeName');
@@ -175,30 +167,24 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
         this.soaService.getById(id).subscribe({
           next: (dto: any) => {
-            // ✅ store id for display/debug if you still show form.id somewhere
             const realId = Number(dto?.id ?? dto?.ID ?? dto?.Id ?? id);
 
+            // ✅ IMPORTANT: keep payeeName as ID
+            // ✅ licensee holds the string
             this.form.patchValue(
               {
-                id: realId, // optional
-
-                // ✅ IMPORTANT: keep string licensee in separate control (used by SAVE payload)
-                licensee: String(dto?.licensee ?? dto?.Licensee ?? ''),
-
+                id: realId,
+                licensee: String(dto?.licensee ?? dto?.Licensee ?? '').trim(),
                 address: String(dto?.address ?? dto?.Address ?? ''),
                 particulars: String(dto?.particulars ?? dto?.Particulars ?? ''),
-
                 date: (dto?.dateIssued ?? dto?.DateIssued)
                   ? String(dto?.dateIssued ?? dto?.DateIssued).slice(0, 10)
                   : this.form.get('date')?.value,
 
                 ...(this.periodCoveredToDates(dto?.periodCovered ?? dto?.PeriodCovered)),
               },
-              { emitEvent: false }
+              { emitEvent: true } // ✅ allow fees computations to react
             );
-
-            this.form.get('periodFrom')?.updateValueAndValidity({ emitEvent: true });
-            this.form.get('periodTo')?.updateValueAndValidity({ emitEvent: true });
           },
           error: (err) => console.warn('⚠️ No details found for id:', id, err),
         });
@@ -242,11 +228,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       if (!res) return;
 
       this.form.patchValue({ address: res.fullAddress }, { emitEvent: true });
-
-      this.patchIfExists('province', res.province);
-      this.patchIfExists('townCity', res.townCity);
-      this.patchIfExists('brgy', res.brgy);
-      this.patchIfExists('addressLine4', res.line4);
     });
   }
 
@@ -277,11 +258,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
       this.form.patchValue({ particulars: res.value }, { emitEvent: true });
     });
-  }
-
-  private patchIfExists(ctrlName: string, value: any): void {
-    const c = this.form.get(ctrlName);
-    if (c) c.setValue(value, { emitEvent: false });
   }
 
   // =========================

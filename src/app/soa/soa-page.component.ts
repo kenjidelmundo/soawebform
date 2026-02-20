@@ -34,7 +34,7 @@ export class SoaPageComponent {
   constructor(private fb: FormBuilder, private soaService: SoaService) {
     this.form = this.fb.group({
       // ===== Header/basic
-      id: [0], // optional display only
+      id: [0], // display only
       isMobileLicensing: [false],
       seriesNumber: [''],
       soaSeries: [''],
@@ -104,7 +104,7 @@ export class SoaPageComponent {
       perFilingFee: [0],
       perSurcharges: [0],
 
-      // ===== MID ROC
+      // ===== MID AMATEUR & ROC BLOCK (UI fields)
       amRadioStationLicense: [0],
       amRadioOperatorsCert: [0],
       amApplicationFee: [0],
@@ -115,6 +115,23 @@ export class SoaPageComponent {
       // DST + TOTAL
       dst: [0],
       totalAmount: [0],
+
+      // ==================================================
+      // ✅ REQUIRED HIDDEN CONTROLS (for SoaFees computation)
+      // ==================================================
+      // ROC selectors
+      amType: [''],        // ex: COMM-NEW, SROP-NEW, etc
+      rocClass: [''],      // ex: RTG 1st, PHN 2nd, etc
+      rocYears: [1],       // ✅ default 1 (NOT 0)
+
+      // AMATEUR selectors
+      amateurType: [''],   // ✅ REQUIRED (missing in your code)
+      amYears: [1],        // ✅ default 1 (NOT 0)
+
+      // Ship selectors (if you use)
+      shipType: [''],
+      shipYears: [1],      // ✅ default 1
+      shipUnits: [1],      // ✅ default 1
     });
   }
 
@@ -123,7 +140,13 @@ export class SoaPageComponent {
   // -------------------------
   private toIsoDate(x: any): string | null {
     if (x === null || x === undefined || x === '') return null;
-    if (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)) return x;
+
+    // already YYYY-MM-DD
+    if (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)) {
+      const d = new Date(x);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    }
+
     const d = new Date(x);
     if (isNaN(d.getTime())) return null;
     return d.toISOString();
@@ -131,9 +154,10 @@ export class SoaPageComponent {
 
   // -------------------------
   // SAVE = UPDATE ONLY
-  // updates the SELECTED record id from dropdown (payeeName)
   // -------------------------
   save(): void {
+    if (this.saving) return;
+
     const v: any = this.form.value ?? {};
     const selectedId = Number(v.payeeName || 0);
 
@@ -145,9 +169,7 @@ export class SoaPageComponent {
     const payload: any = {
       dateIssued: this.toIsoDate(v.date),
 
-      // ✅ backend expects string licensee
-      licensee: (v.licensee ?? '') === '' ? null : String(v.licensee),
-
+      licensee: (v.licensee ?? '') === '' ? null : String(v.licensee).trim(),
       address: (v.address ?? '') === '' ? null : String(v.address),
       particulars: (v.particulars ?? '') === '' ? null : String(v.particulars),
 
@@ -169,14 +191,14 @@ export class SoaPageComponent {
       // permit*
       permitPermitFees: Number(v.perPermitFees || 0),
       permitInspection: Number(v.perInspectionFee || 0),
-      permitFilingFee: Number(v.perFilingFee || 0),
+      permitFillingFee: Number(v.perFilingFee || 0),
       permitSurcharge: Number(v.perSurcharges || 0),
 
       // roc*
       rocRadioStation: Number(v.amRadioStationLicense || 0),
       rocOperatorFee: Number(v.amRadioOperatorsCert || 0),
       rocApplicationFee: Number(v.amApplicationFee || 0),
-      rocFilingFee: Number(v.amFilingFee || 0),
+      rocFillingFee: Number(v.amFilingFee || 0),
       rocSeminarFee: Number(v.amSeminarFee || 0),
       rocSurcharge: Number(v.amSurcharges || 0),
 
@@ -196,10 +218,10 @@ export class SoaPageComponent {
 
     this.saving = true;
 
-    // ✅ ONLY PUT — NEVER POST
     this.soaService.update(selectedId, payload).subscribe({
       next: () => {
         this.saving = false;
+        this.form.patchValue({ id: selectedId }, { emitEvent: false });
         alert(`✅ Updated record ID: ${selectedId}`);
       },
       error: (err: any) => {
@@ -212,7 +234,6 @@ export class SoaPageComponent {
 
   // -------------------------
   // NEW RECORD = CLEAN FORM (NO CREATE)
-  // keeps dropdown list; user can select another record after
   // -------------------------
   newRecord(): void {
     this.form.reset(
@@ -223,8 +244,8 @@ export class SoaPageComponent {
         soaSeries: '',
 
         date: null,
-        payeeName: '',   // ✅ clear selected record
-        licensee: '',    // ✅ clear name string
+        payeeName: '',
+        licensee: '',
         address: '',
         particulars: '',
 
@@ -287,12 +308,21 @@ export class SoaPageComponent {
 
         dst: 0,
         totalAmount: 0,
-      },
-      { emitEvent: false }
-    );
 
-    // allow selecting another record and triggering auto-fill
-    this.form.get('payeeName')?.updateValueAndValidity({ emitEvent: true });
+        // ✅ reset hidden triggers (defaults)
+        amType: '',
+        rocClass: '',
+        rocYears: 1,
+
+        amateurType: '',
+        amYears: 1,
+
+        shipType: '',
+        shipYears: 1,
+        shipUnits: 1,
+      },
+      { emitEvent: true }
+    );
   }
 
   printSoa(): void { console.log('printSoa'); }
