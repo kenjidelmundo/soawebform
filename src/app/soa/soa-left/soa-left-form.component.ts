@@ -30,23 +30,22 @@ type PayeeItem = { id: number; name: string };
 export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   @Input() form!: FormGroup;
 
-  // ✅ dropdown now uses objects {id,name}
   payees: PayeeItem[] = [];
 
   private destroy$ = new Subject<void>();
 
-  // ✅ listeners
   private unlistenAddressClick?: () => void;
   private unlistenPartClick?: () => void;
 
-  // ✅ prevent re-open loop
   private addressDialogOpen = false;
   private particularsDialogOpen = false;
 
-  // ✅ prevent instant re-open right after close (cooldown)
   private addressCoolDownUntil = 0;
   private particularsCoolDownUntil = 0;
   private readonly COOLDOWN_MS = 350;
+
+  // ✅ recommended: next period starts day AFTER previous To (no overlap)
+  private readonly START_NEXT_PERIOD_NEXT_DAY = true;
 
   // ✅ Sample Province/Town/Brgy (replace with your real list)
   private readonly addressData: AddressProvince[] = [
@@ -67,9 +66,9 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.loadPayees();                  // ✅ load dropdown list
+    this.loadPayees();
     this.setupPeriodCovered();
-    this.setupPayeeSelectionAutoFill(); // ✅ selected id -> GET by id
+    this.setupPayeeSelectionAutoFill();
   }
 
   ngAfterViewInit(): void {
@@ -115,7 +114,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // =========================
   // PAYEES (GET ALL)
-  // ✅ keep selected ID visible even after update
   // =========================
   private loadPayees(): void {
     const selectedId = Number(this.form?.get('payeeName')?.value || 0);
@@ -130,7 +128,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           })
           .filter((x) => x.id > 0 && x.name.length > 0);
 
-        // ✅ unique by id
         const uniq = new Map<number, PayeeItem>();
         for (const item of list) {
           if (!uniq.has(item.id)) uniq.set(item.id, item);
@@ -138,8 +135,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
         this.payees = Array.from(uniq.values()).sort((a, b) => a.name.localeCompare(b.name));
 
-        // ✅ re-apply selection if still exists
-        if (selectedId > 0 && this.payees.some(p => p.id === selectedId)) {
+        if (selectedId > 0 && this.payees.some((p) => p.id === selectedId)) {
           this.form.get('payeeName')?.setValue(selectedId, { emitEvent: false });
         }
       },
@@ -152,8 +148,8 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // =========================
   // AUTO-FILL WHEN PAYEE CHANGES
-  // ✅ payeeName is ID ONLY
-  // ✅ DO NOT overwrite payeeName with string
+  // ✅ Particulars is BLANK (do not fetch)
+  // ✅ periodFrom becomes latest old periodTo (+1 day if enabled)
   // =========================
   private setupPayeeSelectionAutoFill(): void {
     const payeeCtrl = this.form.get('payeeName');
@@ -169,21 +165,51 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           next: (dto: any) => {
             const realId = Number(dto?.id ?? dto?.ID ?? dto?.Id ?? id);
 
-            // ✅ IMPORTANT: keep payeeName as ID
-            // ✅ licensee holds the string
+            // ✅ 1) Try direct periodTo from API (if exists)
+            const directTo =
+              this.toYmd(dto?.periodTo ?? dto?.PeriodTo) ||
+              this.toYmd(dto?.to ?? dto?.To);
+
+            // ✅ 2) Parse from periodCovered (supports many formats)
+            const parsed = this.periodCoveredToDates(dto?.periodCovered ?? dto?.PeriodCovered);
+            const parsedTo = parsed.periodTo ?? '';
+
+            // ✅ choose best oldTo
+            const oldTo = directTo || parsedTo || '';
+
+            // ✅ compute new periodFrom
+            let newFrom = oldTo;
+            if (this.START_NEXT_PERIOD_NEXT_DAY && oldTo) {
+              newFrom = this.addDays(oldTo, 1);
+            }
+
+            // ✅ patch form
             this.form.patchValue(
               {
                 id: realId,
                 licensee: String(dto?.licensee ?? dto?.Licensee ?? '').trim(),
                 address: String(dto?.address ?? dto?.Address ?? ''),
-                particulars: String(dto?.particulars ?? dto?.Particulars ?? ''),
+
+                // ✅ BLANK particulars
+                particulars: '',
+
+                // ✅ reset categories (optional but recommended)
+                catROC: false,
+                catMA: false,
+                catMS: false,
+                catOTHERS: false,
+
                 date: (dto?.dateIssued ?? dto?.DateIssued)
                   ? String(dto?.dateIssued ?? dto?.DateIssued).slice(0, 10)
                   : this.form.get('date')?.value,
 
-                ...(this.periodCoveredToDates(dto?.periodCovered ?? dto?.PeriodCovered)),
+                // ✅ new period starts at latest oldTo (or +1 day)
+                periodFrom: newFrom || this.form.get('periodFrom')?.value,
+
+                // ✅ clear To
+                periodTo: '',
               },
-              { emitEvent: true } // ✅ allow fees computations to react
+              { emitEvent: true }
             );
           },
           error: (err) => console.warn('⚠️ No details found for id:', id, err),
@@ -191,14 +217,74 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       });
   }
 
+  // =========================
+  // PARSE periodCovered (many formats)
+  // returns YYYY-MM-DD for date inputs
+  // =========================
   private periodCoveredToDates(periodCovered: any): { periodFrom?: string; periodTo?: string } {
     const s = (periodCovered ?? '').toString().trim();
-    const m = /^(\d{4})-(\d{4})$/.exec(s);
-    if (!m) return {};
-    const y1 = Number(m[1]);
-    const y2 = Number(m[2]);
-    if (!y1 || !y2) return {};
-    return { periodFrom: `${y1}-01-01`, periodTo: `${y2}-12-31` };
+    if (!s) return {};
+
+    // A) d/M/yyyy - d/M/yyyy  (or dd/MM/yyyy - dd/MM/yyyy)
+    let m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+    if (m) {
+      const d1 = Number(m[1]), mo1 = Number(m[2]), y1 = Number(m[3]);
+      const d2 = Number(m[4]), mo2 = Number(m[5]), y2 = Number(m[6]);
+      return {
+        periodFrom: this.toYmdFromParts(y1, mo1, d1),
+        periodTo: this.toYmdFromParts(y2, mo2, d2),
+      };
+    }
+
+    // B) YYYY-MM-DD - YYYY-MM-DD
+    m = /^(\d{4})-(\d{2})-(\d{2})\s*-\s*(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (m) {
+      return {
+        periodFrom: `${m[1]}-${m[2]}-${m[3]}`,
+        periodTo: `${m[4]}-${m[5]}-${m[6]}`,
+      };
+    }
+
+    // C) OLD FORMAT: YYYY-YYYY  (example 2005-2006)
+    // convert to From=YYYY-01-01, To=YYYY-12-31
+    m = /^(\d{4})-(\d{4})$/.exec(s);
+    if (m) {
+      const y1 = Number(m[1]);
+      const y2 = Number(m[2]);
+      if (!y1 || !y2) return {};
+      return {
+        periodFrom: `${y1}-01-01`,
+        periodTo: `${y2}-12-31`,
+      };
+    }
+
+    return {};
+  }
+
+  private toYmd(value: any): string {
+    if (!value) return '';
+    // already YYYY-MM-DD?
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+      return value.trim();
+    }
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  private toYmdFromParts(y: number, m: number, d: number): string {
+    if (!y || !m || !d) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${y}-${pad(m)}-${pad(d)}`;
+  }
+
+  private addDays(yyyyMmDd: string, days: number): string {
+    const d = new Date(yyyyMmDd);
+    if (isNaN(d.getTime())) return yyyyMmDd;
+    d.setDate(d.getDate() + days);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
 
   // =========================
@@ -262,6 +348,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // =========================
   // PERIOD COVERED COMPUTATION
+  // stores FULL DATE RANGE: d/M/yyyy-d/M/yyyy
   // =========================
   private setupPeriodCovered(): void {
     const fromCtrl = this.form.get('periodFrom');
@@ -278,17 +365,21 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(([from, to]) => {
         yearsCtrl.setValue(this.computeYears(from, to), { emitEvent: false });
-        coveredCtrl.setValue(this.computeYearRange(from, to), { emitEvent: false });
+        coveredCtrl.setValue(this.computeDateRange(from, to), { emitEvent: false });
       });
   }
 
-  private computeYearRange(from: any, to: any): string {
+  private computeDateRange(from: any, to: any): string {
     if (!from || !to) return '';
+
     const f = new Date(from);
     const t = new Date(to);
+
     if (isNaN(f.getTime()) || isNaN(t.getTime())) return '';
     if (t < f) return '';
-    return `${f.getFullYear()}-${t.getFullYear()}`;
+
+    const fmt = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+    return `${fmt(f)}-${fmt(t)}`;
   }
 
   private computeYears(from: any, to: any): number {

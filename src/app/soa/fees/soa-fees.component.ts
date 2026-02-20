@@ -1,38 +1,16 @@
 import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {
-  AbstractControl,
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-} from '@angular/forms';
+import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Subject, combineLatest, of } from 'rxjs';
-import { startWith, takeUntil } from 'rxjs/operators';
+import { debounceTime, map, startWith, takeUntil } from 'rxjs/operators';
 
-type RocRow = {
-  ff: number;
-  af: number;
-  semFee: number;
-  roc: number;
-  mod: number;
-  dst: number;
-  sur50: number;
-  sur100: number;
+type FeeRow = {
+  LF?: number;   // License Fee (yearly)
+  ROC?: number;  // ROC yearly
+  MOD?: number;  // modification fee (fixed)
+  DST?: number;  // documentary stamp tax (fixed)
+  SUR?: number;  // surcharge (50% of LF or ROC) depending on rule
 };
-
-interface ShipStationFeeRow {
-  FF: number;
-  PURF: number;
-  POSF: number;
-  CPF: number;
-  LF: number;
-  IF: number;
-  MOD: number;
-  DST: number;
-  SUR50: number;
-  SUR100: number;
-  cert?: number;
-}
 
 @Component({
   selector: 'app-soa-fees',
@@ -43,75 +21,216 @@ interface ShipStationFeeRow {
 })
 export class SoaFeesComponent implements OnInit, OnDestroy {
   @Input() form!: FormGroup;
-  @Input() mode: 'left' | 'mid' = 'left';
+
+  // ✅ your HTML uses mode (left/mid/right)
+  @Input() mode: 'left' | 'mid' | 'right' = 'left';
 
   private destroy$ = new Subject<void>();
 
-  // =====================================================
-  // ROC TABLE
-  // =====================================================
-  private readonly ROC_TABLE: Record<string, RocRow> = {
-    'RTG 1st': { ff: 0, af: 0, semFee: 0, roc: 180, mod: 120, dst: 30, sur50: 90, sur100: 180 },
-    'RTG 2nd': { ff: 0, af: 0, semFee: 0, roc: 120, mod: 120, dst: 30, sur50: 60, sur100: 120 },
-    'RTG 3rd': { ff: 0, af: 0, semFee: 0, roc: 60,  mod: 120, dst: 30, sur50: 30, sur100: 60 },
-
-    'PHN 1st': { ff: 0, af: 0, semFee: 0, roc: 120, mod: 120, dst: 30, sur50: 60, sur100: 120 },
-    'PHN 2nd': { ff: 0, af: 0, semFee: 0, roc: 100, mod: 120, dst: 30, sur50: 50, sur100: 100 },
-    'PHN 3rd': { ff: 0, af: 0, semFee: 0, roc: 60,  mod: 120, dst: 30, sur50: 30, sur100: 60 },
-
-    'RROC- AIRCRAFT': { ff: 0, af: 0, semFee: 0, roc: 100, mod: 120, dst: 30, sur50: 50, sur100: 100 },
-
-    'SROP':     { ff: 20, af: 20, semFee: 60, roc: 120, mod: 30,  dst: 30, sur50: 30, sur100: 60 },
-    'GROC':     { ff: 10, af: 20, semFee: 0,  roc: 60,  mod: 120, dst: 30, sur50: 30, sur100: 60 },
-    'RROC-RLM': { ff: 10, af: 20, semFee: 0,  roc: 60,  mod: 120, dst: 30, sur50: 30, sur100: 60 },
+  // ✅ Values based on your screenshots (adjust if needed)
+  // Table with columns: LF, ROC, MOD, DST, SUR(50%)
+  private readonly AT_ROC: FeeRow = {
+    ROC: 60,
+    MOD: 50,
+    DST: 30,
+    SUR: 30, // 50% of ROC (60 * 0.5)
   };
 
-  // =====================================================
-  // SHIP STATION FEES (kept)
-  // =====================================================
-  private readonly SHIP_STATION_FEES: Record<string, ShipStationFeeRow> = {
-    'DOMESTIC TRADE HIGH POW': { FF: 180, PURF: 240, POSF: 120, CPF: 720, LF: 840, IF: 720, MOD: 180, DST: 30, SUR50: 420, SUR100: 840 },
-    'DOMESTIC TRADE MEDIUM POW': { FF: 180, PURF: 120, POSF: 96, CPF: 600, LF: 720, IF: 720, MOD: 180, DST: 30, SUR50: 360, SUR100: 720 },
-    'DOMESTIC TRADE LOW POW': { FF: 180, PURF: 60, POSF: 60, CPF: 480, LF: 600, IF: 720, MOD: 180, DST: 30, SUR50: 300, SUR100: 600 },
-    'DELETION ': { FF: 180, cert: 200, PURF: 0, POSF: 0, CPF: 0, LF: 0, IF: 0, MOD: 0, DST: 30, SUR50: 0, SUR100: 0 },
+  private readonly AT_RSL_BY_CLASS: Record<string, FeeRow> = {
+    A: { LF: 120, ROC: 60, MOD: 50, DST: 30, SUR: 60 }, // SUR 50% of LF (120*0.5=60)
+    B: { LF: 132, ROC: 60, MOD: 50, DST: 30, SUR: 66 },
+    C: { LF: 144, ROC: 60, MOD: 50, DST: 30, SUR: 72 },
+    D: { LF: 144, ROC: 60, MOD: 50, DST: 30, SUR: 72 }, // if your table has D
   };
-
-  // =====================================================
-  // TOTAL FIELDS
-  // =====================================================
-  private readonly TOTAL_FIELDS: string[] = [
-    'licPermitToPurchase','licFilingFee','licPermitToPossess','licConstructionPermitFee',
-    'licRadioStationLicense','licInspectionFee','licSUF','licFinesPenalties','licSurcharges',
-
-    'appRegistrationFee','appSupervisionRegulationFee','appVerificationAuthFee','appExaminationFee',
-    'appClearanceCertificationFee','appModificationFee','appMiscIncome','appOthers',
-
-    'perPermitFees','perInspectionFee','perFilingFee','perSurcharges',
-
-    'amRadioStationLicense','amRadioOperatorsCert','amApplicationFee','amFilingFee','amSeminarFee','amSurcharges',
-
-    'dst',
-  ];
 
   ngOnInit(): void {
-    if (!this.form) return;
+    const catROC$ = this.form.get('catROC')?.valueChanges.pipe(startWith(this.form.get('catROC')?.value)) ?? of(false);
+    const catMA$ = this.form.get('catMA')?.valueChanges.pipe(startWith(this.form.get('catMA')?.value)) ?? of(false);
 
-    // ✅ ensure selector controls exist (para gumana ROC/Amateur/Ship computations)
-    this.ensureCtrl('amType', '');       // ROC computation type (COMM-NEW, etc)
-    this.ensureCtrl('rocClass', '');     // ROC class (RTG 1st, etc)
-    this.ensureCtrl('rocYears', 1);      // ROC years
+    const txnNew$ = this.form.get('txnNew')?.valueChanges.pipe(startWith(this.form.get('txnNew')?.value)) ?? of(false);
+    const txnRenew$ = this.form.get('txnRenew')?.valueChanges.pipe(startWith(this.form.get('txnRenew')?.value)) ?? of(false);
+    const txnMod$ = this.form.get('txnModification')?.valueChanges.pipe(startWith(this.form.get('txnModification')?.value)) ?? of(false);
 
-    this.ensureCtrl('amateurType', '');  // Amateur formula type (A1-AT-ROC-NEW, etc)
-    this.ensureCtrl('amYears', 1);       // Amateur years
+    const particulars$ =
+      this.form.get('particulars')?.valueChanges.pipe(startWith(this.form.get('particulars')?.value)) ?? of('');
 
-    this.ensureCtrl('shipType', '');
-    this.ensureCtrl('shipYears', 1);
-    this.ensureCtrl('shipUnits', 1);
+    // optional: if you have rslClass control; else default A
+    const rslClass$ =
+      this.form.get('rslClass')?.valueChanges.pipe(startWith(this.form.get('rslClass')?.value)) ?? of('A');
 
-    this.setupRocComputation();
-    this.setupAmateurComputation();
-    this.setupShipStationFormulas();
-    this.setupTotalComputation();
+    // period/year controls
+    const years$ =
+      this.form.get('years')?.valueChanges.pipe(startWith(this.form.get('years')?.value)) ?? of(null);
+
+    const periodFrom$ =
+      this.form.get('periodFrom')?.valueChanges.pipe(startWith(this.form.get('periodFrom')?.value)) ?? of(null);
+
+    const periodTo$ =
+      this.form.get('periodTo')?.valueChanges.pipe(startWith(this.form.get('periodTo')?.value)) ?? of(null);
+
+    combineLatest([
+      catROC$,
+      catMA$,
+      txnNew$,
+      txnRenew$,
+      txnMod$,
+      particulars$,
+      rslClass$,
+      years$,
+      periodFrom$,
+      periodTo$,
+    ])
+      .pipe(
+        debounceTime(80),
+        map(([catROC, catMA, txnNew, txnRenew, txnMod, particulars, rslClass, years, pf, pt]) => {
+          const P = String(particulars ?? '').toUpperCase();
+
+          const isROC = !!catROC || P.includes('ROC');
+          const isMA = !!catMA || P.includes('AMATEUR') || P.includes('MA');
+
+          const cls = (String(rslClass ?? 'A').trim().toUpperCase() || 'A');
+          const y = this.resolveYears(years, pf, pt);
+
+          return {
+            isROC,
+            isMA,
+            txnNew: !!txnNew,
+            txnRenew: !!txnRenew,
+            txnMod: !!txnMod,
+            cls,
+            years: y,
+          };
+        }),
+        takeUntil(this.destroy$)
+      )
+      .subscribe((ctx) => {
+        // Only compute if ROC or MA selected
+        if (!ctx.isROC && !ctx.isMA) {
+          // optional: clear fields when not ROC/MA
+          this.patchFees(0, 0, 0, 0, 0, 0, 0, 0);
+          return;
+        }
+
+        // -----------------------------
+        // Citizen Charter rules (from screenshot)
+        // A.1 AT-ROC (NEW):       FEE AT-ROC = (ROC)(YR) + DST
+        // A.2 AT-ROC (RENEWAL):   FEE AT-ROC = (ROC)(YR) + DST + SUR
+        // A.3 AT-ROC (MODIF):     FEE AT-ROC = MOD + DST
+        //
+        // B.2 AT-RSL (NEW):       FEE AT-RSL = FF + (LF)(YR) + DST
+        // B.3 AT-RSL (RENEWAL):   FEE AT-RSL = (LF)(YR) + DST + SUR
+        // B.4 AT-RSL (MODIF):     FEE AT-RSL = FF + MOD + DST
+        // -----------------------------
+
+        const years = ctx.years;
+
+        // -------------- ROC block --------------
+        let rocRadioStationLicense = 0;
+        let rocOperatorsCert = 0;
+        let rocApplicationFee = 0;
+        let rocFilingFee = 0;
+        let rocSeminarFee = 0;
+        let rocSurcharges = 0;
+        let rocDST = 0;
+
+        if (ctx.isROC) {
+          const row = this.AT_ROC;
+
+          if (ctx.txnMod) {
+            // MOD + DST
+            rocRadioStationLicense = 0;
+            rocOperatorsCert = 0;
+            rocSurcharges = this.num(row.MOD);
+            rocDST = this.num(row.DST);
+          } else if (ctx.txnRenew) {
+            // (ROC*YR) + DST + SUR
+            rocRadioStationLicense = this.num(row.ROC) * years;
+            rocDST = this.num(row.DST);
+            rocSurcharges = this.num(row.SUR);
+          } else {
+            // default NEW if txnNew or none checked
+            // (ROC*YR) + DST
+            rocRadioStationLicense = this.num(row.ROC) * years;
+            rocDST = this.num(row.DST);
+            rocSurcharges = 0;
+          }
+        }
+
+        // -------------- MA / AT-RSL block --------------
+        // We'll map MA to your "FOR AMATEUR AND ROC" fields too.
+        // radio station license = LF (yearly) * years
+        // filing fee = FF (if you have it as a separate fee, put it here)
+        // MOD goes to surcharges field (since no separate MOD field in UI)
+        let maRadioStationLicense = 0;
+        let maOperatorsCert = 0;
+        let maApplicationFee = 0;
+        let maFilingFee = 0;
+        let maSeminarFee = 0;
+        let maSurcharges = 0;
+        let maDST = 0;
+
+        if (ctx.isMA) {
+          const row = this.AT_RSL_BY_CLASS[ctx.cls] ?? this.AT_RSL_BY_CLASS['A'];
+
+          if (ctx.txnMod) {
+            // FF + MOD + DST  (we don't have FF column in your LF table screenshot,
+            // so set filing fee = 0 unless you add it. MOD -> surcharges field.)
+            maRadioStationLicense = 0;
+            maFilingFee = 0;
+            maSurcharges = this.num(row.MOD);
+            maDST = this.num(row.DST);
+          } else if (ctx.txnRenew) {
+            // (LF*YR) + DST + SUR
+            maRadioStationLicense = this.num(row.LF) * years;
+            maDST = this.num(row.DST);
+            maSurcharges = this.num(row.SUR);
+          } else {
+            // NEW: FF + (LF*YR) + DST
+            maRadioStationLicense = this.num(row.LF) * years;
+            maDST = this.num(row.DST);
+            maFilingFee = 0; // put FF here if you have it
+            maSurcharges = 0;
+          }
+
+          // If you want Operators Cert fee for MA as ROC column:
+          // maOperatorsCert = this.num(row.ROC) * years;  // optional
+          maOperatorsCert = 0;
+
+          // Application/Seminar are 0 unless you have values
+          maApplicationFee = 0;
+          maSeminarFee = 0;
+        }
+
+        // If both ROC and MA checked, sum them (common in your UI logic)
+        const amRadioStationLicense = rocRadioStationLicense + maRadioStationLicense;
+        const amRadioOperatorsCert = rocOperatorsCert + maOperatorsCert;
+        const amApplicationFee = rocApplicationFee + maApplicationFee;
+        const amFilingFee = rocFilingFee + maFilingFee;
+        const amSeminarFee = rocSeminarFee + maSeminarFee;
+        const amSurcharges = rocSurcharges + maSurcharges;
+        const dst = rocDST + maDST;
+
+        const totalAmount = this.round2(
+          amRadioStationLicense +
+            amRadioOperatorsCert +
+            amApplicationFee +
+            amFilingFee +
+            amSeminarFee +
+            amSurcharges +
+            dst
+        );
+
+        this.patchFees(
+          amRadioStationLicense,
+          amRadioOperatorsCert,
+          amApplicationFee,
+          amFilingFee,
+          amSeminarFee,
+          amSurcharges,
+          dst,
+          totalAmount
+        );
+      });
   }
 
   ngOnDestroy(): void {
@@ -119,292 +238,68 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  // =====================================================
-  // ROC COMPUTATION -> fills:
-  // amRadioOperatorsCert (total), amFilingFee, amSeminarFee, dst
-  // =====================================================
-  private setupRocComputation(): void {
-    const certCtrl = this.form.get('amRadioOperatorsCert');
-    const dstCtrl = this.form.get('dst');
-    const filingCtrl = this.form.get('amFilingFee');
-    const seminarCtrl = this.form.get('amSeminarFee');
-    const surCtrl = this.form.get('amSurcharges');
-    const modCtrl = this.form.get('appModificationFee');
-
-    if (!certCtrl || !dstCtrl) return;
-
-    const typeCtrl = this.form.get('amType')!;
-    const classCtrl = this.form.get('rocClass')!;
-    const yearsCtrl = this.form.get('rocYears')!;
-
-    combineLatest([
-      typeCtrl.valueChanges.pipe(startWith(typeCtrl.value)),
-      classCtrl.valueChanges.pipe(startWith(classCtrl.value)),
-      yearsCtrl.valueChanges.pipe(startWith(yearsCtrl.value)),
-      surCtrl ? surCtrl.valueChanges.pipe(startWith(surCtrl.value)) : of(0),
-      modCtrl ? modCtrl.valueChanges.pipe(startWith(modCtrl.value)) : of(0),
-    ])
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(([type, rocClass, years, surVal, modVal]) => {
-        const row = this.ROC_TABLE[String(rocClass || '').trim()];
-        if (!row) {
-          // if no class selected yet, keep zero but still set dst if needed
-          return;
-        }
-
-        const yr = this.toNumber(years);
-        const sur = this.toNumber(surVal);
-        const mod = this.toNumber(modVal);
-
-        let total = 0;
-
-        switch (String(type || '')) {
-          case 'COMM-NEW':
-          case 'RROC-AIRCRAFT-NEW':
-            total = (row.roc * yr) + row.dst;
-            break;
-
-          case 'COMM-REN':
-          case 'RROC-AIRCRAFT-REN':
-            total = (row.roc * yr) + row.dst + sur;
-            break;
-
-          case 'TEMP-FOREIGN':
-            total = row.roc + row.dst;
-            break;
-
-          case 'SROP-NEW':
-            total = row.af + row.semFee + (row.roc * yr) + row.dst;
-            break;
-
-          case 'SROP-REN':
-            total = (row.roc * yr) + row.dst + sur;
-            break;
-
-          case 'GROC-NEW':
-          case 'RROC-RLM-NEW':
-            total = row.ff + row.af + (row.roc * yr) + row.dst;
-            break;
-
-          case 'GROC-REN':
-          case 'RROC-RLM-REN':
-            total = (row.roc * yr) + row.dst + sur;
-            break;
-
-          case 'MODIFICATION':
-            total = mod + row.dst;
-            break;
-
-          default:
-            // no type selected -> do nothing
-            return;
-        }
-
-        this.safePatch(dstCtrl, row.dst);
-        this.safePatch(certCtrl, total);
-
-        if (filingCtrl) this.safePatch(filingCtrl, row.ff);
-        if (seminarCtrl) this.safePatch(seminarCtrl, row.semFee);
-      });
+  // ✅ patches the fields you requested
+  private patchFees(
+    amRadioStationLicense: number,
+    amRadioOperatorsCert: number,
+    amApplicationFee: number,
+    amFilingFee: number,
+    amSeminarFee: number,
+    amSurcharges: number,
+    dst: number,
+    totalAmount: number
+  ) {
+    this.form.patchValue(
+      {
+        amRadioStationLicense: this.round2(amRadioStationLicense),
+        amRadioOperatorsCert: this.round2(amRadioOperatorsCert),
+        amApplicationFee: this.round2(amApplicationFee),
+        amFilingFee: this.round2(amFilingFee),
+        amSeminarFee: this.round2(amSeminarFee),
+        amSurcharges: this.round2(amSurcharges),
+        dst: this.round2(dst),
+        totalAmount: this.round2(totalAmount),
+      },
+      { emitEvent: false }
+    );
   }
 
-  // =====================================================
-  // AMATEUR COMPUTATION (simple + works NOW)
-  // Writes to:
-  // amRadioStationLicense OR amRadioOperatorsCert? (depends on your meaning)
-  //
-  // For your UI screenshot: "Radio Station License" is amRadioStationLicense
-  // so dito natin ilalagay ang computed total para makita agad.
-  // =====================================================
-  private setupAmateurComputation(): void {
-    const typeCtrl = this.form.get('amateurType')!;
-    const yearsCtrl = this.form.get('amYears')!;
+  private resolveYears(yearsControlValue: any, periodFrom: any, periodTo: any): number {
+    // 1) if years control exists and has value, use it
+    const y = Number(yearsControlValue);
+    if (Number.isFinite(y) && y > 0) return Math.floor(y);
 
-    const dstCtrl = this.form.get('dst');
-    const surCtrl = this.form.get('amSurcharges');
-    const modCtrl = this.form.get('appModificationFee');
-
-    const targetTotalCtrl = this.form.get('amRadioStationLicense'); // ✅ show computed total here
-
-    if (!targetTotalCtrl) return;
-
-    combineLatest([
-      typeCtrl.valueChanges.pipe(startWith(typeCtrl.value)),
-      yearsCtrl.valueChanges.pipe(startWith(yearsCtrl.value)),
-      surCtrl ? surCtrl.valueChanges.pipe(startWith(surCtrl.value)) : of(0),
-      dstCtrl ? dstCtrl.valueChanges.pipe(startWith(dstCtrl.value)) : of(0),
-      modCtrl ? modCtrl.valueChanges.pipe(startWith(modCtrl.value)) : of(0),
-    ])
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(([type, years, surVal, dstVal, modVal]) => {
-        const yr = this.toNumber(years);
-        const sur = this.toNumber(surVal);
-        const dst = this.toNumber(dstVal) || 30; // fallback
-        const mod = this.toNumber(modVal);
-
-        // pull some base fees from existing controls (para connected sa form mo)
-        const ff = this.toNumber(this.form.get('amFilingFee')?.value);
-        const lf = this.toNumber(this.form.get('amRadioStationLicense')?.value);
-        const pur = this.toNumber(this.form.get('licPermitToPurchase')?.value);
-        const pos = this.toNumber(this.form.get('licPermitToPossess')?.value);
-        const sp = this.toNumber(this.form.get('perPermitFees')?.value);
-        const cpf = this.toNumber(this.form.get('licConstructionPermitFee')?.value);
-
-        let result = 0;
-
-        switch (String(type || '')) {
-          // A. AT-ROC
-          case 'A1-AT-ROC-NEW':
-            result = (lf * yr) + dst;
-            break;
-          case 'A2-AT-ROC-RENEWAL':
-            result = (lf * yr) + dst + sur;
-            break;
-          case 'A3-AT-ROC-MODIFICATION':
-            result = mod + dst;
-            break;
-
-          // B. Permit to Purchase/Possess
-          case 'B1-AT-RSL-PURPOS':
-            result = pur + pos + dst;
-            break;
-
-          // B. AT-RSL NEW/REN/MOD
-          case 'B2-AT-RSL-NEW':
-            result = ff + (lf * yr) + dst;
-            break;
-          case 'B3-AT-RSL-RENEWAL':
-            result = (lf * yr) + dst + sur;
-            break;
-          case 'B4-AT-RSL-MODIFICATION':
-            result = ff + mod + dst;
-            break;
-
-          // Permit STF
-          case 'B5-PERMIT-STF':
-            result = sp + dst;
-            break;
-
-          // Club
-          case 'D2-AT-CLUB-NEW':
-            result = ff + cpf + (lf * yr) + dst;
-            break;
-          case 'D3-AT-CLUB-RENEWAL':
-            result = (lf * yr) + dst + sur;
-            break;
-          case 'D4-AT-CLUB-MODIFICATION':
-            result = ff + cpf + mod + dst;
-            break;
-
-          default:
-            return;
-        }
-
-        // ensure DST at least 30 (common)
-        if (dstCtrl && this.toNumber(dstCtrl.value) <= 0) {
-          this.safePatch(dstCtrl, dst);
-        }
-
-        // ✅ show computed result on Amateur block
-        this.safePatch(targetTotalCtrl, result);
-      });
-  }
-
-  // =====================================================
-  // SHIP STATION FORMULAS (fixed combineLatest)
-  // =====================================================
-  private setupShipStationFormulas(): void {
-    const typeCtrl = this.form.get('shipType');
-    const yearsCtrl = this.form.get('shipYears');
-    const unitsCtrl = this.form.get('shipUnits');
-
-    if (!typeCtrl || !yearsCtrl || !unitsCtrl) return;
-
-    combineLatest([
-      typeCtrl.valueChanges.pipe(startWith(typeCtrl.value)),
-      yearsCtrl.valueChanges.pipe(startWith(yearsCtrl.value)),
-      unitsCtrl.valueChanges.pipe(startWith(unitsCtrl.value)),
-    ])
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(([type, years, units]) => {
-        const row = this.SHIP_STATION_FEES[String(type || '').trim()];
-        if (!row) return;
-
-        const yr = this.toNumber(years);
-        const unit = this.toNumber(units);
-        const sur = this.toNumber(this.form.get('licSurcharges')?.value);
-
-        let result = 0;
-
-        switch (String(type || '')) {
-          case 'A1-PURPOS':
-            result = (row.FF * unit) + (row.PURF * unit) + (row.POSF * unit) + row.DST;
-            break;
-          case 'A2-DOM-NEW-NO-EQ':
-            result = row.CPF + (row.LF * yr) + (row.IF * yr) + row.DST;
-            break;
-          case 'A4-DOM-RENEWAL':
-            result = (row.LF * yr) + (row.IF * yr) + row.DST + sur;
-            break;
-          case 'F-DELETION':
-            result = (row.FF * (row.cert ?? 1)) + row.DST;
-            break;
-          default:
-            return;
-        }
-
-        // you can decide where to display this result:
-        // example put in licRadioStationLicense (pero depende sa UI mo)
-        this.safePatch(this.form.get('licRadioStationLicense')!, result);
-        this.safePatch(this.form.get('dst')!, row.DST);
-      });
-  }
-
-  // =====================================================
-  // TOTAL COMPUTATION
-  // =====================================================
-  private setupTotalComputation(): void {
-    let totalCtrl = this.form.get('totalAmount');
-
-    if (!totalCtrl) {
-      this.form.addControl('totalAmount', new FormControl(0));
-      totalCtrl = this.form.get('totalAmount')!;
+    // 2) else compute from dates if possible
+    const from = this.toDate(periodFrom);
+    const to = this.toDate(periodTo);
+    if (from && to) {
+      // if period is 21/02/2026 to 20/02/2027 => about 1 year
+      const diffDays = Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+      const approxYears = Math.max(1, Math.round(diffDays / 365));
+      return approxYears;
     }
 
-    for (const name of this.TOTAL_FIELDS) {
-      if (!this.form.get(name)) {
-        this.form.addControl(name, new FormControl(0));
-      }
-    }
-
-    const feeCtrls = this.TOTAL_FIELDS
-      .map((name) => this.form.get(name))
-      .filter((c): c is AbstractControl => !!c);
-
-    combineLatest(feeCtrls.map((ctrl) => ctrl.valueChanges.pipe(startWith(ctrl.value))))
-      .pipe(takeUntil(this.destroy$))
-      .subscribe((values) => {
-        let total = 0;
-        for (const val of values) total += this.toNumber(val);
-        totalCtrl!.patchValue(total, { emitEvent: false });
-      });
+    // 3) fallback
+    return 1;
   }
 
-  // =====================================================
-  // HELPERS
-  // =====================================================
-  private ensureCtrl(name: string, initial: any): void {
-    if (!this.form.get(name)) {
-      this.form.addControl(name, new FormControl(initial));
-    }
+  private toDate(v: any): Date | null {
+    if (!v) return null;
+    if (v instanceof Date && !isNaN(v.getTime())) return v;
+
+    // accept ISO or yyyy-mm-dd
+    const d = new Date(v);
+    if (!isNaN(d.getTime())) return d;
+
+    return null;
   }
 
-  private safePatch(ctrl: AbstractControl, value: any): void {
-    ctrl.patchValue(value, { emitEvent: false });
-  }
-
-  private toNumber(value: any): number {
-    const n = Number(value);
+  private num(v: any): number {
+    const n = Number(v);
     return Number.isFinite(n) ? n : 0;
+  }
+
+  private round2(n: number): number {
+    return Math.round((this.num(n) + Number.EPSILON) * 100) / 100;
   }
 }
