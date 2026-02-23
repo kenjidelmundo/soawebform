@@ -1,151 +1,137 @@
-import { Component } from '@angular/core';
-import { AccessSOAPayload, Soa } from '../models/soaform.model';
+import { Injectable } from '@angular/core';
+import { FormGroup } from '@angular/forms';
 
 import pdfMake from 'pdfmake/build/pdfmake';
 import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 
 (pdfMake as any).vfs = (pdfFonts as any).vfs;
 
-@Component({
-  selector: 'app-soa-pdf',
-  standalone: true,
-  templateUrl: './soa-pdf.component.html',
-  styleUrls: ['./soa-pdf.component.css'],
-})
-export class SoaPdfComponent {
+@Injectable({ providedIn: 'root' })
+export class SoaPdfService {
+  private form: FormGroup | null = null;
 
-  mockSoa: Soa = {
-    soaNo: 'MOCK-001',
-    date: 'Mock Date',
-    name: 'Mock User',
-    address: 'Mock Address',
-    type: 'New',
-    particulars: 'Mock Particulars',
-    periodCovered: '2026',
-    sections: [
-      {
-        title: 'FOR LICENSES', rows: [
-          ['Permit to Purchase', 384],
-          ['Filing Fee', 720],
-          ['Permit to Possess / Storage', 240],
-          ['Construction Permit Fee', 0],
-          ['Radio Station License', 0],
-          ['Inspection Fee', 2640],
-          ['Spectrum User’s Fee (SUF)', 88],
-          ['Surcharges', 0],
-          ['Fines and Penalties', 0]
-        ]
-      },
-      {
-        title: 'FOR PERMITS', rows: [
-          ['Permit (Dealer / Reseller / Service Center)', 0],
-          ['Inspection Fee', 0],
-          ['Filing Fee', 0],
-          ['Surcharges', 0]
-        ]
-      },
-      {
-        title: 'FOR AMATEUR AND ROC', rows: [
-          ['Radio Station License', 0],
-          ['Radio Operator’s Certificate', 0],
-          ['Application Fee', 0],
-          ['Filing Fee', 0],
-          ['Seminar Fee', 0],
-          ['Surcharges', 0]
-        ]
-      },
-      {
-        title: 'OTHER APPLICATION', rows: [
-          ['Registration Fee', 0],
-          ['Supervision Regulation Fee', 0],
-          ['Verification / Authentication Fee', 0],
-          ['Examination Fee', 0],
-          ['Clearance / Certification Fee (Special)', 0],
-          ['Modification Fee', 0],
-          ['Miscellaneous Income', 0],
-          ['Documentary Stamp Tax (DST)', 120],
-          ['Others', 0]
-        ]
-      }
-    ]
-  };
+  /** ✅ Call this once from SoaPage so service can fetch live checkbox + values */
+  setForm(form: FormGroup) {
+    this.form = form;
+  }
 
-  generatePDF(soa: Soa): void {
+  /** RightPanel calls this.soaPdf.generatePDF(soaData) — keep that unchanged */
+  generatePDF(soaData: any): void {
+    const live = this.form?.getRawValue?.() ?? this.form?.value ?? {};
+
+    // ✅ Merge: use live form as source-of-truth (so checkboxes always correct)
+    // But keep soaData as fallback if you pass computed rows there.
+    const v = { ...(soaData ?? {}), ...(live ?? {}) };
+
+    const dateStr = this.formatDate(this.pick(v, ['date', 'dateIssued', 'DateIssued'], ''));
+    const soaNo = this.pick(v, ['soaSeries', 'SOASeries', 'soaNo', 'seriesNumber'], '');
+    const name = this.pick(v, ['licensee', 'Licensee', 'name'], '');
+    const address = this.pick(v, ['address', 'Address'], '');
+    const particulars = this.pick(v, ['particulars', 'Particulars'], '');
+    const periodCovered = this.pick(v, ['periodCovered', 'PeriodCovered'], '');
+    const years = this.pick(v, ['periodYears', 'years', 'Years'], 0);
+
+    // ✅ checkboxes from your REAL form controls
+    const flags = {
+      New: !!v.txnNew,
+      Ren: !!v.txnRenew,
+      ECO: !!v.txnCO,
+      CV:  !!v.txnCV,
+      MOD: !!v.txnModification,
+      ROC: !!v.catROC,
+    };
+
+    // ✅ Build sections/rows (use what RightPanel already built, but fill missing from live form)
+    const sections = (soaData?.sections?.length ? soaData.sections : this.buildSectionsFromForm(v));
+
     const docDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
-      pageMargins: [2.5, 2.5, 2.5, 2.5], // max page space
+      pageMargins: [2.5, 2.5, 2.5, 2.5],
       content: [
         {
           columns: [
-            this.soaColumn('Servicing Unit Copy', soa),
-            this.soaColumn('Accounting Unit Copy', soa),
-            this.soaColumn('COA Copy', soa),
-            this.soaColumn('Cash Unit Copy', soa)
+            this.soaColumn('Servicing Unit Copy', { dateStr, soaNo, name, address, particulars, periodCovered, years, flags, sections }),
+            this.soaColumn('Accounting Unit Copy', { dateStr, soaNo, name, address, particulars, periodCovered, years, flags, sections }),
+            this.soaColumn('COA Copy',           { dateStr, soaNo, name, address, particulars, periodCovered, years, flags, sections }),
+            this.soaColumn('Cash Unit Copy',     { dateStr, soaNo, name, address, particulars, periodCovered, years, flags, sections }),
           ],
-          columnGap: 1
-        }
+          columnGap: 1,
+        },
       ],
-      pageBreakBefore: () => false
+      pageBreakBefore: () => false,
     };
 
     pdfMake.createPdf(docDefinition).open();
   }
 
-  checkBox(checked: boolean = false): any {
-    return {
-      canvas: [
-        { type: 'rect', x: 0, y: 0, w: 5.5, h: 5.5, lineWidth: 0.5 },
-        ...(checked ? [
-          { type: 'line', x1: 1, y1: 3, x2: 2.5, y2: 5, lineWidth: 1 },
-          { type: 'line', x1: 2.5, y1: 5, x2: 4.5, y2: 1, lineWidth: 1 }
-        ] : [])
-      ]
+  // -----------------------
+  // Build sections from FORM (if RightPanel did not send sections)
+  // -----------------------
+  private buildSectionsFromForm(v: any) {
+    const num = (x: any) => {
+      const n = Number(x);
+      return Number.isFinite(n) ? n : 0;
     };
-  }
 
-  createSoaTable(soa: Soa): any {
-    const body: any[] = [
-      [
-        { text: 'CODE', bold: true },
-        { text: 'PARTICULARS', bold: true },
-        { text: 'TOTAL', bold: true, alignment: 'right' }
-      ]
+    const dstVal = num(v.dst ?? v.DST);
+
+    return [
+      {
+        title: 'FOR LICENSES',
+        rows: [
+          ['Permit to Purchase', num(v.licPermitToPurchase ?? v.rslPurchase)],
+          ['Filing Fee', num(v.licFilingFee ?? v.rslFillingFee)],
+          ['Permit to Possess / Storage', num(v.licPermitToPossess ?? v.rslPossess)],
+          ['Construction Permit Fee', num(v.licConstructionPermitFee ?? v.rslConstruction)],
+          ['Radio Station License', num(v.licRadioStationLicense ?? v.rslRadioStation)],
+          ['Inspection Fee', num(v.licInspectionFee ?? v.rslInspection)],
+          ['Spectrum User’s Fee (SUF)', num(v.licSUF ?? v.rslSUF)],
+          ['Surcharges', num(v.licSurcharges ?? v.rslSurcharge)],
+          ['Fines and Penalties', num(v.licFinesPenalties)],
+        ],
+      },
+      {
+        title: 'FOR PERMITS',
+        rows: [
+          ['Permit (Dealer / Reseller / Service Center)', num(v.perPermitFees ?? v.permitPermitFees)],
+          ['Inspection Fee', num(v.perInspectionFee ?? v.permitInspection)],
+          ['Filing Fee', num(v.perFilingFee ?? v.permitFillingFee)],
+          ['Surcharges', num(v.perSurcharges ?? v.permitSurcharge)],
+        ],
+      },
+      {
+        title: 'FOR AMATEUR AND ROC',
+        rows: [
+          ['Radio Station License', num(v.amRadioStationLicense ?? v.rocRadioStation)],
+          ["Radio Operator’s Certificate", num(v.amRadioOperatorsCert ?? v.rocOperatorFee)],
+          ['Application Fee', num(v.amApplicationFee ?? v.rocApplicationFee)],
+          ['Filing Fee', num(v.amFilingFee ?? v.rocFillingFee)],
+          ['Seminar Fee', num(v.amSeminarFee ?? v.rocSeminarFee)],
+          ['Surcharges', num(v.amSurcharges ?? v.rocSurcharge)],
+        ],
+      },
+      {
+        title: 'OTHER APPLICATION',
+        rows: [
+          ['Registration Fee', num(v.appRegistrationFee ?? v.otherRegistration)],
+          ['Supervision / Regulation Fee', num(v.appSupervisionRegulationFee ?? v.otherSupervisionRegulation)],
+          ['Verification / Authentication Fee', num(v.appVerificationAuthFee ?? v.otherVerificationAuthentication)],
+          ['Examination Fee', num(v.appExaminationFee ?? v.otherExamination)],
+          ['Clearance / Certification Fee (Special)', num(v.appClearanceCertificationFee ?? v.otherClearanceCertification)],
+          ['Modification Fee', num(v.appModificationFee ?? v.otherModification)],
+          ['Miscellaneous Income', num(v.appMiscIncome ?? v.otherMiscIncome)],
+          ['Documentary Stamp Tax (DST)', dstVal],
+          ['Others', num(v.appOthers ?? v.otherOthers)],
+        ],
+      },
     ];
-
-    soa.sections.forEach(section => {
-      body.push([
-        { text: section.title, colSpan: 3, bold: true, fontSize: 6 },
-        {},
-        {}
-      ]);
-
-      section.rows.forEach(row => {
-        body.push([
-          '',
-          { text: row[0], fontSize: 6 },
-          { text: row[1].toLocaleString('en-US', { minimumFractionDigits: 2 }), alignment: 'right', fontSize: 6 }
-        ]);
-      });
-    });
-
-    return {
-      table: { widths: [22, '*', 58], body },
-      fontSize: 5.9,
-      margin: [0, 0.5, 0, 0.5]
-    };
   }
 
-  soaColumn(label: string, soa: Soa): any {
-    const soaTypes: Record<string, boolean> = {
-      New: soa.type === 'New',
-      Ren: soa.type === 'Ren',
-      ECO: soa.type === 'ECO',
-      CV: soa.type === 'CV',
-      MOD: soa.type === 'MOD',
-      ROC: soa.type === 'ROC'
-    };
-
+  // -----------------------
+  // PDF layout parts
+  // -----------------------
+  private soaColumn(label: string, soa: any): any {
     return {
       width: '24.8%',
       stack: [
@@ -153,75 +139,107 @@ export class SoaPdfComponent {
         { text: 'Statement of Account', fontSize: 6.5, alignment: 'center', margin: [0, 0, 0, 0.3] },
         { text: label, italics: true, fontSize: 6.2, alignment: 'center', margin: [0, 0, 0, 0.6] },
 
-        { text: `Date:         ${soa.date ?? ''}`, fontSize: 6.2, margin: [0, 0, 0, 0.2] },
+        { text: `Date:         ${soa.dateStr ?? ''}`, fontSize: 6.2, margin: [0, 0, 0, 0.2] },
         { text: `No.:           ${soa.soaNo ?? ''}`, fontSize: 6.2, margin: [0, 0, 0, 0.2] },
         { text: `Name:      ${soa.name ?? ''}`, fontSize: 6.2, margin: [0, 0, 0, 0.2] },
         { text: `Address:  ${soa.address ?? ''}`, fontSize: 6.2, margin: [0, 0, 0, 0.2] },
 
+        // ✅ checkboxes row (fetch from form flags)
         {
           columns: [
-            { columns: [this.checkBox(soaTypes['New']), { text: 'New', fontSize: 5.6 }], columnGap: 1.5 },
-            { columns: [this.checkBox(soaTypes['Ren']), { text: 'Ren', fontSize: 5.6 }], columnGap: 1.5 },
-            { columns: [this.checkBox(soaTypes['ECO']), { text: 'ECO', fontSize: 5.6 }], columnGap: 1.5 },
-            { columns: [this.checkBox(soaTypes['CV']), { text: 'CV', fontSize: 5.6 }], columnGap: 1.5 },
-            { columns: [this.checkBox(soaTypes['MOD']), { text: 'MOD', fontSize: 5.6 }], columnGap: 1.5 },
-            { columns: [this.checkBox(soaTypes['ROC']), { text: 'ROC', fontSize: 5.6 }], columnGap: 1.5 }
+            { columns: [this.checkBox(!!soa.flags?.New), { text: 'New', fontSize: 5.6 }], columnGap: 1.5 },
+            { columns: [this.checkBox(!!soa.flags?.Ren), { text: 'Ren', fontSize: 5.6 }], columnGap: 1.5 },
+            { columns: [this.checkBox(!!soa.flags?.ECO), { text: 'ECO', fontSize: 5.6 }], columnGap: 1.5 },
+            { columns: [this.checkBox(!!soa.flags?.CV),  { text: 'CV',  fontSize: 5.6 }], columnGap: 1.5 },
+            { columns: [this.checkBox(!!soa.flags?.MOD), { text: 'MOD', fontSize: 5.6 }], columnGap: 1.5 },
+            { columns: [this.checkBox(!!soa.flags?.ROC), { text: 'ROC', fontSize: 5.6 }], columnGap: 1.5 },
           ],
           columnGap: 4,
-          margin: [0, 0.6, 0, 0.6]
+          margin: [0, 0.6, 0, 0.6],
         },
 
-        { text: `Particulars: ${soa.particulars}`, fontSize: 6.6, margin: [0, 0, 0, 1] },
+        // ✅ Particulars line (from your ParticularsDialog result)
+        { text: `Particulars: ${soa.particulars ?? ''}`, fontSize: 6.2, margin: [0, 0, 0, 0.6] },
 
+        // ✅ Period Covered + Years (from form periodCovered + periodYears)
         {
           columns: [
-            { text: 'Particulars:', fontSize: 6.3, width: 28 },
-            { canvas: [{ type: 'rect', x: 0, y: 0, w: 130, h: 7, lineWidth: 0.6 }] }
+            { text: `Period Covered: ${soa.periodCovered ?? ''}`, fontSize: 6.0 },
+            { text: `Years: ${soa.years ?? ''}`, fontSize: 6.0, alignment: 'right' },
           ],
-          columnGap: 3,
-          margin: [0, 0, 0, 1]
+          margin: [0, 0, 0, 0.6],
         },
 
         this.createSoaTable(soa),
 
         { text: 'NOTE: To be paid on or before the due date otherwise subject to reassessment.', fontSize: 5.6, margin: [0, 1, 0, 0] },
 
-        {
-          columns: [
-            { columns: [this.checkBox(), { text: 'For Assessment Only', fontSize: 5.6, margin: [0, -0.2, 0, 0] }], columnGap: 0.6 },
-            { columns: [this.checkBox(), { text: 'Endorsed for Payment', fontSize: 5.6, margin: [0, -0.2, 0, 0] }], columnGap: 0.6 }
-          ],
-          margin: [0, 0.4, 0, 0]
-        },
-
-        {
-          columns: [
-            {
-              width: '50%',
-              stack: [
-                { text: 'PREPARED BY:', bold: true, fontSize: 6.1, margin: [0, 1, 0, 0] },
-                { text: 'Engr. Ryan J. dela Cruz', bold: true, fontSize: 6.0, margin: [0, 3, 0, 0] },
-                { text: 'Administrative Division', fontSize: 5.7 },
-                { text: 'Over Printed Name & Signature', italics: true, fontSize: 5.3 }
-              ]
-            },
-            {
-              width: '50%',
-              stack: [
-                { text: 'APPROVED BY:', bold: true, fontSize: 6.1, margin: [0, 1, 0, 0] },
-                { text: 'Engr. Gerald Villoso', bold: true, fontSize: 6.0, margin: [0, 3, 0, 0] },
-                { text: 'Administrative Division', fontSize: 5.7 },
-                { text: 'Over Printed Name & Signature', italics: true, fontSize: 5.3 }
-              ]
-            }
-          ],
-          columnGap: 10,
-          margin: [0, 0.6, 0, 0]
-        },
-
-        // filler to eliminate bottom space
-        { text: '', margin: [0, 2, 0, 0] }
-      ]
+        { text: '', margin: [0, 2, 0, 0] },
+      ],
     };
+  }
+
+  private createSoaTable(soa: any): any {
+    const body: any[] = [
+      [
+        { text: 'CODE', bold: true },
+        { text: 'PARTICULARS', bold: true },
+        { text: 'TOTAL', bold: true, alignment: 'right' },
+      ],
+    ];
+
+    (soa.sections ?? []).forEach((section: any) => {
+      body.push([{ text: section.title, colSpan: 3, bold: true, fontSize: 6 }, {}, {}]);
+
+      (section.rows ?? []).forEach((row: any[]) => {
+        const amt = Number(row[1] ?? 0);
+        body.push([
+          '',
+          { text: String(row[0] ?? ''), fontSize: 6 },
+          { text: (Number.isFinite(amt) ? amt : 0).toLocaleString('en-US', { minimumFractionDigits: 2 }), alignment: 'right', fontSize: 6 },
+        ]);
+      });
+    });
+
+    return {
+      table: { widths: [22, '*', 58], body },
+      fontSize: 5.9,
+      margin: [0, 0.5, 0, 0.5],
+    };
+  }
+
+  private checkBox(checked: boolean = false): any {
+    return {
+      canvas: [
+        { type: 'rect', x: 0, y: 0, w: 5.5, h: 5.5, lineWidth: 0.5 },
+        ...(checked
+          ? [
+              { type: 'line', x1: 1, y1: 3, x2: 2.5, y2: 5, lineWidth: 1 },
+              { type: 'line', x1: 2.5, y1: 5, x2: 4.5, y2: 1, lineWidth: 1 },
+            ]
+          : []),
+      ],
+    };
+  }
+
+  // -----------------------
+  // helpers
+  // -----------------------
+  private pick(v: any, keys: string[], fallback: any = ''): any {
+    for (const k of keys) {
+      const val = v?.[k];
+      if (val !== undefined && val !== null && String(val).trim() !== '') return val;
+    }
+    return fallback;
+  }
+
+  private formatDate(x: any): string {
+    if (!x) return '';
+    const d = x instanceof Date ? x : new Date(x);
+    if (isNaN(d.getTime())) return String(x);
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
   }
 }

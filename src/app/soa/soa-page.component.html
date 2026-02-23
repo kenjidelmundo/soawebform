@@ -8,19 +8,20 @@
 
     <div class="rightSpan">
 
-<div style="position:fixed; left:-10000px; top:0; pointer-events:none;">
-  <app-assessment #assess></app-assessment>
-</div>
+      <!-- ✅ Hidden Assessment component for PDF capture (NO layout impact)
+           ✅ FIX: pass the SAME form instance -->
+      <div style="position:fixed; left:-10000px; top:0; pointer-events:none;">
+        <app-assessment #assess [form]="form"></app-assessment>
+      </div>
 
-<app-soa-right-panel
-  [form]="form"
-  (onSave)="save()"
-  (onNewRecord)="newRecord()"
-  (onPrintSOA)="printSoa()"
-  (onAssessment)="assess.exportPDF()"
-  (onPrintOP)="printOp()"
-></app-soa-right-panel>
-
+      <app-soa-right-panel
+        [form]="form"
+        (onSave)="save()"
+        (onNewRecord)="newRecord()"
+        (onPrintSOA)="printSoa()"
+        (onAssessment)="assess.exportPDF()"
+        (onPrintOP)="printOp()"
+      ></app-soa-right-panel>
 
     </div>
 

@@ -1,4 +1,14 @@
-import { Component, ElementRef, ViewChild, Input, ChangeDetectorRef, NgZone } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  ViewChild,
+  Input,
+  ChangeDetectorRef,
+  NgZone,
+  OnDestroy,
+  OnChanges,
+  SimpleChanges,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import html2canvas from 'html2canvas';
@@ -11,18 +21,70 @@ import jsPDF from 'jspdf';
   templateUrl: './assessment.component.html',
   styleUrls: ['./assessment.component.css'],
 })
-export class AssessmentComponent {
-  @Input() form!: FormGroup;
-  @ViewChild('printArea', { static: true }) printArea!: ElementRef<HTMLElement>;
+export class AssessmentComponent implements OnChanges, OnDestroy {
+  // ✅ keep @Input but also store it safely
+  private _form: FormGroup | null = null;
+
+  @Input()
+  set form(v: FormGroup) {
+    this._form = v;
+    console.log('[Assessment] ✅ form received');
+    this.logDebug('setter');
+  }
+  get form(): FormGroup {
+    return this._form as FormGroup;
+  }
+
+  @ViewChild('printArea', { static: true })
+  printArea!: ElementRef<HTMLElement>;
 
   private lastHash = '';
   private lastPdfUrl: string | null = null;
 
   constructor(private cdr: ChangeDetectorRef, private zone: NgZone) {}
 
-  // ✅ your template calls these
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['form']) {
+      console.log('[Assessment] ngOnChanges form changed');
+      this.logDebug('ngOnChanges');
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.lastPdfUrl) URL.revokeObjectURL(this.lastPdfUrl);
+  }
+
+  // -----------------------------
+  // Helpers used by your HTML
+  // -----------------------------
+
+  /**
+   * ✅ IMPORTANT TS-ONLY MAPPING (NO HTML CHANGE)
+   * Your HTML prints v('payeeName'), but your form stores payeeName = selected DB id.
+   * So for PDF we return licensee (string) instead.
+   *
+   * Also HTML uses v('years') but your form control is periodYears.
+   */
   v(name: string): any {
-    return this.form?.get(name)?.value ?? '';
+    if (!this._form) return '';
+
+    // map payeeName -> licensee text
+    if (name === 'payeeName') {
+      const lic = this._form.get('licensee')?.value;
+      if (lic !== undefined && lic !== null && String(lic).trim() !== '') {
+        return String(lic).trim();
+      }
+      // fallback to raw payeeName (id)
+      return this._form.get('payeeName')?.value ?? '';
+    }
+
+    // map years -> periodYears
+    if (name === 'years') {
+      const py = this._form.get('periodYears')?.value;
+      return py ?? this._form.get('years')?.value ?? 0;
+    }
+
+    return this._form.get(name)?.value ?? '';
   }
 
   chk(name: string): string {
@@ -32,7 +94,10 @@ export class AssessmentComponent {
   money(val: any): string {
     const n = Number(val);
     const x = Number.isFinite(n) ? n : 0;
-    return x.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return x.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   }
 
   d(val: any): string {
@@ -45,20 +110,26 @@ export class AssessmentComponent {
     return `${dd}/${mm}/${yyyy}`;
   }
 
+  // -----------------------------
+  // MAIN: called by parent
+  // -----------------------------
   async exportPDF(): Promise<void> {
     const el = this.printArea?.nativeElement;
     if (!el) {
       alert('printArea not found');
       return;
     }
-    if (!this.form) {
-      alert('FormGroup not passed to AssessmentComponent');
-      return;
-    }
 
-    // ✅ DEBUG: confirm values exist
-    console.log('[Assessment] raw form:', this.form.getRawValue?.() ?? this.form.value);
-    console.log('[Assessment] date:', this.v('date'), 'soaSeries:', this.v('soaSeries'), 'payeeName:', this.v('payeeName'));
+    // ✅ if user clicks too fast, wait a bit for input to arrive
+    if (!this._form) {
+      console.warn('[Assessment] form not yet set, waiting...');
+      await this.nextFrame();
+      await this.nextFrame();
+      if (!this._form) {
+        alert('FormGroup not passed to AssessmentComponent');
+        return;
+      }
+    }
 
     // ✅ open tab instantly (popup-safe)
     const win = window.open('about:blank', '_blank');
@@ -68,33 +139,43 @@ export class AssessmentComponent {
     }
     this.renderLoadingScreen(win);
 
-    // ✅ compute hash for cache
-    const hash = this.safeHash(JSON.stringify(this.form.getRawValue?.() ?? this.form.value ?? {}));
+    // ✅ commit latest values and force render
+    this._form.updateValueAndValidity({ emitEvent: false });
+    this.cdr.detectChanges();
+
+    // ✅ wait until zone stable + 2 frames so interpolation updates in DOM
+    await this.waitForAngularStable();
+    await this.nextFrame();
+    await this.nextFrame();
+
+    // ✅ debug
+    console.log('[Assessment] raw form:', this._form.getRawValue?.() ?? this._form.value);
+    this.logDebug('before-capture');
+
+    // ✅ cache hash
+    const raw = this._form.getRawValue?.() ?? this._form.value ?? {};
+    const hash = this.safeHash(JSON.stringify(raw));
     if (hash === this.lastHash && this.lastPdfUrl) {
+      console.log('[Assessment] ✅ using cached PDF');
       this.renderPdf(win, this.lastPdfUrl);
       return;
     }
 
-    // ✅ Ensure latest values are applied and rendered in THIS component template
-    this.form.updateValueAndValidity({ emitEvent: false });
-    this.cdr.detectChanges();
-
-    // ✅ wait 2 frames so Angular interpolation updates DOM
-    await this.nextFrame();
-    await this.nextFrame();
-
+    // ✅ save + temporarily adjust styles (TS-only)
     const old = {
-      width: el.style.width,
-      height: el.style.height,
       overflow: el.style.overflow,
       background: el.style.background,
     };
+    const prevScrollX = window.scrollX;
+    const prevScrollY = window.scrollY;
 
     try {
-      el.style.width = '1123px';
-      el.style.height = '794px';
-      el.style.overflow = 'hidden';
-      el.style.background = '#fff';
+      el.style.overflow = 'visible';
+      el.style.background = '#ffffff';
+      window.scrollTo(0, 0);
+
+      const fullW = Math.ceil(el.scrollWidth || el.getBoundingClientRect().width);
+      const fullH = Math.ceil(el.scrollHeight || el.getBoundingClientRect().height);
 
       // ✅ run html2canvas outside angular for speed
       const canvas = await this.zone.runOutsideAngular(() =>
@@ -103,10 +184,10 @@ export class AssessmentComponent {
           useCORS: true,
           backgroundColor: '#ffffff',
           logging: false,
-          width: 1123,
-          height: 794,
-          windowWidth: 1123,
-          windowHeight: 794,
+          width: fullW,
+          height: fullH,
+          windowWidth: fullW,
+          windowHeight: fullH,
           scrollX: 0,
           scrollY: 0,
         } as any)
@@ -123,7 +204,23 @@ export class AssessmentComponent {
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
 
-      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, pageH);
+      const imgW = pageW;
+      const imgH = (canvas.height * imgW) / canvas.width;
+
+      // ✅ multi-page if needed
+      if (imgH <= pageH) {
+        pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
+      } else {
+        let y = 0;
+        let remaining = imgH;
+
+        while (remaining > 0) {
+          pdf.addImage(imgData, 'JPEG', 0, y, imgW, imgH);
+          remaining -= pageH;
+          y -= pageH;
+          if (remaining > 0) pdf.addPage();
+        }
+      }
 
       const blob = pdf.output('blob');
       const url = URL.createObjectURL(blob);
@@ -132,22 +229,55 @@ export class AssessmentComponent {
       if (this.lastPdfUrl) URL.revokeObjectURL(this.lastPdfUrl);
       this.lastPdfUrl = url;
 
+      console.log('[Assessment] ✅ PDF generated:', url);
+      this.logDebug('after-generate');
+
       this.renderPdf(win, url);
     } catch (e) {
       console.error(e);
       win.document.open();
-      win.document.write(`<p style="font-family:Arial;padding:12px;color:red">Export failed. Check console.</p>`);
+      win.document.write(
+        `<p style="font-family:Arial;padding:12px;color:red">Export failed. Check console.</p>`
+      );
       win.document.close();
     } finally {
-      el.style.width = old.width;
-      el.style.height = old.height;
       el.style.overflow = old.overflow;
       el.style.background = old.background;
+      window.scrollTo(prevScrollX, prevScrollY);
     }
   }
 
+  // -----------------------------
+  // Utilities
+  // -----------------------------
   private nextFrame(): Promise<void> {
     return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  }
+
+  private waitForAngularStable(): Promise<void> {
+    return new Promise((resolve) => {
+      const sub = this.zone.onStable.subscribe(() => {
+        sub.unsubscribe();
+        resolve();
+      });
+      // if already stable, resolve soon
+      queueMicrotask(() => resolve());
+    });
+  }
+
+  private logDebug(tag: string) {
+    console.log(`[Assessment][${tag}]`, {
+      date: this.v('date'),
+      soaSeries: this.v('soaSeries'),
+      payeeName_text: this.v('payeeName'), // ✅ will now show licensee
+      payeeName_raw_id: this._form?.get('payeeName')?.value,
+      licensee: this._form?.get('licensee')?.value,
+      totalAmount: this.v('totalAmount'),
+      totalAmount_money: this.money(this.v('totalAmount')),
+      periodFrom: this.v('periodFrom'),
+      periodTo: this.v('periodTo'),
+      years: this.v('years'),
+    });
   }
 
   private renderLoadingScreen(win: Window) {

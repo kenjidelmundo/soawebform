@@ -14,7 +14,6 @@ export class SoaPdfService {
       pageOrientation: 'landscape',
       pageMargins: [6, 6, 6, 6],
       defaultStyle: { fontSize: 6.0, lineHeight: 1.02 },
-
       content: [
         {
           columns: [
@@ -27,6 +26,10 @@ export class SoaPdfService {
         },
       ],
     };
+
+    // ✅ DEBUG: check what PDF receives
+    console.log('[SoaPdfService] soa.type:', (soa as any)?.type);
+    console.log('[SoaPdfService] soa.flags:', (soa as any)?.flags);
 
     pdfMake.createPdf(docDefinition).open();
   }
@@ -115,12 +118,26 @@ export class SoaPdfService {
   }
 
   // =========================
-  // full column
+  // ✅ checkbox resolver:
+  // 1) use soa.flags booleans (txnNew etc)
+  // 2) fallback to soa.type
   // =========================
-  private soaColumn(copyLabel: string, soa: Soa): any {
-    const t = (soa as any)?.type ?? '';
+  private resolveTypes(soa: Soa) {
+    const flags = (soa as any)?.flags ?? null;
 
-    const types = {
+    if (flags) {
+      return {
+        New: !!flags.txnNew,
+        Ren: !!flags.txnRenew,
+        ECO: !!flags.txnCO,
+        CV:  !!flags.txnCV,
+        MOD: !!flags.txnModification,
+        ROC: !!flags.catROC,
+      };
+    }
+
+    const t = (soa as any)?.type ?? '';
+    return {
       New: t === 'New',
       Ren: t === 'Ren',
       ECO: t === 'ECO',
@@ -128,6 +145,13 @@ export class SoaPdfService {
       MOD: t === 'MOD',
       ROC: t === 'ROC',
     };
+  }
+
+  // =========================
+  // full column
+  // =========================
+  private soaColumn(copyLabel: string, soa: Soa): any {
+    const types = this.resolveTypes(soa);
 
     // form-aligned info row: label | : | value
     const infoLine = (label: string, value: any) => ({
@@ -146,10 +170,12 @@ export class SoaPdfService {
       width: 'auto',
     });
 
+    // ✅ Particulars text (will be printed inside the box)
+    const particularsText = String((soa as any)?.particulars ?? '');
+
     return {
       width: '25%',
       stack: [
-        // ✅ HEADER ORDER: NTC -> SOA -> COPY LABEL (tight spacing)
         {
           stack: [
             {
@@ -169,19 +195,17 @@ export class SoaPdfService {
               text: copyLabel,
               fontSize: 5.8,
               alignment: 'center',
-              margin: [0, 0, 0, 0.8], // space before Date block
+              margin: [0, 0, 0, 0.8],
             },
           ],
           margin: [0, 0, 0, 0],
         },
 
-        // ✅ INFO BLOCK (like screenshot)
         infoLine('Date', (soa as any)?.date),
         infoLine('SOA No.', (soa as any)?.soaNo),
         infoLine('Name', (soa as any)?.name),
         infoLine('Address', (soa as any)?.address),
 
-        // ✅ checkbox row (tight)
         {
           columns: [
             cbItem('New', types.New),
@@ -195,12 +219,16 @@ export class SoaPdfService {
           margin: [0, 0.4, 0, 0.4],
         },
 
-        // ✅ Particulars line + box (aligned)
+        // ✅ Particulars label + box + ACTUAL VALUE inside
         {
           columns: [
             { text: 'Particulars:', bold: true, width: 52, fontSize: 6.0 },
             {
-              canvas: [{ type: 'rect', x: 0, y: 0, w: 130, h: 8, lineWidth: 0.8 }],
+              stack: [
+                { canvas: [{ type: 'rect', x: 0, y: 0, w: 130, h: 8, lineWidth: 0.8 }] },
+                // ✅ print text over the rectangle
+                { text: particularsText, fontSize: 6.0, margin: [2, -7.1, 0, 0] },
+              ],
               width: '*',
             },
           ],
@@ -208,17 +236,14 @@ export class SoaPdfService {
           margin: [0, 0, 0, 2],
         },
 
-        // ✅ table
         this.createSoaTable(soa),
 
-        // ✅ bottom note
         {
           text: 'NOTE: To be paid on or before the due date otherwise subject to reassessment.',
           fontSize: 5.6,
           margin: [0, 2, 0, 1],
         },
 
-        // ✅ bottom checkboxes
         {
           columns: [
             { columns: [this.cb(false), { text: 'For Assessment Only', fontSize: 5.6 }], columnGap: 2 },
@@ -231,4 +256,3 @@ export class SoaPdfService {
     };
   }
 }
-   

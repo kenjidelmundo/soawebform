@@ -29,7 +29,9 @@ export class SoaPageComponent {
   form: FormGroup;
   saving = false;
 
-  @ViewChild('assess') assess!: AssessmentComponent;
+  // ✅ FIX: do NOT use @ViewChild('assess') unless your HTML has #assess
+  // This will find the first <app-assessment> in your template automatically.
+  @ViewChild(AssessmentComponent) assess!: AssessmentComponent;
 
   constructor(private fb: FormBuilder, private soaService: SoaService) {
     this.form = this.fb.group({
@@ -120,18 +122,18 @@ export class SoaPageComponent {
       // ✅ REQUIRED HIDDEN CONTROLS (for SoaFees computation)
       // ==================================================
       // ROC selectors
-      amType: [''],        // ex: COMM-NEW, SROP-NEW, etc
-      rocClass: [''],      // ex: RTG 1st, PHN 2nd, etc
-      rocYears: [1],       // ✅ default 1 (NOT 0)
+      amType: [''], // ex: COMM-NEW, SROP-NEW, etc
+      rocClass: [''], // ex: RTG 1st, PHN 2nd, etc
+      rocYears: [1], // ✅ default 1 (NOT 0)
 
       // AMATEUR selectors
-      amateurType: [''],   // ✅ REQUIRED (missing in your code)
-      amYears: [1],        // ✅ default 1 (NOT 0)
+      amateurType: [''], // ✅ REQUIRED (missing in your code)
+      amYears: [1], // ✅ default 1 (NOT 0)
 
       // Ship selectors (if you use)
       shipType: [''],
-      shipYears: [1],      // ✅ default 1
-      shipUnits: [1],      // ✅ default 1
+      shipYears: [1], // ✅ default 1
+      shipUnits: [1], // ✅ default 1
     });
   }
 
@@ -325,14 +327,31 @@ export class SoaPageComponent {
     );
   }
 
-  printSoa(): void { console.log('printSoa'); }
-  printOp(): void { console.log('printOp'); }
+  printSoa(): void {
+    console.log('printSoa');
+  }
 
+  printOp(): void {
+    console.log('printOp');
+  }
+
+  // ✅ FIXED: will now find the component and call exportPDF()
   assessmentOnly(): void {
-    if (!this.assess) {
-      alert('Assessment component not found.');
+    if (!this.form) {
+      alert('Parent form not ready.');
       return;
     }
+
+    if (!this.assess) {
+      alert(
+        'Assessment component not found in DOM.\nMake sure <app-assessment [form]="form"> exists in soa-page.component.html.'
+      );
+      return;
+    }
+
+    // ensure current typed changes are committed
+    this.form.updateValueAndValidity({ emitEvent: false });
+
     this.assess.exportPDF();
   }
 }

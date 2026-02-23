@@ -53,17 +53,24 @@ export class SoaRightPanelComponent {
     return fallback;
   }
 
+  // ✅ This is what your button should call
   printSOAPreview(): void {
-    const v: any = this.form?.value ?? {};
+    if (!this.form) {
+      alert('Form not found.');
+      return;
+    }
 
-    // ✅ robust field picking (works even if your form uses different names)
+    // ✅ IMPORTANT: getRawValue so checkboxes are included correctly
+    const v: any = this.form.getRawValue?.() ?? this.form.value ?? {};
+
+    // ✅ BASIC FIELDS
     const dateVal = this.pick(v, ['dateIssued', 'date', 'DateIssued'], '');
     const nameVal = this.pick(v, ['licensee', 'Licensee', 'name'], '');
     const addressVal = this.pick(v, ['address', 'Address'], '');
     const particularsVal = this.pick(v, ['particulars', 'Particulars'], '');
     const periodCoveredVal = this.pick(v, ['periodCovered', 'PeriodCovered'], '');
 
-    // ✅ IMPORTANT: DST can be dst OR DST (your API uses DST)
+    // ✅ DST
     const dstVal = this.pickNum(v, ['dst', 'DST'], 0);
 
     // ✅ AM/ROC computed fields (your SoaFeesComponent must patch these exact names)
@@ -74,37 +81,62 @@ export class SoaRightPanelComponent {
     const amSeminarFee          = this.pickNum(v, ['amSeminarFee'], 0);
     const amSurcharges          = this.pickNum(v, ['amSurcharges', 'amSurchargesFee', 'amSurcharge'], 0);
 
-    // ✅ If you also want ROC raw fields to appear when AM fields are zero, fallback:
-    const rocRadioStation = this.pickNum(v, ['rocRadioStation'], 0);
-    const rocOperatorFee  = this.pickNum(v, ['rocOperatorFee'], 0);
-    const rocApplicationFee = this.pickNum(v, ['rocApplicationFee'], 0);
-    const rocFilingFee    = this.pickNum(v, ['rocFillingFee'], 0);
-    const rocSeminarFee   = this.pickNum(v, ['rocSeminarFee'], 0);
-    const rocSurcharge    = this.pickNum(v, ['rocSurcharge'], 0);
+    // ✅ fallback ROC raw fields
+    const rocRadioStation    = this.pickNum(v, ['rocRadioStation'], 0);
+    const rocOperatorFee     = this.pickNum(v, ['rocOperatorFee'], 0);
+    const rocApplicationFee2 = this.pickNum(v, ['rocApplicationFee'], 0);
+    const rocFilingFee       = this.pickNum(v, ['rocFillingFee'], 0);
+    const rocSeminarFee      = this.pickNum(v, ['rocSeminarFee'], 0);
+    const rocSurcharge       = this.pickNum(v, ['rocSurcharge'], 0);
 
-    // ✅ choose displayed values:
     const showRadioStation = amRadioStationLicense !== 0 ? amRadioStationLicense : rocRadioStation;
     const showOperatorCert = amRadioOperatorsCert  !== 0 ? amRadioOperatorsCert  : rocOperatorFee;
-    const showAppFee       = amApplicationFee      !== 0 ? amApplicationFee      : rocApplicationFee;
+    const showAppFee       = amApplicationFee      !== 0 ? amApplicationFee      : rocApplicationFee2;
     const showFilingFee    = amFilingFee           !== 0 ? amFilingFee           : rocFilingFee;
     const showSeminarFee   = amSeminarFee          !== 0 ? amSeminarFee          : rocSeminarFee;
     const showSurcharges   = amSurcharges          !== 0 ? amSurcharges          : rocSurcharge;
 
+    // ✅ ✅ ✅ KEY FIX: send real checkbox booleans to PDF
+    const checkboxFlags = {
+      txnNew: !!v.txnNew,
+      txnRenew: !!v.txnRenew,
+      txnCO: !!v.txnCO,
+      txnCV: !!v.txnCV,
+      txnModification: !!v.txnModification,
+      catROC: !!v.catROC,
+
+      // optional right-panel categories if you want later:
+      catMS: !!v.catMS,
+      catMA: !!v.catMA,
+      catOTHERS: !!v.catOTHERS,
+    };
+
+    // ✅ Keep type for backward compatibility (not required anymore)
+    const type =
+      checkboxFlags.txnNew ? 'New' :
+      checkboxFlags.txnRenew ? 'Ren' :
+      checkboxFlags.txnCO ? 'ECO' :
+      checkboxFlags.txnCV ? 'CV' :
+      checkboxFlags.txnModification ? 'MOD' :
+      checkboxFlags.catROC ? 'ROC' : 'New';
+
     const soaData: any = {
-      soaNo: this.pick(v, ['soaNo', 'SOASeries', 'soaSeries'], ''),
+      // ✅ header
+      soaNo: this.pick(v, ['soaNo', 'SOASeries', 'soaSeries', 'seriesNumber'], ''),
       date: dateVal,
       name: nameVal,
       address: addressVal,
-      type: this.pick(v, ['type'], 'New'),
       particulars: particularsVal,
       periodCovered: periodCoveredVal,
+
+      // ✅ pass BOTH (some templates use type, ours will use the flags)
+      type,
+      flags: checkboxFlags, // ✅ NEW: used by pdf service
 
       sections: [
         {
           title: 'FOR LICENSES',
           rows: [
-            // NOTE: your backend fields are rslPurchase, rslFillingFee, etc.
-            // If your form uses lic* fields, keep them; else add fallback to rsl*.
             ['Permit to Purchase', this.pickNum(v, ['licPermitToPurchase', 'rslPurchase'], 0)],
             ['Filing Fee', this.pickNum(v, ['licFilingFee', 'rslFillingFee'], 0)],
             ['Permit to Possess / Storage', this.pickNum(v, ['licPermitToPossess', 'rslPossess'], 0)],
@@ -113,7 +145,7 @@ export class SoaRightPanelComponent {
             ['Inspection Fee', this.pickNum(v, ['licInspectionFee', 'rslInspection'], 0)],
             ['Spectrum User’s Fee (SUF)', this.pickNum(v, ['licSUF', 'rslSUF'], 0)],
             ['Surcharges', this.pickNum(v, ['licSurcharges', 'rslSurcharge'], 0)],
-            ['Fines and Penalties', this.pickNum(v, ['licFinesPenalties', 'AmnestyFine'], 0)],
+            ['Fines and Penalties', this.pickNum(v, ['licFinesPenalties'], 0)],
           ]
         },
         {
@@ -140,18 +172,22 @@ export class SoaRightPanelComponent {
           title: 'OTHER APPLICATION',
           rows: [
             ['Registration Fee', this.pickNum(v, ['appRegistrationFee', 'otherRegistration'], 0)],
-            ['Supervision / Regulation Fee', this.pickNum(v, ['appSupervisionRegulationFee', 'otherSRF'], 0)],
-            ['Verification / Authentication Fee', this.pickNum(v, ['appVerificationAuthFee', 'otherVerification'], 0)],
-            ['Examination Fee', this.pickNum(v, ['appExaminationFee', 'otherExam'], 0)],
-            ['Clearance / Certification Fee (Special)', this.pickNum(v, ['appClearanceCertificationFee', 'otherClearanceandCertFee'], 0)],
+            ['Supervision / Regulation Fee', this.pickNum(v, ['appSupervisionRegulationFee', 'otherSupervisionRegulation'], 0)],
+            ['Verification / Authentication Fee', this.pickNum(v, ['appVerificationAuthFee', 'otherVerificationAuthentication'], 0)],
+            ['Examination Fee', this.pickNum(v, ['appExaminationFee', 'otherExamination'], 0)],
+            ['Clearance / Certification Fee (Special)', this.pickNum(v, ['appClearanceCertificationFee', 'otherClearanceCertification'], 0)],
             ['Modification Fee', this.pickNum(v, ['appModificationFee', 'otherModification'], 0)],
             ['Miscellaneous Income', this.pickNum(v, ['appMiscIncome', 'otherMiscIncome'], 0)],
             ['Documentary Stamp Tax (DST)', dstVal],
-            ['Others', this.pickNum(v, ['appOthers', 'otherOTHERS'], 0)],
+            ['Others', this.pickNum(v, ['appOthers', 'otherOthers'], 0)],
           ]
         }
       ]
     };
+
+    // ✅ DEBUG: verify checkbox values before sending to pdf
+    console.log('[RightPanel] checkboxFlags', checkboxFlags);
+    console.log('[RightPanel] particulars', particularsVal, 'periodCovered', periodCoveredVal);
 
     this.soaPdf.generatePDF(soaData);
   }
