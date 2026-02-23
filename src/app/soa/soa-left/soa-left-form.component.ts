@@ -18,6 +18,13 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { AddressDialogComponent, AddressProvince } from './address-dialog.component';
 import { ParticularsDialogComponent } from './particulars-dialog.component';
 
+// ✅ already have
+import { RocSubtypeDialogComponent } from './roc-subtype-dialog.component';
+import { TxnTypeDialogComponent, TxnType } from './txn-type-dialog.component';
+
+// ✅ NEW file you need to add
+import { RocLevelDialogComponent } from './roc-level-dialog.component';
+
 type PayeeItem = { id: number; name: string };
 
 @Component({
@@ -44,10 +51,8 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private particularsCoolDownUntil = 0;
   private readonly COOLDOWN_MS = 350;
 
-  // ✅ recommended: next period starts day AFTER previous To (no overlap)
   private readonly START_NEXT_PERIOD_NEXT_DAY = true;
 
-  // ✅ Sample Province/Town/Brgy (replace with your real list)
   private readonly addressData: AddressProvince[] = [
     {
       province: 'Camarines Sur',
@@ -69,6 +74,9 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadPayees();
     this.setupPeriodCovered();
     this.setupPayeeSelectionAutoFill();
+
+    // ✅ auto-check txn + auto-set category flags whenever particulars changes
+    this.setupAutoTxnFromParticulars();
   }
 
   ngAfterViewInit(): void {
@@ -112,6 +120,93 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  // ======================================================
+  // ✅ AUTO CHECK RIGHT PANEL: NEW / RENEW / MOD
+  // ✅ ALSO AUTO-SET catROC/catMA so computation will run
+  // ======================================================
+  private setupAutoTxnFromParticulars(): void {
+    const ctrl = this.form?.get('particulars');
+    if (!ctrl) return;
+
+    ctrl.valueChanges
+      .pipe(startWith(ctrl.value), takeUntil(this.destroy$))
+      .subscribe((val) => {
+        const text = String(val ?? '').trim();
+        if (!text) return;
+
+        this.applyTxnFromParticulars(text);
+        this.applyCategoryFromParticulars(text);
+      });
+  }
+
+  private applyTxnFromParticulars(particularsText: string): void {
+    const t = particularsText.toUpperCase();
+
+    const isMod =
+      t.includes('MODIFICATION') ||
+      t.includes('MODIFIED') ||
+      t.includes('MODIF') ||
+      t.includes('AMEND') ||
+      t.includes('CHANGE') ||
+      t.includes('CORRECTION');
+
+    const isRenew =
+      t.includes('RENEW') ||
+      t.includes('RENEWAL') ||
+      t.includes('REVALID') ||
+      t.includes('EXTEND') ||
+      t.includes('REISSUE') ||
+      t.includes('RE-ISSUE');
+
+    const isNew = !isMod && !isRenew;
+
+    this.form.patchValue(
+      {
+        txnNew: isNew,
+        txnRenew: isRenew,
+        txnModification: isMod,
+      },
+      { emitEvent: false }
+    );
+  }
+
+  // ✅ IMPORTANT: if this is not set, your fee computation stays 0
+  private applyCategoryFromParticulars(particularsText: string): void {
+    const t = particularsText.toUpperCase();
+
+    const isROC = t.includes('ROC');
+    const isMA =
+      t.includes('AMATEUR') ||
+      t.includes('AT-RSL') ||
+      t.includes(' MA ') ||
+      t.endsWith(' MA') ||
+      t.includes('MA-');
+
+    const patch: any = {};
+
+    if (this.form.get('catROC')) patch.catROC = isROC;
+    if (this.form.get('catMA')) patch.catMA = isMA;
+
+    if (this.form.get('catMS')) patch.catMS = false;
+    if (this.form.get('catOTHERS')) patch.catOTHERS = false;
+
+    if (Object.keys(patch).length) {
+      this.form.patchValue(patch, { emitEvent: true }); // emit so fee component recomputes
+    }
+  }
+
+  // ✅ force txn exactly from txn dialog selection
+  private applyTxnFromTxnChoice(txn: TxnType): void {
+    this.form.patchValue(
+      {
+        txnNew: txn === 'NEW',
+        txnRenew: txn === 'RENEW',
+        txnModification: txn === 'MOD',
+      },
+      { emitEvent: false }
+    );
+  }
+
   // =========================
   // PAYEES (GET ALL)
   // =========================
@@ -148,8 +243,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // =========================
   // AUTO-FILL WHEN PAYEE CHANGES
-  // ✅ Particulars is BLANK (do not fetch)
-  // ✅ periodFrom becomes latest old periodTo (+1 day if enabled)
   // =========================
   private setupPayeeSelectionAutoFill(): void {
     const payeeCtrl = this.form.get('payeeName');
@@ -165,35 +258,29 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           next: (dto: any) => {
             const realId = Number(dto?.id ?? dto?.ID ?? dto?.Id ?? id);
 
-            // ✅ 1) Try direct periodTo from API (if exists)
             const directTo =
               this.toYmd(dto?.periodTo ?? dto?.PeriodTo) ||
               this.toYmd(dto?.to ?? dto?.To);
 
-            // ✅ 2) Parse from periodCovered (supports many formats)
             const parsed = this.periodCoveredToDates(dto?.periodCovered ?? dto?.PeriodCovered);
             const parsedTo = parsed.periodTo ?? '';
 
-            // ✅ choose best oldTo
             const oldTo = directTo || parsedTo || '';
 
-            // ✅ compute new periodFrom
             let newFrom = oldTo;
             if (this.START_NEXT_PERIOD_NEXT_DAY && oldTo) {
               newFrom = this.addDays(oldTo, 1);
             }
 
-            // ✅ patch form
             this.form.patchValue(
               {
                 id: realId,
                 licensee: String(dto?.licensee ?? dto?.Licensee ?? '').trim(),
                 address: String(dto?.address ?? dto?.Address ?? ''),
 
-                // ✅ BLANK particulars
+                // blank particulars by rule
                 particulars: '',
 
-                // ✅ reset categories (optional but recommended)
                 catROC: false,
                 catMA: false,
                 catMS: false,
@@ -203,13 +290,15 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
                   ? String(dto?.dateIssued ?? dto?.DateIssued).slice(0, 10)
                   : this.form.get('date')?.value,
 
-                // ✅ new period starts at latest oldTo (or +1 day)
                 periodFrom: newFrom || this.form.get('periodFrom')?.value,
-
-                // ✅ clear To
                 periodTo: '',
               },
               { emitEvent: true }
+            );
+
+            this.form.patchValue(
+              { txnNew: true, txnRenew: false, txnModification: false },
+              { emitEvent: false }
             );
           },
           error: (err) => console.warn('⚠️ No details found for id:', id, err),
@@ -218,14 +307,12 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // =========================
-  // PARSE periodCovered (many formats)
-  // returns YYYY-MM-DD for date inputs
+  // PARSE periodCovered
   // =========================
   private periodCoveredToDates(periodCovered: any): { periodFrom?: string; periodTo?: string } {
     const s = (periodCovered ?? '').toString().trim();
     if (!s) return {};
 
-    // A) d/M/yyyy - d/M/yyyy  (or dd/MM/yyyy - dd/MM/yyyy)
     let m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
     if (m) {
       const d1 = Number(m[1]), mo1 = Number(m[2]), y1 = Number(m[3]);
@@ -236,7 +323,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       };
     }
 
-    // B) YYYY-MM-DD - YYYY-MM-DD
     m = /^(\d{4})-(\d{2})-(\d{2})\s*-\s*(\d{4})-(\d{2})-(\d{2})$/.exec(s);
     if (m) {
       return {
@@ -245,8 +331,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       };
     }
 
-    // C) OLD FORMAT: YYYY-YYYY  (example 2005-2006)
-    // convert to From=YYYY-01-01, To=YYYY-12-31
     m = /^(\d{4})-(\d{4})$/.exec(s);
     if (m) {
       const y1 = Number(m[1]);
@@ -263,7 +347,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private toYmd(value: any): string {
     if (!value) return '';
-    // already YYYY-MM-DD?
     if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
       return value.trim();
     }
@@ -312,43 +395,139 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       addressInput?.blur();
 
       if (!res) return;
-
       this.form.patchValue({ address: res.fullAddress }, { emitEvent: true });
     });
   }
 
   // =========================
-  // PARTICULARS DIALOG
+  // PARTICULARS DIALOG (ROC -> subtype -> (RTG/PHN -> level) -> txn)
   // =========================
   private openParticularsDialog(): void {
     if (this.particularsDialogOpen) return;
     this.particularsDialogOpen = true;
 
-    const ref = this.dialog.open(ParticularsDialogComponent, {
+    const ref1 = this.dialog.open(ParticularsDialogComponent, {
       width: '460px',
       disableClose: true,
       autoFocus: false,
       restoreFocus: false,
     });
 
-    ref.afterClosed().subscribe((res) => {
+    ref1.afterClosed().subscribe((res1) => {
       this.particularsCoolDownUntil = Date.now() + this.COOLDOWN_MS;
-      this.particularsDialogOpen = false;
 
       const partInput = this.el.nativeElement.querySelector(
         'input[formControlName="particulars"]'
       ) as HTMLInputElement | null;
       partInput?.blur();
 
-      if (!res) return;
+      if (!res1?.value) {
+        this.particularsDialogOpen = false;
+        return;
+      }
 
-      this.form.patchValue({ particulars: res.value }, { emitEvent: true });
+      const service = String(res1.value ?? '').trim();
+      if (!service) {
+        this.particularsDialogOpen = false;
+        return;
+      }
+
+      // ROC path
+      if (service.toUpperCase() === 'ROC') {
+        const ref2 = this.dialog.open(RocSubtypeDialogComponent, {
+          width: '520px',
+          disableClose: true,
+          autoFocus: false,
+          restoreFocus: false,
+        });
+
+        ref2.afterClosed().subscribe((res2) => {
+          if (!res2?.value) {
+            this.particularsDialogOpen = false;
+            return;
+          }
+
+          const subtype = String(res2.value ?? '').trim().toUpperCase();
+          if (!subtype) {
+            this.particularsDialogOpen = false;
+            return;
+          }
+
+          // ✅ If RTG or PHN: ask for level 1/2/3
+          if (subtype === 'RTG' || subtype === 'PHN') {
+            const refLevel = this.dialog.open(RocLevelDialogComponent, {
+              width: '420px',
+              disableClose: true,
+              autoFocus: false,
+              restoreFocus: false,
+              data: { base: subtype },
+            });
+
+            refLevel.afterClosed().subscribe((resL) => {
+              if (!resL?.value) {
+                this.particularsDialogOpen = false;
+                return;
+              }
+
+              const leveled = String(resL.value ?? '').trim().toUpperCase(); // 1RTG/2RTG/3RTG or 1PHN/2PHN/3PHN
+              if (!leveled) {
+                this.particularsDialogOpen = false;
+                return;
+              }
+
+              this.openTxnTypeDialogAndFinalize(`ROC - ${leveled}`);
+            });
+
+            return;
+          }
+
+          // Other ROC subtype
+          this.openTxnTypeDialogAndFinalize(`ROC - ${subtype}`);
+        });
+
+        return;
+      }
+
+      // Non-ROC: directly txn
+      this.openTxnTypeDialogAndFinalize(service);
+    });
+  }
+
+  private openTxnTypeDialogAndFinalize(baseText: string): void {
+    const ref3 = this.dialog.open(TxnTypeDialogComponent, {
+      width: '460px',
+      disableClose: true,
+      autoFocus: false,
+      restoreFocus: false,
+    });
+
+    ref3.afterClosed().subscribe((res3) => {
+      this.particularsCoolDownUntil = Date.now() + this.COOLDOWN_MS;
+      this.particularsDialogOpen = false;
+
+      if (!res3?.value) return;
+
+      const txn = res3.value as TxnType;
+
+      let finalText = baseText;
+      if (txn === 'NEW') finalText = `${baseText} - NEW`;
+      if (txn === 'RENEW') finalText = `${baseText} - RENEW`;
+      if (txn === 'MOD') finalText = `${baseText} - MODIFICATION`;
+
+      // patch particulars
+      this.form.patchValue({ particulars: finalText }, { emitEvent: true });
+
+      // ensure category flags so fees compute
+      this.applyCategoryFromParticulars(finalText);
+
+      // ensure txn checkboxes
+      this.applyTxnFromTxnChoice(txn);
+      this.applyTxnFromParticulars(finalText);
     });
   }
 
   // =========================
   // PERIOD COVERED COMPUTATION
-  // stores FULL DATE RANGE: d/M/yyyy-d/M/yyyy
   // =========================
   private setupPeriodCovered(): void {
     const fromCtrl = this.form.get('periodFrom');

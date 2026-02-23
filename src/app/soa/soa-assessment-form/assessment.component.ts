@@ -6,8 +6,6 @@ import {
   ChangeDetectorRef,
   NgZone,
   OnDestroy,
-  OnChanges,
-  SimpleChanges,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
@@ -21,19 +19,8 @@ import jsPDF from 'jspdf';
   templateUrl: './assessment.component.html',
   styleUrls: ['./assessment.component.css'],
 })
-export class AssessmentComponent implements OnChanges, OnDestroy {
-  // ✅ keep @Input but also store it safely
-  private _form: FormGroup | null = null;
-
-  @Input()
-  set form(v: FormGroup) {
-    this._form = v;
-    console.log('[Assessment] ✅ form received');
-    this.logDebug('setter');
-  }
-  get form(): FormGroup {
-    return this._form as FormGroup;
-  }
+export class AssessmentComponent implements OnDestroy {
+  @Input() form!: FormGroup;
 
   @ViewChild('printArea', { static: true })
   printArea!: ElementRef<HTMLElement>;
@@ -43,61 +30,59 @@ export class AssessmentComponent implements OnChanges, OnDestroy {
 
   constructor(private cdr: ChangeDetectorRef, private zone: NgZone) {}
 
-  ngOnChanges(changes: SimpleChanges): void {
-    if (changes['form']) {
-      console.log('[Assessment] ngOnChanges form changed');
-      this.logDebug('ngOnChanges');
-    }
-  }
-
   ngOnDestroy(): void {
     if (this.lastPdfUrl) URL.revokeObjectURL(this.lastPdfUrl);
   }
 
-  // -----------------------------
-  // Helpers used by your HTML
-  // -----------------------------
+  // ==========================================
+  // ✅ ALIAS MAP (NO HTML CHANGE)
+  // ==========================================
+  private resolveControlName(name: string): string {
+    const map: Record<string, string> = {
+      // HTML uses: co/cv but your form uses txnCO/txnCV
+      co: 'txnCO',
+      cv: 'txnCV',
 
-  /**
-   * ✅ IMPORTANT TS-ONLY MAPPING (NO HTML CHANGE)
-   * Your HTML prints v('payeeName'), but your form stores payeeName = selected DB id.
-   * So for PDF we return licensee (string) instead.
-   *
-   * Also HTML uses v('years') but your form control is periodYears.
-   */
+      // HTML uses these exact names but form uses op*
+      forAssessmentOnly: 'opAssessmentOnly',
+      endorsedForPayment: 'opEndorsedForPayment',
+
+      // HTML uses years but your form uses periodYears
+      years: 'periodYears',
+
+      // HTML uses dueDate but your form uses opNotePayOnOrBefore
+      dueDate: 'opNotePayOnOrBefore',
+    };
+    return map[name] ?? name;
+  }
+
+  // ==========================================
+  // ✅ HTML helpers
+  // ==========================================
   v(name: string): any {
-    if (!this._form) return '';
+    if (!this.form) return '';
 
-    // map payeeName -> licensee text
+    // ✅ BIG FIX: template prints v('payeeName') but your control is an ID.
+    // Return LICENSEE string instead.
     if (name === 'payeeName') {
-      const lic = this._form.get('licensee')?.value;
-      if (lic !== undefined && lic !== null && String(lic).trim() !== '') {
-        return String(lic).trim();
-      }
-      // fallback to raw payeeName (id)
-      return this._form.get('payeeName')?.value ?? '';
+      const lic = this.form.get('licensee')?.value;
+      return (lic ?? '').toString();
     }
 
-    // map years -> periodYears
-    if (name === 'years') {
-      const py = this._form.get('periodYears')?.value;
-      return py ?? this._form.get('years')?.value ?? 0;
-    }
-
-    return this._form.get(name)?.value ?? '';
+    const real = this.resolveControlName(name);
+    return this.form.get(real)?.value ?? '';
   }
 
   chk(name: string): string {
-    return this.v(name) ? '☑' : '☐';
+    const real = this.resolveControlName(name);
+    const val = this.form?.get(real)?.value;
+    return !!val ? '☑' : '☐';
   }
 
   money(val: any): string {
     const n = Number(val);
     const x = Number.isFinite(n) ? n : 0;
-    return x.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+    return x.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   d(val: any): string {
@@ -110,28 +95,36 @@ export class AssessmentComponent implements OnChanges, OnDestroy {
     return `${dd}/${mm}/${yyyy}`;
   }
 
-  // -----------------------------
-  // MAIN: called by parent
-  // -----------------------------
+  // ==========================================
+  // ✅ PDF EXPORT (html2canvas)
+  // ==========================================
   async exportPDF(): Promise<void> {
     const el = this.printArea?.nativeElement;
+
     if (!el) {
       alert('printArea not found');
       return;
     }
-
-    // ✅ if user clicks too fast, wait a bit for input to arrive
-    if (!this._form) {
-      console.warn('[Assessment] form not yet set, waiting...');
-      await this.nextFrame();
-      await this.nextFrame();
-      if (!this._form) {
-        alert('FormGroup not passed to AssessmentComponent');
-        return;
-      }
+    if (!this.form) {
+      alert('FormGroup not passed to AssessmentComponent');
+      return;
     }
 
-    // ✅ open tab instantly (popup-safe)
+    // ✅ DEBUG values that must appear
+    console.log('[Assessment] RAW:', this.form.getRawValue?.() ?? this.form.value);
+    console.log('[Assessment] DEBUG:', {
+      date: this.v('date'),
+      soaSeries: this.v('soaSeries'),
+      payeeName_display: this.v('payeeName'), // ✅ licensee string now
+      licensee: this.v('licensee'),
+      totalAmount: this.v('totalAmount'),
+      co: this.chk('co'),
+      cv: this.chk('cv'),
+      years: this.v('years'),
+      periodYears: this.v('periodYears'),
+    });
+
+    // popup-safe
     const win = window.open('about:blank', '_blank');
     if (!win) {
       alert('Popup blocked. Allow popups for localhost:4200');
@@ -139,55 +132,35 @@ export class AssessmentComponent implements OnChanges, OnDestroy {
     }
     this.renderLoadingScreen(win);
 
-    // ✅ commit latest values and force render
-    this._form.updateValueAndValidity({ emitEvent: false });
-    this.cdr.detectChanges();
-
-    // ✅ wait until zone stable + 2 frames so interpolation updates in DOM
-    await this.waitForAngularStable();
-    await this.nextFrame();
-    await this.nextFrame();
-
-    // ✅ debug
-    console.log('[Assessment] raw form:', this._form.getRawValue?.() ?? this._form.value);
-    this.logDebug('before-capture');
-
-    // ✅ cache hash
-    const raw = this._form.getRawValue?.() ?? this._form.value ?? {};
+    // cache hash
+    const raw = this.form.getRawValue?.() ?? this.form.value ?? {};
     const hash = this.safeHash(JSON.stringify(raw));
     if (hash === this.lastHash && this.lastPdfUrl) {
-      console.log('[Assessment] ✅ using cached PDF');
       this.renderPdf(win, this.lastPdfUrl);
       return;
     }
 
-    // ✅ save + temporarily adjust styles (TS-only)
+    // ✅ force render before capture
+    this.form.updateValueAndValidity({ emitEvent: false });
+    this.cdr.detectChanges();
+    await this.nextFrame();
+    await this.nextFrame();
+
     const old = {
       overflow: el.style.overflow,
       background: el.style.background,
     };
-    const prevScrollX = window.scrollX;
-    const prevScrollY = window.scrollY;
 
     try {
       el.style.overflow = 'visible';
-      el.style.background = '#ffffff';
-      window.scrollTo(0, 0);
+      el.style.background = '#fff';
 
-      const fullW = Math.ceil(el.scrollWidth || el.getBoundingClientRect().width);
-      const fullH = Math.ceil(el.scrollHeight || el.getBoundingClientRect().height);
-
-      // ✅ run html2canvas outside angular for speed
       const canvas = await this.zone.runOutsideAngular(() =>
         html2canvas(el, {
           scale: 2,
           useCORS: true,
           backgroundColor: '#ffffff',
           logging: false,
-          width: fullW,
-          height: fullH,
-          windowWidth: fullW,
-          windowHeight: fullH,
           scrollX: 0,
           scrollY: 0,
         } as any)
@@ -204,16 +177,16 @@ export class AssessmentComponent implements OnChanges, OnDestroy {
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
 
+      // fit image to page
       const imgW = pageW;
       const imgH = (canvas.height * imgW) / canvas.width;
 
-      // ✅ multi-page if needed
       if (imgH <= pageH) {
         pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
       } else {
+        // multi-page
         let y = 0;
         let remaining = imgH;
-
         while (remaining > 0) {
           pdf.addImage(imgData, 'JPEG', 0, y, imgW, imgH);
           remaining -= pageH;
@@ -229,55 +202,20 @@ export class AssessmentComponent implements OnChanges, OnDestroy {
       if (this.lastPdfUrl) URL.revokeObjectURL(this.lastPdfUrl);
       this.lastPdfUrl = url;
 
-      console.log('[Assessment] ✅ PDF generated:', url);
-      this.logDebug('after-generate');
-
       this.renderPdf(win, url);
     } catch (e) {
       console.error(e);
       win.document.open();
-      win.document.write(
-        `<p style="font-family:Arial;padding:12px;color:red">Export failed. Check console.</p>`
-      );
+      win.document.write(`<p style="font-family:Arial;padding:12px;color:red">Export failed. Check console.</p>`);
       win.document.close();
     } finally {
       el.style.overflow = old.overflow;
       el.style.background = old.background;
-      window.scrollTo(prevScrollX, prevScrollY);
     }
   }
 
-  // -----------------------------
-  // Utilities
-  // -----------------------------
   private nextFrame(): Promise<void> {
     return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-  }
-
-  private waitForAngularStable(): Promise<void> {
-    return new Promise((resolve) => {
-      const sub = this.zone.onStable.subscribe(() => {
-        sub.unsubscribe();
-        resolve();
-      });
-      // if already stable, resolve soon
-      queueMicrotask(() => resolve());
-    });
-  }
-
-  private logDebug(tag: string) {
-    console.log(`[Assessment][${tag}]`, {
-      date: this.v('date'),
-      soaSeries: this.v('soaSeries'),
-      payeeName_text: this.v('payeeName'), // ✅ will now show licensee
-      payeeName_raw_id: this._form?.get('payeeName')?.value,
-      licensee: this._form?.get('licensee')?.value,
-      totalAmount: this.v('totalAmount'),
-      totalAmount_money: this.money(this.v('totalAmount')),
-      periodFrom: this.v('periodFrom'),
-      periodTo: this.v('periodTo'),
-      years: this.v('years'),
-    });
   }
 
   private renderLoadingScreen(win: Window) {

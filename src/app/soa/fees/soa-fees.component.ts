@@ -5,11 +5,19 @@ import { Subject, combineLatest, of } from 'rxjs';
 import { debounceTime, map, startWith, takeUntil } from 'rxjs/operators';
 
 type FeeRow = {
-  LF?: number;   // License Fee (yearly)
-  ROC?: number;  // ROC yearly
-  MOD?: number;  // modification fee (fixed)
-  DST?: number;  // documentary stamp tax (fixed)
-  SUR?: number;  // surcharge (50% of LF or ROC) depending on rule
+  LF?: number;  // License Fee (AT-RSL)
+  ROC?: number; // ROC per year (ROC Operator)
+  MOD?: number; // Modification fee
+  DST?: number;
+  SUR?: number; // surcharge (AT-RSL legacy)
+  FF?: number;  // Filing Fee (AT-RSL)
+};
+
+type RocOperatorRow = {
+  ROC: number;     // per year
+  DST: number;     // flat
+  SUR50: number;   // surcharge 50%
+  SUR100: number;  // surcharge 100%
 };
 
 @Component({
@@ -21,151 +29,157 @@ type FeeRow = {
 })
 export class SoaFeesComponent implements OnInit, OnDestroy {
   @Input() form!: FormGroup;
-
-  // ✅ your HTML uses mode (left/mid/right)
   @Input() mode: 'left' | 'mid' | 'right' = 'left';
 
   private destroy$ = new Subject<void>();
 
-  // ✅ Values based on your screenshots (adjust if needed)
-  // Table with columns: LF, ROC, MOD, DST, SUR(50%)
-  private readonly AT_ROC: FeeRow = {
-    ROC: 60,
-    MOD: 50,
-    DST: 30,
-    SUR: 30, // 50% of ROC (60 * 0.5)
+  // ==========================
+  // ✅ ROC OPERATOR TABLE (YOUR SHEET)
+  // ==========================
+  private readonly ROC_OPERATOR: Record<string, RocOperatorRow> = {
+    // RTG levels
+    '1RTG': { ROC: 180, DST: 30, SUR50: 90, SUR100: 180 },
+    '2RTG': { ROC: 120, DST: 30, SUR50: 60, SUR100: 120 },
+    '3RTG': { ROC: 60,  DST: 30, SUR50: 30, SUR100: 60 },
+
+    // PHN levels
+    '1PHN': { ROC: 120, DST: 30, SUR50: 60, SUR100: 120 },
+    '2PHN': { ROC: 100, DST: 30, SUR50: 50, SUR100: 100 },
+    '3PHN': { ROC: 60,  DST: 30, SUR50: 30, SUR100: 60 },
+
+    // Other ROC types
+    'RROC-AIRCRAFT': { ROC: 100, DST: 30, SUR50: 50, SUR100: 100 },
+    'SROP':          { ROC: 60,  DST: 30, SUR50: 30, SUR100: 60 },
+    'GROC':          { ROC: 60,  DST: 30, SUR50: 30, SUR100: 60 },
+    'RROC-RLM':      { ROC: 60,  DST: 30, SUR50: 30, SUR100: 60 },
   };
 
+  // ✅ if Particulars says just "ROC" without subtype, default to classic 60/30/30
+  private readonly ROC_DEFAULT: RocOperatorRow = { ROC: 60, DST: 30, SUR50: 30, SUR100: 60 };
+
+  // ✅ you previously had MOD=50 for ROC modifications; keep it unless you give new sheet for MOD
+  private readonly ROC_MOD_FEE = 50;
+
+  // ==========================
+  // MA / AT-RSL TABLE (KEEP YOUR CURRENT)
+  // ==========================
   private readonly AT_RSL_BY_CLASS: Record<string, FeeRow> = {
-    A: { LF: 120, ROC: 60, MOD: 50, DST: 30, SUR: 60 }, // SUR 50% of LF (120*0.5=60)
-    B: { LF: 132, ROC: 60, MOD: 50, DST: 30, SUR: 66 },
-    C: { LF: 144, ROC: 60, MOD: 50, DST: 30, SUR: 72 },
-    D: { LF: 144, ROC: 60, MOD: 50, DST: 30, SUR: 72 }, // if your table has D
+    A: { LF: 120, MOD: 50, DST: 30, SUR: 60, FF: 60 },
+    B: { LF: 132, MOD: 50, DST: 30, SUR: 66, FF: 60 },
+    C: { LF: 144, MOD: 50, DST: 30, SUR: 72, FF: 60 },
+    D: { LF: 144, MOD: 50, DST: 30, SUR: 72, FF: 60 },
   };
 
   ngOnInit(): void {
+    if (!this.form) return;
+
+    // ✅ Run if the ROC/MA section exists (NO HTML change)
+    const hasROCMASection =
+      !!this.form.get('amRadioStationLicense') ||
+      !!this.form.get('amSurcharges') ||
+      !!this.form.get('dst') ||
+      !!this.form.get('totalAmount');
+
+    if (!hasROCMASection) return;
+
     const catROC$ = this.form.get('catROC')?.valueChanges.pipe(startWith(this.form.get('catROC')?.value)) ?? of(false);
-    const catMA$ = this.form.get('catMA')?.valueChanges.pipe(startWith(this.form.get('catMA')?.value)) ?? of(false);
+    const catMA$  = this.form.get('catMA') ?.valueChanges.pipe(startWith(this.form.get('catMA') ?.value)) ?? of(false);
 
-    const txnNew$ = this.form.get('txnNew')?.valueChanges.pipe(startWith(this.form.get('txnNew')?.value)) ?? of(false);
+    const txnNew$   = this.form.get('txnNew')?.valueChanges.pipe(startWith(this.form.get('txnNew')?.value)) ?? of(false);
     const txnRenew$ = this.form.get('txnRenew')?.valueChanges.pipe(startWith(this.form.get('txnRenew')?.value)) ?? of(false);
-    const txnMod$ = this.form.get('txnModification')?.valueChanges.pipe(startWith(this.form.get('txnModification')?.value)) ?? of(false);
+    const txnMod$   = this.form.get('txnModification')?.valueChanges.pipe(startWith(this.form.get('txnModification')?.value)) ?? of(false);
 
-    const particulars$ =
-      this.form.get('particulars')?.valueChanges.pipe(startWith(this.form.get('particulars')?.value)) ?? of('');
+    const particulars$ = this.form.get('particulars')?.valueChanges.pipe(startWith(this.form.get('particulars')?.value)) ?? of('');
 
-    // optional: if you have rslClass control; else default A
     const rslClass$ =
-      this.form.get('rslClass')?.valueChanges.pipe(startWith(this.form.get('rslClass')?.value)) ?? of('A');
+      this.form.get('rslClass')?.valueChanges.pipe(startWith(this.form.get('rslClass')?.value)) ??
+      of('A');
 
-    // period/year controls
-    const years$ =
-      this.form.get('years')?.valueChanges.pipe(startWith(this.form.get('years')?.value)) ?? of(null);
-
+    const periodYears$ =
+      this.form.get('periodYears')?.valueChanges.pipe(startWith(this.form.get('periodYears')?.value)) ??
+      of(null);
     const periodFrom$ =
-      this.form.get('periodFrom')?.valueChanges.pipe(startWith(this.form.get('periodFrom')?.value)) ?? of(null);
-
+      this.form.get('periodFrom')?.valueChanges.pipe(startWith(this.form.get('periodFrom')?.value)) ??
+      of(null);
     const periodTo$ =
-      this.form.get('periodTo')?.valueChanges.pipe(startWith(this.form.get('periodTo')?.value)) ?? of(null);
+      this.form.get('periodTo')?.valueChanges.pipe(startWith(this.form.get('periodTo')?.value)) ??
+      of(null);
 
-    combineLatest([
-      catROC$,
-      catMA$,
-      txnNew$,
-      txnRenew$,
-      txnMod$,
-      particulars$,
-      rslClass$,
-      years$,
-      periodFrom$,
-      periodTo$,
-    ])
+    combineLatest([catROC$, catMA$, txnNew$, txnRenew$, txnMod$, particulars$, rslClass$, periodYears$, periodFrom$, periodTo$])
       .pipe(
-        debounceTime(80),
-        map(([catROC, catMA, txnNew, txnRenew, txnMod, particulars, rslClass, years, pf, pt]) => {
+        debounceTime(50),
+        map(([catROC, catMA, txnNew, txnRenew, txnMod, particulars, rslClass, periodYears, pf, pt]) => {
           const P = String(particulars ?? '').toUpperCase();
 
           const isROC = !!catROC || P.includes('ROC');
-          const isMA = !!catMA || P.includes('AMATEUR') || P.includes('MA');
+          const isMA  = !!catMA  || P.includes('AMATEUR') || P.includes('AT-RSL') || P.includes(' MA ');
 
           const cls = (String(rslClass ?? 'A').trim().toUpperCase() || 'A');
-          const y = this.resolveYears(years, pf, pt);
+          const years = this.resolveYears(periodYears, pf, pt);
 
           return {
-            isROC,
-            isMA,
-            txnNew: !!txnNew,
-            txnRenew: !!txnRenew,
-            txnMod: !!txnMod,
-            cls,
-            years: y,
+            isROC, isMA,
+            txnNew: !!txnNew, txnRenew: !!txnRenew, txnMod: !!txnMod,
+            particulars: String(particulars ?? ''),
+            cls, years
           };
         }),
         takeUntil(this.destroy$)
       )
       .subscribe((ctx) => {
-        // Only compute if ROC or MA selected
+        // ✅ default txnNew if none checked (safety)
+        if ((ctx.isROC || ctx.isMA) && !ctx.txnNew && !ctx.txnRenew && !ctx.txnMod) {
+          this.form.patchValue({ txnNew: true, txnRenew: false, txnModification: false }, { emitEvent: false });
+          ctx.txnNew = true;
+        }
+
         if (!ctx.isROC && !ctx.isMA) {
-          // optional: clear fields when not ROC/MA
-          this.patchFees(0, 0, 0, 0, 0, 0, 0, 0);
+          this.patchROCMA(0, 0, 0, 0, 0, 0, 0, 0);
           return;
         }
 
-        // -----------------------------
-        // Citizen Charter rules (from screenshot)
-        // A.1 AT-ROC (NEW):       FEE AT-ROC = (ROC)(YR) + DST
-        // A.2 AT-ROC (RENEWAL):   FEE AT-ROC = (ROC)(YR) + DST + SUR
-        // A.3 AT-ROC (MODIF):     FEE AT-ROC = MOD + DST
-        //
-        // B.2 AT-RSL (NEW):       FEE AT-RSL = FF + (LF)(YR) + DST
-        // B.3 AT-RSL (RENEWAL):   FEE AT-RSL = (LF)(YR) + DST + SUR
-        // B.4 AT-RSL (MODIF):     FEE AT-RSL = FF + MOD + DST
-        // -----------------------------
+        const years = Math.max(1, ctx.years);
 
-        const years = ctx.years;
-
-        // -------------- ROC block --------------
+        // ======================================================
+        // ✅ ROC COMPUTATION (NOW BASED ON YOUR ROC OPERATOR SHEET)
+        // ======================================================
         let rocRadioStationLicense = 0;
-        let rocOperatorsCert = 0;
-        let rocApplicationFee = 0;
-        let rocFilingFee = 0;
-        let rocSeminarFee = 0;
         let rocSurcharges = 0;
         let rocDST = 0;
 
         if (ctx.isROC) {
-          const row = this.AT_ROC;
+          const P = ctx.particulars;
+          const op = this.getRocOperatorRowFromParticulars(P);
 
           if (ctx.txnMod) {
-            // MOD + DST
+            // MODIFICATION: MOD + DST
             rocRadioStationLicense = 0;
-            rocOperatorsCert = 0;
-            rocSurcharges = this.num(row.MOD);
-            rocDST = this.num(row.DST);
+            rocSurcharges = this.ROC_MOD_FEE;
+            rocDST = this.num(op.DST);
           } else if (ctx.txnRenew) {
-            // (ROC*YR) + DST + SUR
-            rocRadioStationLicense = this.num(row.ROC) * years;
-            rocDST = this.num(row.DST);
-            rocSurcharges = this.num(row.SUR);
+            // RENEW: ROC*YR + DST + SUR
+            rocRadioStationLicense = this.num(op.ROC) * years;
+            rocDST = this.num(op.DST);
+
+            // ✅ DEFAULT: SUR50 (since you didn't implement "months late" yet)
+            rocSurcharges = this.num(op.SUR50);
+
+            // (optional: if your Particulars ever contains "SUR100", this supports it)
+            const up = P.toUpperCase();
+            if (up.includes('SUR100') || up.includes('100%')) rocSurcharges = this.num(op.SUR100);
           } else {
-            // default NEW if txnNew or none checked
-            // (ROC*YR) + DST
-            rocRadioStationLicense = this.num(row.ROC) * years;
-            rocDST = this.num(row.DST);
+            // NEW: ROC*YR + DST
+            rocRadioStationLicense = this.num(op.ROC) * years;
+            rocDST = this.num(op.DST);
             rocSurcharges = 0;
           }
         }
 
-        // -------------- MA / AT-RSL block --------------
-        // We'll map MA to your "FOR AMATEUR AND ROC" fields too.
-        // radio station license = LF (yearly) * years
-        // filing fee = FF (if you have it as a separate fee, put it here)
-        // MOD goes to surcharges field (since no separate MOD field in UI)
+        // ======================================================
+        // ✅ MA / AT-RSL (KEEP YOUR EXISTING LOGIC)
+        // ======================================================
         let maRadioStationLicense = 0;
-        let maOperatorsCert = 0;
-        let maApplicationFee = 0;
         let maFilingFee = 0;
-        let maSeminarFee = 0;
         let maSurcharges = 0;
         let maDST = 0;
 
@@ -173,54 +187,42 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
           const row = this.AT_RSL_BY_CLASS[ctx.cls] ?? this.AT_RSL_BY_CLASS['A'];
 
           if (ctx.txnMod) {
-            // FF + MOD + DST  (we don't have FF column in your LF table screenshot,
-            // so set filing fee = 0 unless you add it. MOD -> surcharges field.)
-            maRadioStationLicense = 0;
-            maFilingFee = 0;
+            maFilingFee = this.num(row.FF);      // FF + MOD + DST
             maSurcharges = this.num(row.MOD);
             maDST = this.num(row.DST);
           } else if (ctx.txnRenew) {
-            // (LF*YR) + DST + SUR
-            maRadioStationLicense = this.num(row.LF) * years;
+            maRadioStationLicense = this.num(row.LF) * years; // LF*YR + DST + SUR
             maDST = this.num(row.DST);
             maSurcharges = this.num(row.SUR);
           } else {
-            // NEW: FF + (LF*YR) + DST
+            maFilingFee = this.num(row.FF);      // FF + LF*YR + DST
             maRadioStationLicense = this.num(row.LF) * years;
             maDST = this.num(row.DST);
-            maFilingFee = 0; // put FF here if you have it
-            maSurcharges = 0;
           }
-
-          // If you want Operators Cert fee for MA as ROC column:
-          // maOperatorsCert = this.num(row.ROC) * years;  // optional
-          maOperatorsCert = 0;
-
-          // Application/Seminar are 0 unless you have values
-          maApplicationFee = 0;
-          maSeminarFee = 0;
         }
 
-        // If both ROC and MA checked, sum them (common in your UI logic)
+        // ======================================================
+        // ✅ PATCH YOUR FORM FIELDS
+        // ======================================================
         const amRadioStationLicense = rocRadioStationLicense + maRadioStationLicense;
-        const amRadioOperatorsCert = rocOperatorsCert + maOperatorsCert;
-        const amApplicationFee = rocApplicationFee + maApplicationFee;
-        const amFilingFee = rocFilingFee + maFilingFee;
-        const amSeminarFee = rocSeminarFee + maSeminarFee;
+        const amRadioOperatorsCert = 0;
+        const amApplicationFee = 0;
+        const amFilingFee = maFilingFee; // ROC has none
+        const amSeminarFee = 0;
         const amSurcharges = rocSurcharges + maSurcharges;
         const dst = rocDST + maDST;
 
         const totalAmount = this.round2(
           amRadioStationLicense +
-            amRadioOperatorsCert +
-            amApplicationFee +
-            amFilingFee +
-            amSeminarFee +
-            amSurcharges +
-            dst
+          amRadioOperatorsCert +
+          amApplicationFee +
+          amFilingFee +
+          amSeminarFee +
+          amSurcharges +
+          dst
         );
 
-        this.patchFees(
+        this.patchROCMA(
           amRadioStationLicense,
           amRadioOperatorsCert,
           amApplicationFee,
@@ -238,8 +240,36 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  // ✅ patches the fields you requested
-  private patchFees(
+  // ============================================
+  // ✅ PARSE ROC OPERATOR FROM PARTICULARS STRING
+  // ============================================
+  // accepts:
+  // "ROC - 1RTG - NEW"
+  // "ROC - RTG - NEW" (will default to ROC base 60 unless 1/2/3 is present)
+  // "ROC - RROC-AIRCRAFT - RENEW"
+  // "ROC - SROP - NEW"
+  // "ROC - RROC-RLM - RENEW"
+  private getRocOperatorRowFromParticulars(particulars: string): RocOperatorRow {
+    const P = String(particulars ?? '').toUpperCase();
+
+    // normalize common separators
+    const cleaned = P.replace(/\s+/g, ' ').trim();
+
+    // match 1RTG / 2RTG / 3RTG / 1PHN / 2PHN / 3PHN
+    const m = /(1RTG|2RTG|3RTG|1PHN|2PHN|3PHN)/.exec(cleaned);
+    if (m?.[1] && this.ROC_OPERATOR[m[1]]) return this.ROC_OPERATOR[m[1]];
+
+    // match explicit keywords
+    if (cleaned.includes('RROC-AIRCRAFT') || cleaned.includes('AIRCRAFT')) return this.ROC_OPERATOR['RROC-AIRCRAFT'];
+    if (cleaned.includes('RROC-RLM') || cleaned.includes('RLM')) return this.ROC_OPERATOR['RROC-RLM'];
+    if (cleaned.includes('SROP')) return this.ROC_OPERATOR['SROP'];
+    if (cleaned.includes('GROC')) return this.ROC_OPERATOR['GROC'];
+
+    // if just ROC but no subtype/level
+    return this.ROC_DEFAULT;
+  }
+
+  private patchROCMA(
     amRadioStationLicense: number,
     amRadioOperatorsCert: number,
     amApplicationFee: number,
@@ -249,49 +279,40 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     dst: number,
     totalAmount: number
   ) {
-    this.form.patchValue(
-      {
-        amRadioStationLicense: this.round2(amRadioStationLicense),
-        amRadioOperatorsCert: this.round2(amRadioOperatorsCert),
-        amApplicationFee: this.round2(amApplicationFee),
-        amFilingFee: this.round2(amFilingFee),
-        amSeminarFee: this.round2(amSeminarFee),
-        amSurcharges: this.round2(amSurcharges),
-        dst: this.round2(dst),
-        totalAmount: this.round2(totalAmount),
-      },
-      { emitEvent: false }
-    );
+    // ✅ patch only existing controls (won’t break your form)
+    const p: any = {};
+
+    if (this.form.get('amRadioStationLicense')) p.amRadioStationLicense = this.round2(amRadioStationLicense);
+    if (this.form.get('amRadioOperatorsCert')) p.amRadioOperatorsCert = this.round2(amRadioOperatorsCert);
+    if (this.form.get('amApplicationFee')) p.amApplicationFee = this.round2(amApplicationFee);
+    if (this.form.get('amFilingFee')) p.amFilingFee = this.round2(amFilingFee);
+    if (this.form.get('amSeminarFee')) p.amSeminarFee = this.round2(amSeminarFee);
+    if (this.form.get('amSurcharges')) p.amSurcharges = this.round2(amSurcharges);
+    if (this.form.get('dst')) p.dst = this.round2(dst);
+    if (this.form.get('totalAmount')) p.totalAmount = this.round2(totalAmount);
+
+    if (Object.keys(p).length) {
+      this.form.patchValue(p, { emitEvent: false });
+    }
   }
 
-  private resolveYears(yearsControlValue: any, periodFrom: any, periodTo: any): number {
-    // 1) if years control exists and has value, use it
-    const y = Number(yearsControlValue);
-    if (Number.isFinite(y) && y > 0) return Math.floor(y);
+  private resolveYears(periodYearsValue: any, periodFrom: any, periodTo: any): number {
+    const y = Math.floor(Number(periodYearsValue));
+    if (Number.isFinite(y) && y > 0) return y;
 
-    // 2) else compute from dates if possible
     const from = this.toDate(periodFrom);
     const to = this.toDate(periodTo);
-    if (from && to) {
-      // if period is 21/02/2026 to 20/02/2027 => about 1 year
+    if (from && to && to >= from) {
       const diffDays = Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
-      const approxYears = Math.max(1, Math.round(diffDays / 365));
-      return approxYears;
+      return Math.max(1, Math.round(diffDays / 365));
     }
-
-    // 3) fallback
     return 1;
   }
 
   private toDate(v: any): Date | null {
     if (!v) return null;
-    if (v instanceof Date && !isNaN(v.getTime())) return v;
-
-    // accept ISO or yyyy-mm-dd
-    const d = new Date(v);
-    if (!isNaN(d.getTime())) return d;
-
-    return null;
+    const d = v instanceof Date ? v : new Date(v);
+    return isNaN(d.getTime()) ? null : d;
   }
 
   private num(v: any): number {

@@ -2,9 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 
-export type ParticularsDialogResult = {
-  value: string;
-};
+export type ParticularsDialogResult = { value: 'ROC' | 'Amateur' };
 
 @Component({
   selector: 'app-particulars-dialog',
@@ -12,7 +10,7 @@ export type ParticularsDialogResult = {
   imports: [CommonModule],
   template: `
     <div class="dlg">
-      <div class="dlgHead">Select Particulars</div>
+      <div class="dlgHead">Select Service</div>
 
       <div class="btnGrid">
         <button type="button" class="pickBtn" (click)="pick('ROC')">
@@ -66,8 +64,7 @@ export type ParticularsDialogResult = {
 export class ParticularsDialogComponent {
   constructor(private ref: MatDialogRef<ParticularsDialogComponent, ParticularsDialogResult>) {}
 
-  pick(type: 'ROC' | 'Amateur') {
-    const value = type; 
+  pick(value: 'ROC' | 'Amateur') {
     this.ref.close({ value });
   }
 
