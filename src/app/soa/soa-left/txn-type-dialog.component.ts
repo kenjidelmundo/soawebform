@@ -13,10 +13,37 @@ export type TxnTypeDialogResult = { value: TxnType };
     <div class="dlg">
       <div class="dlgHead">Transaction Type</div>
 
-      <div class="grid">
-        <button type="button" class="opt" [class.on]="selected==='NEW'" (click)="select('NEW')">NEW</button>
-        <button type="button" class="opt" [class.on]="selected==='RENEW'" (click)="select('RENEW')">RENEW</button>
-        <button type="button" class="opt" [class.on]="selected==='MOD'" (click)="select('MOD')">MOD</button>
+      <!-- ✅ plain checkbox list (no border cards) -->
+      <div class="list">
+        <label class="row">
+          <input
+            type="checkbox"
+            class="cb"
+            [checked]="selected==='NEW'"
+            (change)="select('NEW')"
+          />
+          <span class="txt">New</span>
+        </label>
+
+        <label class="row">
+          <input
+            type="checkbox"
+            class="cb"
+            [checked]="selected==='RENEW'"
+            (change)="select('RENEW')"
+          />
+          <span class="txt">Renew</span>
+        </label>
+
+        <label class="row">
+          <input
+            type="checkbox"
+            class="cb"
+            [checked]="selected==='MOD'"
+            (change)="select('MOD')"
+          />
+          <span class="txt">Modification</span>
+        </label>
       </div>
 
       <div class="dlgFoot">
@@ -26,20 +53,25 @@ export type TxnTypeDialogResult = { value: TxnType };
     </div>
   `,
   styles: [`
-    .dlg { width: 420px; max-width: 92vw; padding: 14px; font-family: Arial, sans-serif; }
-    .dlgHead { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+    .dlg { width: 420px; max-width: 92vw; padding: 14px; font-family: Arial, sans-serif; background: #fff; }
+    .dlgHead { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
 
-    .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-    .opt {
-      height: 48px;
-      border: 1px solid #bbb;
-      border-radius: 10px;
-      background: #fff;
+    /* ✅ plain list like your screenshot */
+    .list { display: grid; gap: 6px; padding-left: 2px; }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       cursor: pointer;
       font-weight: 700;
+      font-size: 14px;
+      line-height: 1.2;
+      user-select: none;
+      padding: 0;           /* no tile feel */
+      border: none;         /* no border */
+      background: transparent;
     }
-    .opt:hover { border-color: #2f74ff; }
-    .opt.on { border-color: #2f74ff; outline: 2px solid rgba(47,116,255,.25); }
+    .cb { width: 14px; height: 14px; margin: 0; }
 
     .dlgFoot {
       margin-top: 14px;
@@ -68,6 +100,7 @@ export class TxnTypeDialogComponent {
 
   constructor(private ref: MatDialogRef<TxnTypeDialogComponent, TxnTypeDialogResult>) {}
 
+  // ✅ still single-select (checkbox look)
   select(v: TxnType) {
     this.selected = v;
   }

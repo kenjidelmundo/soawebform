@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 
-export type ParticularsDialogResult = { value: 'ROC' | 'Amateur' };
+export type ParticularsDialogResult = { value: 'ROC' | 'Amateur' | 'ShipStation' };
 
 @Component({
   selector: 'app-particulars-dialog',
@@ -29,6 +29,16 @@ export type ParticularsDialogResult = { value: 'ROC' | 'Amateur' };
             </svg>
           </span>
           <span class="txt">Amateur</span>
+        </button>
+
+        <!-- ✅ ADDED ONLY: Ship Station -->
+        <button type="button" class="pickBtn" (click)="pick('ShipStation')">
+          <span class="ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M3 7h11v9H3V7zm12 2h3l3 3v4h-6V9zm-9 9h2a2 2 0 004 0h6a2 2 0 104 0v-1H5v1zm3 0a1 1 0 11-2 0 1 1 0 012 0zm12 0a1 1 0 11-2 0 1 1 0 012 0z"/>
+            </svg>
+          </span>
+          <span class="txt">Ship Station</span>
         </button>
       </div>
 
@@ -64,7 +74,7 @@ export type ParticularsDialogResult = { value: 'ROC' | 'Amateur' };
 export class ParticularsDialogComponent {
   constructor(private ref: MatDialogRef<ParticularsDialogComponent, ParticularsDialogResult>) {}
 
-  pick(value: 'ROC' | 'Amateur') {
+  pick(value: 'ROC' | 'Amateur' | 'ShipStation') {
     this.ref.close({ value });
   }
 
