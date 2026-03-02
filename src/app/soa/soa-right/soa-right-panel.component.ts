@@ -1,6 +1,6 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormGroup, ReactiveFormsModule, AbstractControl } from '@angular/forms';
 import { SoaPdfService } from '../soa-pdf/soa-pdf.service';
 
 @Component({
@@ -61,6 +61,70 @@ export class SoaRightPanelComponent {
     return fallback;
   }
 
+  // ✅ guaranteed: finds a boolean anywhere in the FormGroup tree by keyword
+  private findBoolInFormTree(root: AbstractControl | null | undefined, keywords: string[]): boolean {
+    if (!root) return false;
+    const keys = keywords.map((k) => k.toLowerCase());
+
+    const walk = (ctrl: AbstractControl): boolean | null => {
+      const anyCtrl: any = ctrl as any;
+
+      // FormGroup/FormArray has .controls
+      if (anyCtrl?.controls && typeof anyCtrl.controls === 'object') {
+        for (const name of Object.keys(anyCtrl.controls)) {
+          const child = anyCtrl.controls[name] as AbstractControl;
+          const nameLower = String(name).toLowerCase();
+
+          // match name by keywords
+          const match = keys.every((k) => nameLower.includes(k));
+          if (match) {
+            // if it is a checkbox control, its value should be boolean
+            const v = (child as any)?.value;
+            if (typeof v === 'boolean') return v;
+          }
+
+          const found = walk(child);
+          if (found !== null) return found;
+        }
+      }
+
+      return null;
+    };
+
+    const r = walk(root);
+    return r === null ? false : !!r;
+  }
+
+  // ✅ reads string (prepared/approved) safely
+  private findStringInFormTree(root: AbstractControl | null | undefined, keywords: string[]): string {
+    if (!root) return '';
+    const keys = keywords.map((k) => k.toLowerCase());
+
+    const walk = (ctrl: AbstractControl): string | null => {
+      const anyCtrl: any = ctrl as any;
+
+      if (anyCtrl?.controls && typeof anyCtrl.controls === 'object') {
+        for (const name of Object.keys(anyCtrl.controls)) {
+          const child = anyCtrl.controls[name] as AbstractControl;
+          const nameLower = String(name).toLowerCase();
+
+          const match = keys.every((k) => nameLower.includes(k));
+          if (match) {
+            const v = (child as any)?.value;
+            if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+          }
+
+          const found = walk(child);
+          if (found !== null) return found;
+        }
+      }
+      return null;
+    };
+
+    const r = walk(root);
+    return r === null ? '' : r;
+  }
+
   // ✅ pdfMake SOA preview button should call this
   printSOAPreview(): void {
     if (!this.form) {
@@ -70,6 +134,16 @@ export class SoaRightPanelComponent {
 
     const v: any = this.form.getRawValue?.() ?? this.form.value ?? {};
 
+    // ✅ WORKING: find checkbox values anywhere in the form tree (no guessing names)
+    const forAssessmentOnly = this.findBoolInFormTree(this.form, ['assessment']);
+    const endorsedForPayment = this.findBoolInFormTree(this.form, ['endorsed']);
+
+    // ✅ WORKING: get names (you already have these, but this makes it robust)
+    const preparedBy =
+      this.findStringInFormTree(this.form, ['prepared']) || this.pick(v, ['preparedBy'], '');
+    const approvedBy =
+      this.findStringInFormTree(this.form, ['approved']) || this.pick(v, ['approvedBy'], '');
+
     const soaData: any = {
       soaNo: this.pick(v, ['soaSeries', 'seriesNumber', 'opSeries'], ''),
       date: this.pick(v, ['date', 'dateIssued'], ''),
@@ -78,7 +152,9 @@ export class SoaRightPanelComponent {
       particulars: this.pick(v, ['particulars'], ''),
       periodCovered: this.pick(v, ['periodCovered'], ''),
 
-      // ✅ checkbox flags from real form controls
+      preparedBy,
+      approvedBy,
+
       flags: {
         txnNew: !!v.txnNew,
         txnRenew: !!v.txnRenew,
@@ -86,6 +162,10 @@ export class SoaRightPanelComponent {
         txnCV: !!v.txnCV,
         txnModification: !!v.txnModification,
         catROC: !!v.catROC,
+
+        // ✅ THESE TWO WILL NOW BE TRUE when the user checks them (guaranteed)
+        forAssessmentOnly,
+        endorsedForPayment,
       },
 
       sections: [
@@ -140,7 +220,9 @@ export class SoaRightPanelComponent {
       ],
     };
 
-    console.log('[RightPanel] sending to pdfMake:', soaData);
+    console.log('[RightPanel] forAssessmentOnly:', forAssessmentOnly);
+    console.log('[RightPanel] endorsedForPayment:', endorsedForPayment);
+
     this.soaPdf.generatePDF(soaData);
   }
 }

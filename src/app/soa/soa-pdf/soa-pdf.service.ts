@@ -27,16 +27,10 @@ export class SoaPdfService {
       ],
     };
 
-    // ✅ DEBUG: check what PDF receives
-    console.log('[SoaPdfService] soa.type:', (soa as any)?.type);
     console.log('[SoaPdfService] soa.flags:', (soa as any)?.flags);
-
     pdfMake.createPdf(docDefinition).open();
   }
 
-  // =========================
-  // small checkbox
-  // =========================
   private cb(checked: boolean): any {
     return {
       canvas: [
@@ -55,9 +49,6 @@ export class SoaPdfService {
     return Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
   }
 
-  // =========================
-  // table + total amount
-  // =========================
   private createSoaTable(soa: Soa): any {
     const body: any[] = [
       [
@@ -68,38 +59,27 @@ export class SoaPdfService {
     ];
 
     const sections: any[] = Array.isArray((soa as any)?.sections) ? (soa as any).sections : [];
-
     let grandTotal = 0;
 
-    if (!sections.length) {
-      body.push([
-        { text: 'NO SECTIONS PASSED', colSpan: 3, italics: true, alignment: 'center', fontSize: 6.0 },
-        {},
-        {},
-      ]);
-    } else {
-      sections.forEach((section) => {
-        body.push([{ text: section.title ?? '', colSpan: 3, bold: true, fontSize: 6.0 }, {}, {}]);
-
-        const rows = Array.isArray(section.rows) ? section.rows : [];
-        rows.forEach((row: any) => {
-          const amt = Number(row?.[1] ?? 0);
-          grandTotal += amt;
-
-          body.push([
-            { text: '', fontSize: 5.8 },
-            { text: row?.[0] ?? '', fontSize: 5.8 },
-            { text: this.money(amt), alignment: 'right', fontSize: 5.8 },
-          ]);
-        });
+    sections.forEach((section) => {
+      body.push([{ text: section.title ?? '', colSpan: 3, bold: true, fontSize: 6.0 }, {}, {}]);
+      const rows = Array.isArray(section.rows) ? section.rows : [];
+      rows.forEach((row: any) => {
+        const amt = Number(row?.[1] ?? 0);
+        grandTotal += amt;
+        body.push([
+          { text: '', fontSize: 5.8 },
+          { text: row?.[0] ?? '', fontSize: 5.8 },
+          { text: this.money(amt), alignment: 'right', fontSize: 5.8 },
+        ]);
       });
+    });
 
-      body.push([
-        { text: 'TOTAL AMOUNT', colSpan: 2, bold: true, fontSize: 6.0, alignment: 'right' },
-        {},
-        { text: this.money(grandTotal), bold: true, fontSize: 6.0, alignment: 'right' },
-      ]);
-    }
+    body.push([
+      { text: 'TOTAL AMOUNT', colSpan: 2, bold: true, fontSize: 6.0, alignment: 'right' },
+      {},
+      { text: this.money(grandTotal), bold: true, fontSize: 6.0, alignment: 'right' },
+    ]);
 
     return {
       table: { widths: [22, '*', 46], body },
@@ -117,25 +97,18 @@ export class SoaPdfService {
     };
   }
 
-  // =========================
-  // ✅ checkbox resolver:
-  // 1) use soa.flags booleans (txnNew etc)
-  // 2) fallback to soa.type
-  // =========================
   private resolveTypes(soa: Soa) {
     const flags = (soa as any)?.flags ?? null;
-
     if (flags) {
       return {
         New: !!flags.txnNew,
         Ren: !!flags.txnRenew,
         ECO: !!flags.txnCO,
-        CV:  !!flags.txnCV,
+        CV: !!flags.txnCV,
         MOD: !!flags.txnModification,
         ROC: !!flags.catROC,
       };
     }
-
     const t = (soa as any)?.type ?? '';
     return {
       New: t === 'New',
@@ -147,20 +120,22 @@ export class SoaPdfService {
     };
   }
 
-  // =========================
-  // full column
-  // =========================
   private soaColumn(copyLabel: string, soa: Soa): any {
     const types = this.resolveTypes(soa);
 
-    // form-aligned info row: label | : | value
+    // ✅ THE TWO CHECKBOXES (MUST BE TRUE/FALSE HERE)
+    const forAssessmentOnly = !!(soa as any)?.flags?.forAssessmentOnly;
+    const endorsedForPayment = !!(soa as any)?.flags?.endorsedForPayment;
+
+    const preparedBy = String((soa as any)?.preparedBy ?? '');
+    const approvedBy = String((soa as any)?.approvedBy ?? '');
+
     const infoLine = (label: string, value: any) => ({
       columns: [
         { text: label, bold: true, width: 36, fontSize: 6.0 },
         { text: ':', bold: true, width: 6, fontSize: 6.0, alignment: 'center' },
         { text: String(value ?? ''), width: '*', fontSize: 6.0 },
       ],
-      columnGap: 0,
       margin: [0, 0, 0, 0.2],
     });
 
@@ -170,36 +145,14 @@ export class SoaPdfService {
       width: 'auto',
     });
 
-    // ✅ Particulars text (will be printed inside the box)
     const particularsText = String((soa as any)?.particulars ?? '');
 
     return {
       width: '25%',
       stack: [
-        {
-          stack: [
-            {
-              text: 'NATIONAL TELECOMMUNICATIONS COMMISSION',
-              bold: true,
-              fontSize: 6.8,
-              alignment: 'center',
-              margin: [0, 0, 0, 0],
-            },
-            {
-              text: 'Statement of Account',
-              fontSize: 6.0,
-              alignment: 'center',
-              margin: [0, 0, 0, 0],
-            },
-            {
-              text: copyLabel,
-              fontSize: 5.8,
-              alignment: 'center',
-              margin: [0, 0, 0, 0.8],
-            },
-          ],
-          margin: [0, 0, 0, 0],
-        },
+        { text: 'NATIONAL TELECOMMUNICATIONS COMMISSION', bold: true, fontSize: 6.8, alignment: 'center' },
+        { text: 'Statement of Account', fontSize: 6.0, alignment: 'center' },
+        { text: copyLabel, fontSize: 5.8, alignment: 'center', margin: [0, 0, 0, 0.8] },
 
         infoLine('Date', (soa as any)?.date),
         infoLine('SOA No.', (soa as any)?.soaNo),
@@ -219,14 +172,12 @@ export class SoaPdfService {
           margin: [0, 0.4, 0, 0.4],
         },
 
-        // ✅ Particulars label + box + ACTUAL VALUE inside
         {
           columns: [
             { text: 'Particulars:', bold: true, width: 52, fontSize: 6.0 },
             {
               stack: [
                 { canvas: [{ type: 'rect', x: 0, y: 0, w: 130, h: 8, lineWidth: 0.8 }] },
-                // ✅ print text over the rectangle
                 { text: particularsText, fontSize: 6.0, margin: [2, -7.1, 0, 0] },
               ],
               width: '*',
@@ -238,19 +189,31 @@ export class SoaPdfService {
 
         this.createSoaTable(soa),
 
+        { text: 'NOTE: To be paid on or before the due date otherwise subject to reassessment.', fontSize: 5.6, margin: [0, 2, 0, 1] },
+
+        // ✅ NOW TICKS WHEN TRUE
         {
-          text: 'NOTE: To be paid on or before the due date otherwise subject to reassessment.',
-          fontSize: 5.6,
-          margin: [0, 2, 0, 1],
+          columns: [
+            { columns: [this.cb(forAssessmentOnly), { text: 'For Assessment Only', fontSize: 5.6 }], columnGap: 2 },
+            { columns: [this.cb(endorsedForPayment), { text: 'Endorsed for Payment', fontSize: 5.6 }], columnGap: 2 },
+          ],
+          columnGap: 10,
+          margin: [0, 0, 0, 0.5],
         },
 
         {
           columns: [
-            { columns: [this.cb(false), { text: 'For Assessment Only', fontSize: 5.6 }], columnGap: 2 },
-            { columns: [this.cb(false), { text: 'Endorsed for Payment', fontSize: 5.6 }], columnGap: 2 },
+            { text: 'Prepared By:', bold: true, width: 56, fontSize: 5.8 },
+            { text: preparedBy, width: '*', fontSize: 5.8 },
           ],
-          columnGap: 10,
-          margin: [0, 0, 0, 0],
+          margin: [0, 0.2, 0, 0],
+        },
+        {
+          columns: [
+            { text: 'Approved By:', bold: true, width: 56, fontSize: 5.8 },
+            { text: approvedBy, width: '*', fontSize: 5.8 },
+          ],
+          margin: [0, 0.2, 0, 0],
         },
       ],
     };

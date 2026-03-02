@@ -10,17 +10,12 @@ import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 export class SoaPdfService {
   private form: FormGroup | null = null;
 
-  /** ✅ Call this once from SoaPage so service can fetch live checkbox + values */
   setForm(form: FormGroup) {
     this.form = form;
   }
 
-  /** RightPanel calls this.soaPdf.generatePDF(soaData) — keep that unchanged */
   generatePDF(soaData: any): void {
     const live = this.form?.getRawValue?.() ?? this.form?.value ?? {};
-
-    // ✅ Merge: use live form as source-of-truth (so checkboxes always correct)
-    // But keep soaData as fallback if you pass computed rows there.
     const v = { ...(soaData ?? {}), ...(live ?? {}) };
 
     const dateStr = this.formatDate(this.pick(v, ['date', 'dateIssued', 'DateIssued'], ''));
@@ -31,43 +26,106 @@ export class SoaPdfService {
     const periodCovered = this.pick(v, ['periodCovered', 'PeriodCovered'], '');
     const years = this.pick(v, ['periodYears', 'years', 'Years'], 0);
 
-    // ✅ checkboxes from your REAL form controls
     const flags = {
       New: !!v.txnNew,
       Ren: !!v.txnRenew,
       ECO: !!v.txnCO,
-      CV:  !!v.txnCV,
+      CV: !!v.txnCV,
       MOD: !!v.txnModification,
       ROC: !!v.catROC,
+
+      // ✅ ADDED
+      forAssessmentOnly: !!this.pick(v, ['forAssessmentOnly', 'chkForAssessmentOnly'], false),
+      endorsedForPayment: !!this.pick(v, ['endorsedForPayment', 'chkEndorsedForPayment'], false),
     };
 
-    // ✅ Build sections/rows (use what RightPanel already built, but fill missing from live form)
-    const sections = (soaData?.sections?.length ? soaData.sections : this.buildSectionsFromForm(v));
+    const preparedBy = this.pick(v, ['preparedBy', 'PreparedBy'], '');
+    const approvedBy = this.pick(v, ['approvedBy', 'ApprovedBy'], '');
+
+    const sections = soaData?.sections?.length ? soaData.sections : this.buildSectionsFromForm(v);
+
+    const base = { dateStr, soaNo, name, address, particulars, periodCovered, years, flags, sections, preparedBy, approvedBy };
 
     const docDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
-      pageMargins: [2.5, 2.5, 2.5, 2.5],
+
+      // ✅ leave space at bottom for footer (VERY IMPORTANT)
+      pageMargins: [2.5, 2.5, 2.5, 22],
+
       content: [
         {
           columns: [
-            this.soaColumn('Servicing Unit Copy', { dateStr, soaNo, name, address, particulars, periodCovered, years, flags, sections }),
-            this.soaColumn('Accounting Unit Copy', { dateStr, soaNo, name, address, particulars, periodCovered, years, flags, sections }),
-            this.soaColumn('COA Copy',           { dateStr, soaNo, name, address, particulars, periodCovered, years, flags, sections }),
-            this.soaColumn('Cash Unit Copy',     { dateStr, soaNo, name, address, particulars, periodCovered, years, flags, sections }),
+            this.soaColumn('Servicing Unit Copy', base),
+            this.soaColumn('Accounting Unit Copy', base),
+            this.soaColumn('COA Copy', base),
+            this.soaColumn('Cash Unit Copy', base),
           ],
           columnGap: 1,
         },
       ],
+
+      // ✅ FOOTER ALWAYS RENDERS UNDER THE PAGE
+      footer: () => {
+        return {
+          margin: [2.5, 0, 2.5, 2.5],
+          columns: [
+            this.footerBox(base),
+            this.footerBox(base),
+            this.footerBox(base),
+            this.footerBox(base),
+          ],
+          columnGap: 1,
+        };
+      },
+
       pageBreakBefore: () => false,
     };
 
     pdfMake.createPdf(docDefinition).open();
   }
 
-  // -----------------------
-  // Build sections from FORM (if RightPanel did not send sections)
-  // -----------------------
+  private footerBox(soa: any): any {
+    return {
+      width: '24.8%',
+      stack: [
+        {
+          columns: [
+            {
+              columns: [
+                this.checkBox(!!soa.flags?.forAssessmentOnly),
+                { text: 'For Assessment Only', fontSize: 5.6, margin: [2, 0, 0, 0] },
+              ],
+              columnGap: 1,
+            },
+            {
+              columns: [
+                this.checkBox(!!soa.flags?.endorsedForPayment),
+                { text: 'Endorsed for Payment', fontSize: 5.6, margin: [2, 0, 0, 0] },
+              ],
+              columnGap: 1,
+              alignment: 'right',
+            },
+          ],
+        },
+        {
+          margin: [0, 1, 0, 0],
+          columns: [
+            { text: 'Prepared By:', fontSize: 5.8, bold: true, width: 50 },
+            { text: String(soa.preparedBy ?? ''), fontSize: 5.8, width: '*' },
+          ],
+        },
+        {
+          margin: [0, 0.5, 0, 0],
+          columns: [
+            { text: 'Approved By:', fontSize: 5.8, bold: true, width: 50 },
+            { text: String(soa.approvedBy ?? ''), fontSize: 5.8, width: '*' },
+          ],
+        },
+      ],
+    };
+  }
+
   private buildSectionsFromForm(v: any) {
     const num = (x: any) => {
       const n = Number(x);
@@ -128,9 +186,6 @@ export class SoaPdfService {
     ];
   }
 
-  // -----------------------
-  // PDF layout parts
-  // -----------------------
   private soaColumn(label: string, soa: any): any {
     return {
       width: '24.8%',
@@ -144,13 +199,12 @@ export class SoaPdfService {
         { text: `Name:      ${soa.name ?? ''}`, fontSize: 6.2, margin: [0, 0, 0, 0.2] },
         { text: `Address:  ${soa.address ?? ''}`, fontSize: 6.2, margin: [0, 0, 0, 0.2] },
 
-        // ✅ checkboxes row (fetch from form flags)
         {
           columns: [
             { columns: [this.checkBox(!!soa.flags?.New), { text: 'New', fontSize: 5.6 }], columnGap: 1.5 },
             { columns: [this.checkBox(!!soa.flags?.Ren), { text: 'Ren', fontSize: 5.6 }], columnGap: 1.5 },
             { columns: [this.checkBox(!!soa.flags?.ECO), { text: 'ECO', fontSize: 5.6 }], columnGap: 1.5 },
-            { columns: [this.checkBox(!!soa.flags?.CV),  { text: 'CV',  fontSize: 5.6 }], columnGap: 1.5 },
+            { columns: [this.checkBox(!!soa.flags?.CV), { text: 'CV', fontSize: 5.6 }], columnGap: 1.5 },
             { columns: [this.checkBox(!!soa.flags?.MOD), { text: 'MOD', fontSize: 5.6 }], columnGap: 1.5 },
             { columns: [this.checkBox(!!soa.flags?.ROC), { text: 'ROC', fontSize: 5.6 }], columnGap: 1.5 },
           ],
@@ -158,10 +212,8 @@ export class SoaPdfService {
           margin: [0, 0.6, 0, 0.6],
         },
 
-        // ✅ Particulars line (from your ParticularsDialog result)
         { text: `Particulars: ${soa.particulars ?? ''}`, fontSize: 6.2, margin: [0, 0, 0, 0.6] },
 
-        // ✅ Period Covered + Years (from form periodCovered + periodYears)
         {
           columns: [
             { text: `Period Covered: ${soa.periodCovered ?? ''}`, fontSize: 6.0 },
@@ -173,19 +225,13 @@ export class SoaPdfService {
         this.createSoaTable(soa),
 
         { text: 'NOTE: To be paid on or before the due date otherwise subject to reassessment.', fontSize: 5.6, margin: [0, 1, 0, 0] },
-
-        { text: '', margin: [0, 2, 0, 0] },
       ],
     };
   }
 
   private createSoaTable(soa: any): any {
     const body: any[] = [
-      [
-        { text: 'CODE', bold: true },
-        { text: 'PARTICULARS', bold: true },
-        { text: 'TOTAL', bold: true, alignment: 'right' },
-      ],
+      [{ text: 'CODE', bold: true }, { text: 'PARTICULARS', bold: true }, { text: 'TOTAL', bold: true, alignment: 'right' }],
     ];
 
     (soa.sections ?? []).forEach((section: any) => {
@@ -201,11 +247,7 @@ export class SoaPdfService {
       });
     });
 
-    return {
-      table: { widths: [22, '*', 58], body },
-      fontSize: 5.9,
-      margin: [0, 0.5, 0, 0.5],
-    };
+    return { table: { widths: [22, '*', 58], body }, fontSize: 5.9, margin: [0, 0.5, 0, 0.5] };
   }
 
   private checkBox(checked: boolean = false): any {
@@ -222,9 +264,6 @@ export class SoaPdfService {
     };
   }
 
-  // -----------------------
-  // helpers
-  // -----------------------
   private pick(v: any, keys: string[], fallback: any = ''): any {
     for (const k of keys) {
       const val = v?.[k];
