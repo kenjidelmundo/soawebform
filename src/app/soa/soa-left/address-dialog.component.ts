@@ -37,7 +37,9 @@ export type AddressDialogResult = {
           <label>Province</label>
           <select formControlName="province">
             <option value="">-- Select Province --</option>
-            <option *ngFor="let p of provinces" [value]="p.province">{{ p.province }}</option>
+            <option *ngFor="let p of provinces" [value]="p.province">
+              {{ p.province }}
+            </option>
           </select>
         </div>
 
@@ -45,7 +47,9 @@ export type AddressDialogResult = {
           <label>Town/City</label>
           <select formControlName="townCity">
             <option value="">-- Select Town/City --</option>
-            <option *ngFor="let t of towns" [value]="t.townCity">{{ t.townCity }}</option>
+            <option *ngFor="let t of towns" [value]="t.townCity">
+              {{ t.townCity }}
+            </option>
           </select>
         </div>
 
@@ -59,30 +63,85 @@ export type AddressDialogResult = {
 
         <div class="row">
           <label>Unit # / Bldg / Street / Purok</label>
-          <input type="text" formControlName="line4" placeholder="e.g. Unit 2, ABC Bldg, Purok 3" />
+          <input
+            type="text"
+            formControlName="line4"
+            placeholder="e.g. Unit 2, ABC Bldg, Purok 3"
+          />
         </div>
       </form>
 
       <div class="dlgFoot">
         <button type="button" class="btn" (click)="close()">Cancel</button>
-        <button type="button" class="btn primary" [disabled]="fg.invalid" (click)="useAddress()">
+        <button
+          type="button"
+          class="btn primary"
+          [disabled]="fg.invalid"
+          (click)="useAddress()"
+        >
           Use Address
         </button>
       </div>
     </div>
   `,
-  styles: [`
-    .dlg { width: 520px; max-width: 92vw; padding: 14px; font-family: Arial, sans-serif; }
-    .dlgHead { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
-    .dlgBody { display: grid; gap: 10px; }
-    .row { display: grid; gap: 6px; }
-    label { font-size: 13px; font-weight: 600; }
-    select, input { height: 34px; padding: 6px 8px; border: 1px solid #bbb; border-radius: 6px; }
-    .dlgFoot { margin-top: 14px; display: flex; justify-content: flex-end; gap: 10px; }
-    .btn { height: 34px; padding: 0 12px; border: 1px solid #999; background: #fff; border-radius: 6px; cursor: pointer; }
-    .btn.primary { border-color: #2f74ff; background: #2f74ff; color: #fff; }
-    .btn:disabled, .btn.primary:disabled { opacity: .5; cursor: not-allowed; }
-  `]
+  styles: [
+    `
+      .dlg {
+        width: 520px;
+        max-width: 92vw;
+        padding: 14px;
+        font-family: Arial, sans-serif;
+      }
+      .dlgHead {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 12px;
+      }
+      .dlgBody {
+        display: grid;
+        gap: 10px;
+      }
+      .row {
+        display: grid;
+        gap: 6px;
+      }
+      label {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      select,
+      input {
+        height: 34px;
+        padding: 6px 8px;
+        border: 1px solid #bbb;
+        border-radius: 6px;
+      }
+      .dlgFoot {
+        margin-top: 14px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+      .btn {
+        height: 34px;
+        padding: 0 12px;
+        border: 1px solid #999;
+        background: #fff;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .btn.primary {
+        border-color: #2f74ff;
+        background: #2f74ff;
+        color: #fff;
+      }
+      .btn:disabled,
+      .btn.primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    `,
+  ],
 })
 export class AddressDialogComponent {
   provinces: AddressProvince[] = [];
@@ -91,9 +150,7 @@ export class AddressDialogComponent {
 
   fg = this.fb.group({
     province: ['', Validators.required],
-    // ✅ start disabled until province selected
     townCity: this.fb.control({ value: '', disabled: true }, Validators.required),
-    // ✅ start disabled until town selected
     brgy: this.fb.control({ value: '', disabled: true }, Validators.required),
     line4: [''],
   });
@@ -104,7 +161,6 @@ export class AddressDialogComponent {
     @Inject(MAT_DIALOG_DATA) public data: AddressDialogData
   ) {
     this.provinces = data?.provinces ?? [];
-
     const init = data?.initial ?? {};
 
     // preload province
@@ -123,7 +179,7 @@ export class AddressDialogComponent {
     if (init.brgy) this.fg.patchValue({ brgy: init.brgy }, { emitEvent: false });
     if (init.line4) this.fg.patchValue({ line4: init.line4 }, { emitEvent: false });
 
-    // listeners (enable/disable controls in TS)
+    // listeners
     this.fg.get('province')!.valueChanges.subscribe((prov) => {
       this.onProvinceChanged((prov || '').toString(), true);
     });
@@ -139,11 +195,8 @@ export class AddressDialogComponent {
     const townCtrl = this.fg.get('townCity')!;
     const brgyCtrl = this.fg.get('brgy')!;
 
-    if (this.towns.length > 0) {
-      townCtrl.enable({ emitEvent: false });
-    } else {
-      townCtrl.disable({ emitEvent: false });
-    }
+    if (this.towns.length > 0) townCtrl.enable({ emitEvent: false });
+    else townCtrl.disable({ emitEvent: false });
 
     // clear dependent
     this.brgys = [];
@@ -159,25 +212,20 @@ export class AddressDialogComponent {
     this.brgys = this.getBrgys(province, townCity);
 
     const brgyCtrl = this.fg.get('brgy')!;
-    if (this.brgys.length > 0) {
-      brgyCtrl.enable({ emitEvent: false });
-    } else {
-      brgyCtrl.disable({ emitEvent: false });
-    }
+    if (this.brgys.length > 0) brgyCtrl.enable({ emitEvent: false });
+    else brgyCtrl.disable({ emitEvent: false });
 
-    if (reset) {
-      this.fg.patchValue({ brgy: '' }, { emitEvent: false });
-    }
+    if (reset) this.fg.patchValue({ brgy: '' }, { emitEvent: false });
   }
 
   private getTowns(province: string): AddressTown[] {
-    const p = this.provinces.find(x => x.province === province);
+    const p = this.provinces.find((x) => x.province === province);
     return p?.towns ?? [];
   }
 
   private getBrgys(province: string, townCity: string): string[] {
-    const p = this.provinces.find(x => x.province === province);
-    const t = p?.towns?.find(x => x.townCity === townCity);
+    const p = this.provinces.find((x) => x.province === province);
+    const t = p?.towns?.find((x) => x.townCity === townCity);
     return t?.barangays ?? [];
   }
 
@@ -198,7 +246,9 @@ export class AddressDialogComponent {
   }
 
   private buildFullAddress(province: string, townCity: string, brgy: string, line4: string): string {
-    const parts = [line4, brgy, townCity, province].map(x => (x || '').trim()).filter(Boolean);
+    const parts = [line4, brgy, townCity, province]
+      .map((x) => (x || '').trim())
+      .filter(Boolean);
     return parts.join(', ');
   }
 }

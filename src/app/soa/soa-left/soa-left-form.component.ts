@@ -15,7 +15,7 @@ import { startWith, takeUntil } from 'rxjs/operators';
 
 // ✅ dialogs (NO HTML change)
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { AddressDialogComponent, AddressProvince } from './address-dialog.component';
+import { AddressDialogComponent } from './address-dialog.component';
 import { ParticularsDialogComponent } from './particulars-dialog.component';
 
 // ✅ txn dialog
@@ -25,6 +25,9 @@ import { TxnTypeDialogComponent, TxnType } from './txn-type-dialog.component';
 import { openRocParticularsFlow } from './particulars-roc.flow';
 import { openShipStationParticularsFlow } from './particulars-ship.flow';
 import { openAmateurParticularsFlow } from './particulars-amateur.flow';
+
+// ✅ DB address service
+import { AddressService } from './address.service';
 
 type PayeeItem = { id: number; name: string };
 
@@ -54,21 +57,12 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private readonly START_NEXT_PERIOD_NEXT_DAY = true;
 
-  private readonly addressData: AddressProvince[] = [
-    {
-      province: 'Camarines Sur',
-      towns: [
-        { townCity: 'Naga City', barangays: ['Abella', 'Bagumbayan Norte', 'Concepcion Pequeña'] },
-        { townCity: 'Pili', barangays: ['Cadlan', 'Curry', 'San Jose'] },
-      ],
-    },
-  ];
-
   constructor(
     private soaService: SoaService,
     private el: ElementRef<HTMLElement>,
     private renderer: Renderer2,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private addressSvc: AddressService
   ) {}
 
   ngOnInit(): void {
@@ -83,6 +77,9 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
+    // ==========================
+    // Address click hook
+    // ==========================
     const addressInput = this.el.nativeElement.querySelector(
       'input[formControlName="address"]'
     ) as HTMLInputElement | null;
@@ -90,6 +87,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     if (addressInput) {
       this.renderer.setAttribute(addressInput, 'readonly', 'true');
       this.renderer.setStyle(addressInput, 'cursor', 'pointer');
+      this.renderer.setStyle(addressInput, 'pointer-events', 'auto');
 
       this.unlistenAddressClick = this.renderer.listen(addressInput, 'click', (ev) => {
         ev.preventDefault();
@@ -99,19 +97,23 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }
 
+    // ==========================
+    // Particulars click hook
+    // ==========================
     const partInput = this.el.nativeElement.querySelector(
-      'input[formControlName="particulars"]'
-    ) as HTMLInputElement | null;
+      'input[formControlName="particulars"], textarea[formControlName="particulars"]'
+    ) as (HTMLInputElement | HTMLTextAreaElement) | null;
 
     if (partInput) {
       this.renderer.setAttribute(partInput, 'readonly', 'true');
       this.renderer.setStyle(partInput, 'cursor', 'pointer');
+      this.renderer.setStyle(partInput, 'pointer-events', 'auto');
 
       this.unlistenPartClick = this.renderer.listen(partInput, 'click', (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
         if (Date.now() < this.particularsCoolDownUntil) return;
-        this.openParticularsDialog();
+        this.openParticularsDialog(); // ✅ NOW WORKS (implemented below)
       });
     }
   }
@@ -142,7 +144,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       });
   }
 
-  // ✅ FIX: never match NEW inside RENEW; and write to nested controls too
   private applyTxnFromParticulars(particularsText: string): void {
     const t = String(particularsText ?? '').toUpperCase();
 
@@ -155,7 +156,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       t.includes('CHANGE') ||
       t.includes('CORRECTION');
 
-    // ✅ use word boundary, and check renew first
     const hasRenew =
       /\bRENEW(AL)?\b/.test(t) ||
       t.includes('REVALID') ||
@@ -163,17 +163,13 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       t.includes('REISSUE') ||
       t.includes('RE-ISSUE');
 
-    // ✅ NEW must be an explicit word, not part of RENEW
-    const hasNew =
-      /\bNEW\b/.test(t) ||
-      t.includes('NEW APPLICATION');
+    const hasNew = /\bNEW\b/.test(t) || t.includes('NEW APPLICATION');
 
     const curNew = this.getBoolDeep('txnNew');
     const curRenew = this.getBoolDeep('txnRenew');
     const curMod = this.getBoolDeep('txnModification');
     const anySelected = curNew || curRenew || curMod;
 
-    // ✅ if text explicitly says NEW/RENEW/MOD then enforce it
     if (hasMod || hasRenew || hasNew) {
       this.setTxnEverywhere({
         txnNew: hasNew && !hasMod && !hasRenew,
@@ -183,14 +179,11 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    // ✅ if user already selected something, do NOT override
     if (anySelected) return;
 
-    // ✅ default only if nothing selected at all
     this.setTxnEverywhere({ txnNew: true, txnRenew: false, txnModification: false });
   }
 
-  // ✅ force txn exactly from txn dialog selection (and write to nested controls too)
   private applyTxnFromTxnChoice(txn: TxnType): void {
     this.setTxnEverywhere({
       txnNew: txn === 'NEW',
@@ -198,29 +191,23 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       txnModification: txn === 'MOD',
     });
 
-    // optional: if you have a string control
     this.setStringDeep('txnType', txn);
     this.setStringDeep('transactionType', txn);
   }
 
-  // ✅ set the 3 txn booleans in root and nested form groups (fixes "still NEW")
   private setTxnEverywhere(v: { txnNew: boolean; txnRenew: boolean; txnModification: boolean }): void {
     this.setBoolDeep('txnNew', v.txnNew);
     this.setBoolDeep('txnRenew', v.txnRenew);
     this.setBoolDeep('txnModification', v.txnModification);
   }
 
-  // ✅ read boolean from anywhere in the form tree
   private getBoolDeep(controlName: string): boolean {
-    const found = this.findBoolInFormTree(this.form, [controlName]);
-    return !!found;
+    return this.findBoolInFormTree(this.form, [controlName]);
   }
 
-  // ✅ set boolean control by name anywhere in form tree (root or nested)
   private setBoolDeep(controlName: string, value: boolean): void {
     if (!this.form) return;
 
-    // root direct
     const direct = this.form.get(controlName);
     if (direct) direct.setValue(value, { emitEvent: false });
 
@@ -234,7 +221,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
         const child = controls[key];
         const keyLower = String(key).toLowerCase();
 
-        // match exact OR endsWith (handles flags.txnNew etc.)
         if (keyLower === target || keyLower.endsWith(target)) {
           const current = child?.value;
           if (typeof current === 'boolean') child.setValue(value, { emitEvent: false });
@@ -247,7 +233,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     walk(this.form as any);
   }
 
-  // ✅ optional: set string control deep if exists
   private setStringDeep(controlName: string, value: string): void {
     if (!this.form) return;
 
@@ -363,8 +348,8 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
             const parsedTo = parsed.periodTo ?? '';
 
             const oldTo = directTo || parsedTo || '';
-
             let newFrom = oldTo;
+
             if (this.START_NEXT_PERIOD_NEXT_DAY && oldTo) {
               newFrom = this.addDays(oldTo, 1);
             }
@@ -392,7 +377,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
               { emitEvent: true }
             );
 
-            // default txn on new payee, but set deep too
             this.setTxnEverywhere({ txnNew: true, txnRenew: false, txnModification: false });
           },
           error: (err) => console.warn('⚠️ No details found for id:', id, err),
@@ -441,206 +425,284 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     return Number(years.toFixed(2));
   }
 
+  // ======================================================
+  // ✅ ADDRESS DIALOG (DB ONLY - NO HARD CODED)
+  // ======================================================
   private openAddressDialog(): void {
     if (this.addressDialogOpen) return;
     this.addressDialogOpen = true;
 
-    const ref = this.dialog.open(AddressDialogComponent, {
-      width: '560px',
-      disableClose: true,
-      autoFocus: false,
-      restoreFocus: false,
-      data: { provinces: this.addressData },
-    });
+    this.addressSvc.getProvinces().subscribe({
+      next: (provinces) => {
+        if (!Array.isArray(provinces) || provinces.length === 0) {
+          console.error('❌ Address API returned EMPTY list', provinces);
+          alert('Address list is empty. Check /api/Address/provinces');
+          this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
+          this.addressDialogOpen = false;
+          return;
+        }
 
-    ref.afterClosed().subscribe((res) => {
-      this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
-      this.addressDialogOpen = false;
+        const ref = this.dialog.open(AddressDialogComponent, {
+          width: '560px',
+          disableClose: true,
+          autoFocus: false,
+          restoreFocus: false,
+          data: { provinces: provinces as any },
+        });
 
-      const addressInput = this.el.nativeElement.querySelector(
-        'input[formControlName="address"]'
-      ) as HTMLInputElement | null;
-      addressInput?.blur();
+        ref.afterClosed().subscribe((res) => {
+          this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
+          this.addressDialogOpen = false;
 
-      if (!res) return;
-      this.form.patchValue({ address: res.fullAddress }, { emitEvent: true });
+          const addressInput = this.el.nativeElement.querySelector(
+            'input[formControlName="address"]'
+          ) as HTMLInputElement | null;
+          addressInput?.blur();
+
+          if (!res) return;
+          this.form.patchValue({ address: res.fullAddress }, { emitEvent: true });
+        });
+      },
+      error: (err) => {
+        console.error('❌ Address API ERROR:', err);
+        alert('Failed to load address list from API. Check console/network.');
+
+        this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
+        this.addressDialogOpen = false;
+      },
     });
   }
 
   // ======================================================
-  // ✅ PARTICULARS DIALOG (FIXED)
-  // SHIP EARTH + DELETION do NOT change txn
+  // ✅ PARTICULARS DIALOG (FIXED) -> routes to proper flows
   // ======================================================
   private openParticularsDialog(): void {
     if (this.particularsDialogOpen) return;
     this.particularsDialogOpen = true;
 
-    const ref1 = this.dialog.open(ParticularsDialogComponent, {
-      width: '460px',
+    const ref = this.dialog.open(ParticularsDialogComponent, {
+      width: '640px',
+      maxWidth: '92vw',
+      panelClass: 'soa-dlg',
       disableClose: true,
       autoFocus: false,
       restoreFocus: false,
     });
 
-    ref1.afterClosed().subscribe((res1) => {
+    ref.afterClosed().subscribe((res: any) => {
       this.particularsCoolDownUntil = Date.now() + this.COOLDOWN_MS;
+      this.particularsDialogOpen = false;
 
       const partInput = this.el.nativeElement.querySelector(
-        'input[formControlName="particulars"]'
-      ) as HTMLInputElement | null;
+        'input[formControlName="particulars"], textarea[formControlName="particulars"]'
+      ) as (HTMLInputElement | HTMLTextAreaElement) | null;
       partInput?.blur();
 
-      if (!res1?.value) {
-        this.particularsDialogOpen = false;
+      if (!res) return;
+
+      // ✅ accept many possible shapes so it won't break
+      const kindRaw =
+        res?.value ??
+        res?.type ??
+        res?.kind ??
+        res?.selected ??
+        res?.category ??
+        res;
+
+      const kind = String(kindRaw ?? '').toUpperCase().trim();
+
+      // Route safely
+      if (kind.includes('ROC')) {
+        openRocParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
+          this.applyFinalParticulars(finalText, txn);
+        });
         return;
       }
 
-      const service = String(res1.value ?? '').trim();
-      const serviceUp = service.toUpperCase();
-
-      // ✅ txn is OPTIONAL
-      const finalize = (finalText: string, txn?: TxnType) => {
-        this.form.patchValue({ particulars: finalText }, { emitEvent: true });
-        this.applyCategoryFromParticulars(finalText);
-
-        if (txn) this.applyTxnFromTxnChoice(txn);
-
-        this.particularsDialogOpen = false;
-      };
-
-      const cancel = () => {
-        this.particularsDialogOpen = false;
-      };
-
-      if (serviceUp === 'SHIPSTATION' || serviceUp === 'SHIP STATION') {
-        openShipStationParticularsFlow(this.dialog, cancel, finalize);
+      if (kind.includes('SHIP')) {
+        openShipStationParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
+          this.applyFinalParticulars(finalText, txn);
+        });
         return;
       }
 
-      if (serviceUp === 'ROC') {
-        openRocParticularsFlow(this.dialog, cancel, (t: string, x: TxnType) => finalize(t, x));
+      if (kind.includes('AMATEUR') || kind.includes('AT-') || kind.includes('MA')) {
+        openAmateurParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
+          this.applyFinalParticulars(finalText, txn);
+        });
         return;
       }
 
-      if (serviceUp === 'AMATEUR') {
-        openAmateurParticularsFlow(this.dialog, cancel, (t: string, x: TxnType) => finalize(t, x));
-        return;
-      }
-
-      // Other services -> txn required
-      this.openTxnTypeDialogAndFinalize(
-        service,
-        (t: string, x: TxnType) => finalize(t, x),
-        cancel
-      );
+      // ✅ fallback: if dialog returns direct text
+      const txt = String(res?.finalText ?? res?.text ?? '').trim();
+      if (txt) this.applyFinalParticulars(txt, undefined);
     });
   }
 
+  private applyFinalParticulars(finalText: string, txn?: TxnType): void {
+    const patch: any = { particulars: finalText };
+
+    // if you have txnType or transactionType control, patch it
+    if (txn) {
+      if (this.form.get('txnType')) patch.txnType = txn;
+      if (this.form.get('transactionType')) patch.transactionType = txn;
+      this.applyTxnFromTxnChoice(txn);
+    }
+
+    // ✅ emitEvent TRUE to trigger computations
+    this.form.patchValue(patch, { emitEvent: true });
+    this.form.get('particulars')?.updateValueAndValidity({ emitEvent: true });
+
+    // category auto-set for computations
+    this.applyCategoryFromParticulars(finalText);
+  }
+
+  // ======================================================
+  // ✅ TXN TYPE DIALOG HELPER (if you still use it elsewhere)
+  // ======================================================
   private openTxnTypeDialogAndFinalize(
     baseText: string,
     finalize: (finalText: string, txn: TxnType) => void,
     cancel: () => void
   ): void {
-    const ref3 = this.dialog.open(TxnTypeDialogComponent, {
-      width: '460px',
+    const ref = this.dialog.open(TxnTypeDialogComponent, {
+      width: '420px',
+      maxWidth: '92vw',
+      panelClass: 'soa-dlg',
       disableClose: true,
       autoFocus: false,
       restoreFocus: false,
     });
 
-    ref3.afterClosed().subscribe((res3) => {
-      if (!res3?.value) {
+    ref.afterClosed().subscribe((r: any) => {
+      const txn: TxnType | undefined = r?.value ?? r?.txn ?? r;
+      if (!txn) {
         cancel();
         return;
       }
 
-      const txn = res3.value as TxnType;
       const txnText = txn === 'MOD' ? 'MODIFICATION' : txn;
       const finalText = `${baseText} - ${txnText}`;
       finalize(finalText, txn);
     });
   }
 
+  // ======================================================
+  // ✅ helpers you left blank (now complete)
+  // ======================================================
   private periodCoveredToDates(periodCovered: any): { periodFrom?: string; periodTo?: string } {
-    const s = (periodCovered ?? '').toString().trim();
+    const s = String(periodCovered ?? '').trim();
     if (!s) return {};
 
-    let m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
-    if (m) {
-      const d1 = Number(m[1]), mo1 = Number(m[2]), y1 = Number(m[3]);
-      const d2 = Number(m[4]), mo2 = Number(m[5]), y2 = Number(m[6]);
-      return {
-        periodFrom: this.toYmdFromParts(y1, mo1, d1),
-        periodTo: this.toYmdFromParts(y2, mo2, d2),
-      };
+    // common formats: "DD/MM/YYYY-DD/MM/YYYY" or "YYYY-MM-DD - YYYY-MM-DD"
+    const parts = s.split('-').map((x) => x.trim());
+    if (parts.length < 2) return {};
+
+    const p1 = this.parseToYmd(parts[0]);
+    const p2 = this.parseToYmd(parts.slice(1).join('-')); // in case date contains '-'
+
+    const out: any = {};
+    if (p1) out.periodFrom = p1;
+    if (p2) out.periodTo = p2;
+    return out;
+  }
+
+  private parseToYmd(raw: string): string {
+    const v = String(raw ?? '').trim();
+    if (!v) return '';
+
+    // already y-m-d
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+
+    // dd/mm/yyyy
+    const m1 = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m1) {
+      const d = Number(m1[1]);
+      const m = Number(m1[2]);
+      const y = Number(m1[3]);
+      return this.toYmdFromParts(y, m, d);
     }
 
-    m = /^(\d{4})-(\d{2})-(\d{2})\s*-\s*(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-    if (m) {
-      return { periodFrom: `${m[1]}-${m[2]}-${m[3]}`, periodTo: `${m[4]}-${m[5]}-${m[6]}` };
+    // mm/dd/yyyy
+    const m2 = v.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (m2) {
+      const a = Number(m2[1]);
+      const b = Number(m2[2]);
+      const y = Number(m2[3]);
+      // assume a=month b=day
+      return this.toYmdFromParts(y, a, b);
     }
 
-    m = /^(\d{4})-(\d{4})$/.exec(s);
-    if (m) {
-      const y1 = Number(m[1]);
-      const y2 = Number(m[2]);
-      if (!y1 || !y2) return {};
-      return { periodFrom: `${y1}-01-01`, periodTo: `${y2}-12-31` };
-    }
+    // Date string
+    const d = new Date(v);
+    if (!isNaN(d.getTime())) return this.toYmd(d);
 
-    return {};
+    return '';
   }
 
   private toYmd(value: any): string {
     if (!value) return '';
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return value.trim();
-    const d = new Date(value);
+    const d = value instanceof Date ? value : new Date(value);
     if (isNaN(d.getTime())) return '';
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   }
 
   private toYmdFromParts(y: number, m: number, d: number): string {
     if (!y || !m || !d) return '';
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${y}-${pad(m)}-${pad(d)}`;
+    const mm = String(m).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    return `${y}-${mm}-${dd}`;
   }
 
   private addDays(yyyyMmDd: string, days: number): string {
-    const d = new Date(yyyyMmDd);
-    if (isNaN(d.getTime())) return yyyyMmDd;
-    d.setDate(d.getDate() + days);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const s = String(yyyyMmDd ?? '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return yyyyMmDd;
+    const dt = new Date(s + 'T00:00:00');
+    if (isNaN(dt.getTime())) return yyyyMmDd;
+    dt.setDate(dt.getDate() + Number(days || 0));
+    return this.toYmd(dt);
   }
 
-  // ✅ tree search helpers
   private findBoolInFormTree(root: AbstractControl | null | undefined, keywords: string[]): boolean {
     if (!root) return false;
-    const keys = keywords.map((k) => k.toLowerCase());
 
-    const walk = (ctrl: AbstractControl): boolean | null => {
-      const anyCtrl: any = ctrl as any;
+    const targets = (keywords ?? []).map((k) => String(k).toLowerCase());
+    let found = false;
 
-      if (anyCtrl?.controls && typeof anyCtrl.controls === 'object') {
-        for (const name of Object.keys(anyCtrl.controls)) {
-          const child = anyCtrl.controls[name] as AbstractControl;
-          const nameLower = String(name).toLowerCase();
+    const walk = (ctrl: any, path: string) => {
+      if (!ctrl || found) return;
 
-          const match = keys.every((k) => nameLower.includes(k));
-          if (match) {
-            const v = (child as any)?.value;
-            if (typeof v === 'boolean') return v;
+      const controls = ctrl.controls;
+      if (!controls || typeof controls !== 'object') return;
+
+      for (const key of Object.keys(controls)) {
+        if (found) return;
+
+        const child = controls[key];
+        const keyLower = String(key).toLowerCase();
+        const full = path ? `${path}.${keyLower}` : keyLower;
+
+        if (targets.some((t) => keyLower === t || full.endsWith(t) || keyLower.endsWith(t))) {
+          if (typeof child?.value === 'boolean') {
+            found = !!child.value;
+            return;
           }
-
-          const found = walk(child);
-          if (found !== null) return found;
         }
+
+        walk(child, full);
       }
-      return null;
     };
 
-    const r = walk(root);
-    return r === null ? false : !!r;
+    // direct check first (fast)
+    for (const k of targets) {
+      const direct = this.form?.get(k);
+      if (direct && typeof direct.value === 'boolean') return !!direct.value;
+    }
+
+    walk(root as any, '');
+    return found;
   }
 }

@@ -39,36 +39,25 @@ export class AssessmentComponent implements OnDestroy {
   // ==========================================
   private resolveControlName(name: string): string {
     const map: Record<string, string> = {
-      // HTML uses: co/cv but your form uses txnCO/txnCV
       co: 'txnCO',
       cv: 'txnCV',
-
-      // HTML uses these exact names but form uses op*
       forAssessmentOnly: 'opAssessmentOnly',
       endorsedForPayment: 'opEndorsedForPayment',
-
-      // HTML uses years but your form uses periodYears
       years: 'periodYears',
-
-      // HTML uses dueDate but your form uses opNotePayOnOrBefore
       dueDate: 'opNotePayOnOrBefore',
     };
     return map[name] ?? name;
   }
 
   // ==========================================
-  // ✅ HTML helpers
+  // ✅ TEMPLATE HELPERS (USED BY YOUR HTML)
   // ==========================================
   v(name: string): any {
     if (!this.form) return '';
-
-    // ✅ BIG FIX: template prints v('payeeName') but your control is an ID.
-    // Return LICENSEE string instead.
     if (name === 'payeeName') {
       const lic = this.form.get('licensee')?.value;
       return (lic ?? '').toString();
     }
-
     const real = this.resolveControlName(name);
     return this.form.get(real)?.value ?? '';
   }
@@ -82,7 +71,10 @@ export class AssessmentComponent implements OnDestroy {
   money(val: any): string {
     const n = Number(val);
     const x = Number.isFinite(n) ? n : 0;
-    return x.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return x.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   }
 
   d(val: any): string {
@@ -96,7 +88,100 @@ export class AssessmentComponent implements OnDestroy {
   }
 
   // ==========================================
-  // ✅ PDF EXPORT (html2canvas)
+  // ✅ EXPORT-ONLY FOOTER (exact flow)
+  // checkbox row
+  // prepared by
+  // approved by
+  // ==========================================
+  private buildFooterElement(): HTMLElement {
+    const footer = document.createElement('div');
+    footer.setAttribute('data-pdf-footer', '1');
+
+    const prepared = this.v('preparedBy') || '';
+    const approved = this.v('approvedBy') || '';
+
+    footer.innerHTML = `
+      <div style="margin-top:6px; font-size:8pt; display:flex; gap:30px;">
+        <span>${this.chk('forAssessmentOnly')} For Assessment Only</span>
+        <span>${this.chk('endorsedForPayment')} Endorsed for Payment</span>
+      </div>
+
+      <div style="margin-top:6px; font-size:8pt;">
+        <b>Prepared By:</b> ${prepared}
+      </div>
+
+      <div style="margin-top:4px; font-size:8pt;">
+        <b>Approved By:</b> ${approved}
+      </div>
+    `;
+    return footer;
+  }
+
+  // ✅ remove existing duplicate checkbox row & prepared/approved in HTML (export only)
+  // we mark removed nodes so we can restore them after capture
+  private hideExistingFooterBits(page: HTMLElement): void {
+    // hide the checkbox row that contains both texts
+    const candidates = Array.from(page.querySelectorAll<HTMLElement>('div, span, p'));
+    for (const el of candidates) {
+      const t = (el.textContent ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+      const hasFAO = t.includes('for assessment only');
+      const hasEFP = t.includes('endorsed for payment');
+
+      // hide container that likely represents that checkbox row
+      if (hasFAO && hasEFP) {
+        if (!el.hasAttribute('data-hide-pdf')) {
+          el.setAttribute('data-hide-pdf', '1');
+          (el as any).__oldDisplay = el.style.display;
+          el.style.display = 'none';
+        }
+      }
+    }
+
+    // hide Prepared/Approved lines if already printed in HTML
+    for (const el of candidates) {
+      const t = (el.textContent ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (t.startsWith('prepared by') || t.startsWith('approved by')) {
+        if (!el.hasAttribute('data-hide-pdf')) {
+          el.setAttribute('data-hide-pdf', '1');
+          (el as any).__oldDisplay = el.style.display;
+          el.style.display = 'none';
+        }
+      }
+    }
+  }
+
+  private restoreHiddenFooterBits(page: HTMLElement): void {
+    page.querySelectorAll<HTMLElement>('[data-hide-pdf="1"]').forEach((el: any) => {
+      el.style.display = el.__oldDisplay ?? '';
+      el.removeAttribute('data-hide-pdf');
+      delete el.__oldDisplay;
+    });
+  }
+
+  private injectFooterIntoPages(root: HTMLElement): void {
+    const pages = Array.from(root.querySelectorAll<HTMLElement>('.soa-page'));
+    pages.forEach((p) => {
+      // remove previously injected footer
+      p.querySelectorAll('[data-pdf-footer="1"]').forEach((n) => n.remove());
+
+      // hide existing duplicates (export only)
+      this.hideExistingFooterBits(p);
+
+      // inject single footer
+      p.appendChild(this.buildFooterElement());
+    });
+  }
+
+  private cleanupAfterExport(root: HTMLElement): void {
+    const pages = Array.from(root.querySelectorAll<HTMLElement>('.soa-page'));
+    pages.forEach((p) => {
+      p.querySelectorAll('[data-pdf-footer="1"]').forEach((n) => n.remove());
+      this.restoreHiddenFooterBits(p);
+    });
+  }
+
+  // ==========================================
+  // ✅ PDF EXPORT (html2canvas keeps your CSS/HTML)
   // ==========================================
   async exportPDF(): Promise<void> {
     const el = this.printArea?.nativeElement;
@@ -110,37 +195,19 @@ export class AssessmentComponent implements OnDestroy {
       return;
     }
 
-    // ✅ DEBUG values that must appear
-    console.log('[Assessment] RAW:', this.form.getRawValue?.() ?? this.form.value);
-    console.log('[Assessment] DEBUG:', {
-      date: this.v('date'),
-      soaSeries: this.v('soaSeries'),
-      payeeName_display: this.v('payeeName'), // ✅ licensee string now
-      licensee: this.v('licensee'),
-      totalAmount: this.v('totalAmount'),
-      co: this.chk('co'),
-      cv: this.chk('cv'),
-      years: this.v('years'),
-      periodYears: this.v('periodYears'),
-    });
-
-    // popup-safe
     const win = window.open('about:blank', '_blank');
     if (!win) {
       alert('Popup blocked. Allow popups for localhost:4200');
       return;
     }
-    this.renderLoadingScreen(win);
 
-    // cache hash
     const raw = this.form.getRawValue?.() ?? this.form.value ?? {};
     const hash = this.safeHash(JSON.stringify(raw));
     if (hash === this.lastHash && this.lastPdfUrl) {
-      this.renderPdf(win, this.lastPdfUrl);
+      win.location.href = this.lastPdfUrl;
       return;
     }
 
-    // ✅ force render before capture
     this.form.updateValueAndValidity({ emitEvent: false });
     this.cdr.detectChanges();
     await this.nextFrame();
@@ -152,6 +219,12 @@ export class AssessmentComponent implements OnDestroy {
     };
 
     try {
+      // ✅ export-only: hide duplicates + inject clean footer
+      this.injectFooterIntoPages(el);
+      this.cdr.detectChanges();
+      await this.nextFrame();
+      await this.nextFrame();
+
       el.style.overflow = 'visible';
       el.style.background = '#fff';
 
@@ -166,7 +239,7 @@ export class AssessmentComponent implements OnDestroy {
         } as any)
       );
 
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
       const pdf = new jsPDF({
         orientation: 'landscape',
@@ -177,14 +250,12 @@ export class AssessmentComponent implements OnDestroy {
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
 
-      // fit image to page
       const imgW = pageW;
       const imgH = (canvas.height * imgW) / canvas.width;
 
       if (imgH <= pageH) {
         pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
       } else {
-        // multi-page
         let y = 0;
         let remaining = imgH;
         while (remaining > 0) {
@@ -202,13 +273,20 @@ export class AssessmentComponent implements OnDestroy {
       if (this.lastPdfUrl) URL.revokeObjectURL(this.lastPdfUrl);
       this.lastPdfUrl = url;
 
-      this.renderPdf(win, url);
+      win.location.href = url;
     } catch (e) {
       console.error(e);
       win.document.open();
-      win.document.write(`<p style="font-family:Arial;padding:12px;color:red">Export failed. Check console.</p>`);
+      win.document.write(
+        `<p style="font-family:Arial;padding:12px;color:red">Export failed. Check console.</p>`
+      );
       win.document.close();
     } finally {
+      // ✅ restore DOM
+      try {
+        this.cleanupAfterExport(el);
+      } catch {}
+
       el.style.overflow = old.overflow;
       el.style.background = old.background;
     }
@@ -216,45 +294,6 @@ export class AssessmentComponent implements OnDestroy {
 
   private nextFrame(): Promise<void> {
     return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-  }
-
-  private renderLoadingScreen(win: Window) {
-    win.document.open();
-    win.document.write(`
-      <html>
-        <head>
-          <title>Assessment Preview</title>
-          <style>
-            html, body { margin:0; height:100%; font-family: Arial, sans-serif; }
-            .wrap { height:100%; display:flex; align-items:center; justify-content:center; background:#f3f6fb; }
-            .card { background:#fff; border:1px solid #d9e2ef; border-radius:12px; padding:18px 22px; box-shadow:0 8px 24px rgba(0,0,0,.08); }
-            .spinner { width:28px; height:28px; border:3px solid #d9e2ef; border-top:3px solid #2563eb; border-radius:50%; animation:spin .9s linear infinite; margin:0 auto 10px; }
-            @keyframes spin { 0% {transform:rotate(0)} 100% {transform:rotate(360deg)} }
-            .txt { text-align:center; color:#111827; font-size:14px; }
-          </style>
-        </head>
-        <body>
-          <div class="wrap">
-            <div class="card">
-              <div class="spinner"></div>
-              <div class="txt">Generating PDF…</div>
-            </div>
-          </div>
-        </body>
-      </html>
-    `);
-    win.document.close();
-  }
-
-  private renderPdf(win: Window, url: string) {
-    win.document.open();
-    win.document.write(`
-      <html>
-        <head><title>Assessment Preview</title><style>html, body { margin:0; height:100%; }</style></head>
-        <body><iframe src="${url}" style="border:0;width:100%;height:100%"></iframe></body>
-      </html>
-    `);
-    win.document.close();
   }
 
   private safeHash(s: string): string {
