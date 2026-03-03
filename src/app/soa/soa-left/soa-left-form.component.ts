@@ -8,7 +8,7 @@ import {
   Renderer2,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormGroup, ReactiveFormsModule, AbstractControl } from '@angular/forms';
 import { SoaService } from '../soa.service';
 import { Subject, combineLatest } from 'rxjs';
 import { startWith, takeUntil } from 'rxjs/operators';
@@ -77,11 +77,12 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadPayees();
     this.setupPeriodCovered();
     this.setupPayeeSelectionAutoFill();
-    this.setupAutoTxnFromParticulars(); // auto-check NEW/RENEW/MOD + cat flags
+
+    // ✅ keep this (it helps if particulars updated manually)
+    this.setupAutoTxnFromParticulars();
   }
 
   ngAfterViewInit(): void {
-    // ADDRESS click -> dialog
     const addressInput = this.el.nativeElement.querySelector(
       'input[formControlName="address"]'
     ) as HTMLInputElement | null;
@@ -98,7 +99,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }
 
-    // PARTICULARS click -> dialog chain
     const partInput = this.el.nativeElement.querySelector(
       'input[formControlName="particulars"]'
     ) as HTMLInputElement | null;
@@ -142,10 +142,12 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       });
   }
 
+  // ✅ FIX: never match NEW inside RENEW; and write to nested controls too
   private applyTxnFromParticulars(particularsText: string): void {
-    const t = particularsText.toUpperCase();
+    const t = String(particularsText ?? '').toUpperCase();
 
-    const isMod =
+    const hasMod =
+      /\bMOD\b/.test(t) ||
       t.includes('MODIFICATION') ||
       t.includes('MODIFIED') ||
       t.includes('MODIF') ||
@@ -153,27 +155,129 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       t.includes('CHANGE') ||
       t.includes('CORRECTION');
 
-    const isRenew =
-      t.includes('RENEW') ||
-      t.includes('RENEWAL') ||
+    // ✅ use word boundary, and check renew first
+    const hasRenew =
+      /\bRENEW(AL)?\b/.test(t) ||
       t.includes('REVALID') ||
       t.includes('EXTEND') ||
       t.includes('REISSUE') ||
       t.includes('RE-ISSUE');
 
-    const isNew = !isMod && !isRenew;
+    // ✅ NEW must be an explicit word, not part of RENEW
+    const hasNew =
+      /\bNEW\b/.test(t) ||
+      t.includes('NEW APPLICATION');
 
-    this.form.patchValue(
-      {
-        txnNew: isNew,
-        txnRenew: isRenew,
-        txnModification: isMod,
-      },
-      { emitEvent: false }
-    );
+    const curNew = this.getBoolDeep('txnNew');
+    const curRenew = this.getBoolDeep('txnRenew');
+    const curMod = this.getBoolDeep('txnModification');
+    const anySelected = curNew || curRenew || curMod;
+
+    // ✅ if text explicitly says NEW/RENEW/MOD then enforce it
+    if (hasMod || hasRenew || hasNew) {
+      this.setTxnEverywhere({
+        txnNew: hasNew && !hasMod && !hasRenew,
+        txnRenew: hasRenew && !hasMod,
+        txnModification: hasMod,
+      });
+      return;
+    }
+
+    // ✅ if user already selected something, do NOT override
+    if (anySelected) return;
+
+    // ✅ default only if nothing selected at all
+    this.setTxnEverywhere({ txnNew: true, txnRenew: false, txnModification: false });
   }
 
-  // ✅ IMPORTANT: ShipStation should not force catROC/catMA
+  // ✅ force txn exactly from txn dialog selection (and write to nested controls too)
+  private applyTxnFromTxnChoice(txn: TxnType): void {
+    this.setTxnEverywhere({
+      txnNew: txn === 'NEW',
+      txnRenew: txn === 'RENEW',
+      txnModification: txn === 'MOD',
+    });
+
+    // optional: if you have a string control
+    this.setStringDeep('txnType', txn);
+    this.setStringDeep('transactionType', txn);
+  }
+
+  // ✅ set the 3 txn booleans in root and nested form groups (fixes "still NEW")
+  private setTxnEverywhere(v: { txnNew: boolean; txnRenew: boolean; txnModification: boolean }): void {
+    this.setBoolDeep('txnNew', v.txnNew);
+    this.setBoolDeep('txnRenew', v.txnRenew);
+    this.setBoolDeep('txnModification', v.txnModification);
+  }
+
+  // ✅ read boolean from anywhere in the form tree
+  private getBoolDeep(controlName: string): boolean {
+    const found = this.findBoolInFormTree(this.form, [controlName]);
+    return !!found;
+  }
+
+  // ✅ set boolean control by name anywhere in form tree (root or nested)
+  private setBoolDeep(controlName: string, value: boolean): void {
+    if (!this.form) return;
+
+    // root direct
+    const direct = this.form.get(controlName);
+    if (direct) direct.setValue(value, { emitEvent: false });
+
+    const target = controlName.toLowerCase();
+
+    const walk = (ctrl: any) => {
+      const controls = ctrl?.controls;
+      if (!controls || typeof controls !== 'object') return;
+
+      for (const key of Object.keys(controls)) {
+        const child = controls[key];
+        const keyLower = String(key).toLowerCase();
+
+        // match exact OR endsWith (handles flags.txnNew etc.)
+        if (keyLower === target || keyLower.endsWith(target)) {
+          const current = child?.value;
+          if (typeof current === 'boolean') child.setValue(value, { emitEvent: false });
+        }
+
+        walk(child);
+      }
+    };
+
+    walk(this.form as any);
+  }
+
+  // ✅ optional: set string control deep if exists
+  private setStringDeep(controlName: string, value: string): void {
+    if (!this.form) return;
+
+    const direct = this.form.get(controlName);
+    if (direct) direct.setValue(value, { emitEvent: false });
+
+    const target = controlName.toLowerCase();
+
+    const walk = (ctrl: any) => {
+      const controls = ctrl?.controls;
+      if (!controls || typeof controls !== 'object') return;
+
+      for (const key of Object.keys(controls)) {
+        const child = controls[key];
+        const keyLower = String(key).toLowerCase();
+
+        if (keyLower === target || keyLower.endsWith(target)) {
+          const current = child?.value;
+          if (typeof current === 'string' || current === null || current === undefined) {
+            child.setValue(value, { emitEvent: false });
+          }
+        }
+
+        walk(child);
+      }
+    };
+
+    walk(this.form as any);
+  }
+
   private applyCategoryFromParticulars(particularsText: string): void {
     const t = particularsText.toUpperCase();
 
@@ -204,18 +308,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     if (Object.keys(patch).length) {
       this.form.patchValue(patch, { emitEvent: true });
     }
-  }
-
-  // ✅ force txn exactly from txn dialog selection
-  private applyTxnFromTxnChoice(txn: TxnType): void {
-    this.form.patchValue(
-      {
-        txnNew: txn === 'NEW',
-        txnRenew: txn === 'RENEW',
-        txnModification: txn === 'MOD',
-      },
-      { emitEvent: false }
-    );
   }
 
   // =========================
@@ -250,9 +342,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  // =========================
-  // AUTO-FILL WHEN PAYEE CHANGES
-  // =========================
   private setupPayeeSelectionAutoFill(): void {
     const payeeCtrl = this.form.get('payeeName');
     if (!payeeCtrl) return;
@@ -303,16 +392,14 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
               { emitEvent: true }
             );
 
-            this.form.patchValue({ txnNew: true, txnRenew: false, txnModification: false }, { emitEvent: false });
+            // default txn on new payee, but set deep too
+            this.setTxnEverywhere({ txnNew: true, txnRenew: false, txnModification: false });
           },
           error: (err) => console.warn('⚠️ No details found for id:', id, err),
         });
       });
   }
 
-  // =========================
-  // PERIOD COVERED COMPUTATION
-  // =========================
   private setupPeriodCovered(): void {
     const fromCtrl = this.form.get('periodFrom');
     const toCtrl = this.form.get('periodTo');
@@ -354,9 +441,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     return Number(years.toFixed(2));
   }
 
-  // =========================
-  // ADDRESS DIALOG
-  // =========================
   private openAddressDialog(): void {
     if (this.addressDialogOpen) return;
     this.addressDialogOpen = true;
@@ -383,13 +467,10 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  // =========================
-  // PARTICULARS DIALOG ROUTER
-  // ROC -> ROC flow file
-  // SHIPSTATION -> ship flow file
-  // AMATEUR -> amateur flow file
-  // else -> txn only here (stays in left TS)
-  // =========================
+  // ======================================================
+  // ✅ PARTICULARS DIALOG (FIXED)
+  // SHIP EARTH + DELETION do NOT change txn
+  // ======================================================
   private openParticularsDialog(): void {
     if (this.particularsDialogOpen) return;
     this.particularsDialogOpen = true;
@@ -417,11 +498,13 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       const service = String(res1.value ?? '').trim();
       const serviceUp = service.toUpperCase();
 
-      const finalize = (finalText: string, txn: TxnType) => {
+      // ✅ txn is OPTIONAL
+      const finalize = (finalText: string, txn?: TxnType) => {
         this.form.patchValue({ particulars: finalText }, { emitEvent: true });
         this.applyCategoryFromParticulars(finalText);
-        this.applyTxnFromTxnChoice(txn);
-        this.applyTxnFromParticulars(finalText);
+
+        if (txn) this.applyTxnFromTxnChoice(txn);
+
         this.particularsDialogOpen = false;
       };
 
@@ -429,30 +512,30 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
         this.particularsDialogOpen = false;
       };
 
-      // ✅ ShipStation flow (separate file)
       if (serviceUp === 'SHIPSTATION' || serviceUp === 'SHIP STATION') {
         openShipStationParticularsFlow(this.dialog, cancel, finalize);
         return;
       }
 
-      // ✅ ROC flow (separate file)
       if (serviceUp === 'ROC') {
-        openRocParticularsFlow(this.dialog, cancel, finalize);
+        openRocParticularsFlow(this.dialog, cancel, (t: string, x: TxnType) => finalize(t, x));
         return;
       }
 
-      // ✅ Amateur flow (separate file)
       if (serviceUp === 'AMATEUR') {
-        openAmateurParticularsFlow(this.dialog, cancel, finalize);
+        openAmateurParticularsFlow(this.dialog, cancel, (t: string, x: TxnType) => finalize(t, x));
         return;
       }
 
-      // ✅ other services -> txn only (stays here)
-      this.openTxnTypeDialogAndFinalize(service, finalize, cancel);
+      // Other services -> txn required
+      this.openTxnTypeDialogAndFinalize(
+        service,
+        (t: string, x: TxnType) => finalize(t, x),
+        cancel
+      );
     });
   }
 
-  // ✅ other services (not ROC/Ship/Amateur)
   private openTxnTypeDialogAndFinalize(
     baseText: string,
     finalize: (finalText: string, txn: TxnType) => void,
@@ -478,9 +561,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  // =========================
-  // periodCovered parsing helpers
-  // =========================
   private periodCoveredToDates(periodCovered: any): { periodFrom?: string; periodTo?: string } {
     const s = (periodCovered ?? '').toString().trim();
     if (!s) return {};
@@ -532,5 +612,35 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     d.setDate(d.getDate() + days);
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  // ✅ tree search helpers
+  private findBoolInFormTree(root: AbstractControl | null | undefined, keywords: string[]): boolean {
+    if (!root) return false;
+    const keys = keywords.map((k) => k.toLowerCase());
+
+    const walk = (ctrl: AbstractControl): boolean | null => {
+      const anyCtrl: any = ctrl as any;
+
+      if (anyCtrl?.controls && typeof anyCtrl.controls === 'object') {
+        for (const name of Object.keys(anyCtrl.controls)) {
+          const child = anyCtrl.controls[name] as AbstractControl;
+          const nameLower = String(name).toLowerCase();
+
+          const match = keys.every((k) => nameLower.includes(k));
+          if (match) {
+            const v = (child as any)?.value;
+            if (typeof v === 'boolean') return v;
+          }
+
+          const found = walk(child);
+          if (found !== null) return found;
+        }
+      }
+      return null;
+    };
+
+    const r = walk(root);
+    return r === null ? false : !!r;
   }
 }

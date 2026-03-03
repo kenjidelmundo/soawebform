@@ -1,7 +1,11 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule, AbstractControl } from '@angular/forms';
 import { SoaPdfService } from '../soa-pdf/soa-pdf.service';
+import { Subject, merge, interval } from 'rxjs';
+import { startWith, takeUntil, filter, map, distinctUntilChanged } from 'rxjs/operators';
+
+type TxnKey = 'NEW' | 'RENEW' | 'MOD';
 
 @Component({
   selector: 'app-soa-right-panel',
@@ -10,7 +14,7 @@ import { SoaPdfService } from '../soa-pdf/soa-pdf.service';
   templateUrl: './soa-right-panel.component.html',
   styleUrls: ['./soa-right-panel.component.css'],
 })
-export class SoaRightPanelComponent {
+export class SoaRightPanelComponent implements OnInit, OnDestroy {
   @Input() form!: FormGroup;
 
   @Output() onSave = new EventEmitter<void>();
@@ -19,26 +23,149 @@ export class SoaRightPanelComponent {
   @Output() onAssessment = new EventEmitter<void>();
   @Output() onPrintOP = new EventEmitter<void>();
 
+  private destroy$ = new Subject<void>();
+  private txnGuard = false;
+
   constructor(private soaPdf: SoaPdfService) {}
 
-  save(): void {
-    this.onSave.emit();
+  ngOnInit(): void {
+    this.setupTxnSingleSelect();     // ✅ user clicking right panel still behaves like radio
+    this.setupTxnAutoSyncPolling();  // ✅ always sync from particulars even if emitEvent:false
   }
-  newRecord(): void {
-    this.onNewRecord.emit();
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
-  printSoa(): void {
-    this.onPrintSOA.emit();
+
+  save(): void { this.onSave.emit(); }
+  newRecord(): void { this.onNewRecord.emit(); }
+  printSoa(): void { this.onPrintSOA.emit(); }
+  assessment(): void { this.onAssessment.emit(); }
+  printOp(): void { this.onPrintOP.emit(); }
+
+  // ======================================================
+  // ✅ Right panel NEW/RENEW/MOD must be SINGLE SELECT
+  // ======================================================
+  private setupTxnSingleSelect(): void {
+    if (!this.form) return;
+
+    const cNew = this.form.get('txnNew');
+    const cRen = this.form.get('txnRenew');
+    const cMod = this.form.get('txnModification');
+
+    if (!cNew && !cRen && !cMod) return;
+
+    const stream$ = merge(
+      ...(cNew ? [cNew.valueChanges.pipe(startWith(cNew.value), map((v) => ({ key: 'NEW' as const, v })))] : []),
+      ...(cRen ? [cRen.valueChanges.pipe(startWith(cRen.value), map((v) => ({ key: 'RENEW' as const, v })))] : []),
+      ...(cMod ? [cMod.valueChanges.pipe(startWith(cMod.value), map((v) => ({ key: 'MOD' as const, v })))] : [])
+    );
+
+    stream$
+      .pipe(takeUntil(this.destroy$), filter(() => !this.txnGuard))
+      .subscribe(({ key, v }) => {
+        if (!v) return; // only when user turns one ON
+        this.applyTxnKey(key);
+      });
   }
-  assessment(): void {
-    this.onAssessment.emit();
+
+  // ======================================================
+  // ✅ HARD FIX: Poll the form and sync txn checkboxes
+  // This works even if Particulars is patched with emitEvent:false
+  // ======================================================
+  private setupTxnAutoSyncPolling(): void {
+    if (!this.form) return;
+
+    interval(200)
+      .pipe(
+        takeUntil(this.destroy$),
+        filter(() => !this.txnGuard),
+        map(() => {
+          // read raw values (works even if controls are disabled)
+          const raw: any = this.form.getRawValue?.() ?? this.form.value ?? {};
+
+          // ✅ get PARTICULARS text from any control containing "particular"
+          const particularsText =
+            this.findStringInFormTree(this.form, ['particular']) ||
+            String(raw.particulars ?? '');
+
+          // also allow dedicated txn-type controls if you have them
+          const txnTypeAny =
+            raw.txnType ??
+            raw.transactionType ??
+            raw.particularsTxnType ??
+            raw.partTxnType ??
+            this.findStringInFormTree(this.form, ['txn', 'type']) ??
+            this.findStringInFormTree(this.form, ['transaction', 'type']);
+
+          // decide from txnType control first, then from particulars text
+          return this.normalizeTxn(txnTypeAny) || this.normalizeTxn(particularsText);
+        }),
+        distinctUntilChanged()
+      )
+      .subscribe((key) => {
+        if (!key) return;
+        this.applyTxnKey(key);
+      });
   }
-  printOp(): void {
-    this.onPrintOP.emit();
+
+  // ======================================================
+  // ✅ Apply txn selection to right panel checkboxes
+  // Also writes txnType/transactionType if those controls exist
+  // ======================================================
+  private applyTxnKey(key: TxnKey): void {
+    const cNew = this.form.get('txnNew');
+    const cRen = this.form.get('txnRenew');
+    const cMod = this.form.get('txnModification');
+
+    if (!cNew && !cRen && !cMod) return;
+
+    this.txnGuard = true;
+
+    const patch: any = {
+      txnNew: key === 'NEW',
+      txnRenew: key === 'RENEW',
+      txnModification: key === 'MOD',
+    };
+
+    // patch only if those controls exist
+    if (!cNew) delete patch.txnNew;
+    if (!cRen) delete patch.txnRenew;
+    if (!cMod) delete patch.txnModification;
+
+    // optional: keep a string txnType control in sync if present
+    if (this.form.get('txnType')) patch.txnType = key;
+    if (this.form.get('transactionType')) patch.transactionType = key;
+
+    this.form.patchValue(patch, { emitEvent: false });
+
+    this.txnGuard = false;
+  }
+
+  // ======================================================
+  // ✅ FIX: RENEW must NOT become NEW (word-boundary + RENEW-first)
+  // ======================================================
+  private normalizeTxn(v: any): TxnKey | null {
+    if (v === null || v === undefined) return null;
+
+    const s = String(v).trim().toUpperCase();
+
+    // exact
+    if (s === 'RENEW' || s === 'RENEWAL') return 'RENEW';
+    if (s === 'MOD' || s === 'MODIFICATION') return 'MOD';
+    if (s === 'NEW') return 'NEW';
+
+    // ✅ word boundaries; check RENEW first
+    if (/\bRENEW(AL)?\b/.test(s)) return 'RENEW';
+    if (/\bMOD(IFICATION)?\b/.test(s)) return 'MOD';
+    if (/\bNEW\b/.test(s)) return 'NEW';
+
+    return null;
   }
 
   // -----------------------
-  // helpers
+  // helpers (unchanged)
   // -----------------------
   private num(v: any): number {
     const n = Number(v);
@@ -61,7 +188,6 @@ export class SoaRightPanelComponent {
     return fallback;
   }
 
-  // ✅ guaranteed: finds a boolean anywhere in the FormGroup tree by keyword
   private findBoolInFormTree(root: AbstractControl | null | undefined, keywords: string[]): boolean {
     if (!root) return false;
     const keys = keywords.map((k) => k.toLowerCase());
@@ -69,16 +195,13 @@ export class SoaRightPanelComponent {
     const walk = (ctrl: AbstractControl): boolean | null => {
       const anyCtrl: any = ctrl as any;
 
-      // FormGroup/FormArray has .controls
       if (anyCtrl?.controls && typeof anyCtrl.controls === 'object') {
         for (const name of Object.keys(anyCtrl.controls)) {
           const child = anyCtrl.controls[name] as AbstractControl;
           const nameLower = String(name).toLowerCase();
 
-          // match name by keywords
           const match = keys.every((k) => nameLower.includes(k));
           if (match) {
-            // if it is a checkbox control, its value should be boolean
             const v = (child as any)?.value;
             if (typeof v === 'boolean') return v;
           }
@@ -87,7 +210,6 @@ export class SoaRightPanelComponent {
           if (found !== null) return found;
         }
       }
-
       return null;
     };
 
@@ -95,7 +217,6 @@ export class SoaRightPanelComponent {
     return r === null ? false : !!r;
   }
 
-  // ✅ reads string (prepared/approved) safely
   private findStringInFormTree(root: AbstractControl | null | undefined, keywords: string[]): string {
     if (!root) return '';
     const keys = keywords.map((k) => k.toLowerCase());
@@ -108,6 +229,7 @@ export class SoaRightPanelComponent {
           const child = anyCtrl.controls[name] as AbstractControl;
           const nameLower = String(name).toLowerCase();
 
+          // ✅ if keywords = ['particular'] then it matches any name containing that
           const match = keys.every((k) => nameLower.includes(k));
           if (match) {
             const v = (child as any)?.value;
@@ -134,11 +256,9 @@ export class SoaRightPanelComponent {
 
     const v: any = this.form.getRawValue?.() ?? this.form.value ?? {};
 
-    // ✅ WORKING: find checkbox values anywhere in the form tree (no guessing names)
     const forAssessmentOnly = this.findBoolInFormTree(this.form, ['assessment']);
     const endorsedForPayment = this.findBoolInFormTree(this.form, ['endorsed']);
 
-    // ✅ WORKING: get names (you already have these, but this makes it robust)
     const preparedBy =
       this.findStringInFormTree(this.form, ['prepared']) || this.pick(v, ['preparedBy'], '');
     const approvedBy =
@@ -147,7 +267,7 @@ export class SoaRightPanelComponent {
     const soaData: any = {
       soaNo: this.pick(v, ['soaSeries', 'seriesNumber', 'opSeries'], ''),
       date: this.pick(v, ['date', 'dateIssued'], ''),
-      name: this.pick(v, ['licensee'], ''), // ✅ NAME MUST BE licensee
+      name: this.pick(v, ['licensee'], ''),
       address: this.pick(v, ['address'], ''),
       particulars: this.pick(v, ['particulars'], ''),
       periodCovered: this.pick(v, ['periodCovered'], ''),
@@ -163,7 +283,6 @@ export class SoaRightPanelComponent {
         txnModification: !!v.txnModification,
         catROC: !!v.catROC,
 
-        // ✅ THESE TWO WILL NOW BE TRUE when the user checks them (guaranteed)
         forAssessmentOnly,
         endorsedForPayment,
       },
@@ -219,9 +338,6 @@ export class SoaRightPanelComponent {
         },
       ],
     };
-
-    console.log('[RightPanel] forAssessmentOnly:', forAssessmentOnly);
-    console.log('[RightPanel] endorsedForPayment:', endorsedForPayment);
 
     this.soaPdf.generatePDF(soaData);
   }

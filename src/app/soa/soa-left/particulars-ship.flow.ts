@@ -1,114 +1,96 @@
 import { MatDialog } from '@angular/material/dialog';
-import { TxnTypeDialogComponent, TxnType } from './txn-type-dialog.component';
+import { TxnType } from './txn-type-dialog.component';
 
-import { ShipStationMainDialogComponent, ShipMain } from './ship-station-main-dialog.component';
-import { ShipStationSubDialogComponent, ShipSub } from './ship-station-sub-dialog.component';
-import { ShipStationLevel2DialogComponent, ShipLevel } from './ship-station-level2-dialog.component';
-import { ShipStationNewOptionsDialogComponent } from './ship-station-new-options-dialog.component.ts';
+import {
+  ShipStationMainDialogComponent,
+  ShipMain,
+} from './ship-station-main-dialog.component';
 
+// Ship Station License (scope -> options) ✅ NO intl code anymore
+import {
+  openShipStationLicenseFlow,
+  ShipStationLicensePicked,
+} from './particulars-shipstation-license.flow';
+
+// Coastal flow (telegraphy/telephony)
+import { openCoastalParticularsFlow } from './particulars-coastal.flow';
+
+// ✅ called by SoaLeftFormComponent
 export function openShipStationParticularsFlow(
   dialog: MatDialog,
   cancel: () => void,
-  finalize: (finalText: string, txn: TxnType) => void
-) {
+  finalize: (finalText: string, txn?: TxnType) => void
+): void {
   const refMain = dialog.open(ShipStationMainDialogComponent, {
-    width: '560px',
+    width: '460px',
+    maxWidth: '92vw',
+    panelClass: 'soa-dlg',
     disableClose: true,
     autoFocus: false,
     restoreFocus: false,
   });
 
-  refMain.afterClosed().subscribe((resMain) => {
-    if (!resMain?.value) {
+  refMain.afterClosed().subscribe((r0) => {
+    if (!r0?.value) {
       cancel();
       return;
     }
 
-    const main = resMain.value as ShipMain;
+    const main = r0.value as ShipMain;
 
-    const refSub = dialog.open(ShipStationSubDialogComponent, {
-      width: '560px',
-      disableClose: true,
-      autoFocus: false,
-      restoreFocus: false,
-      data: { main },
-    });
+    // ===================================================
+    // 1) SHIP STATION LICENSE
+    // ===================================================
+    if (main === 'SHIP_STATION_LICENSE') {
+      openShipStationLicenseFlow(dialog, cancel, (picked: ShipStationLicensePicked) => {
+        const txnText = picked.txn === 'MOD' ? 'MODIFICATION' : picked.txn;
 
-    refSub.afterClosed().subscribe((resSub) => {
-      if (!resSub?.value) {
-        cancel();
-        return;
-      }
+        // ✅ POWER TEXT: supports both old and new naming
+        const powerText =
+          picked.power === 'HIGH_POWERED'
+            ? 'HIGH POWERED'
+            : picked.power === 'MEDIUM_POWERED' || (picked.power as any) === 'HF_VHF_POWERED'
+            ? 'MEDIUM POWERED'
+            : 'LOW POWERED';
 
-      const sub = resSub.value as ShipSub;
+        const scopeText = picked.scope; // DOMESTIC / INTERNATIONAL
 
-      const refLvl = dialog.open(ShipStationLevel2DialogComponent, {
-        width: '520px',
-        disableClose: true,
-        autoFocus: false,
-        restoreFocus: false,
-        data: { sub },
+        // ✅ REMOVED intlCode completely
+        const finalText = `SHIP STATION LICENSE - ${scopeText} - ${powerText} - ${txnText}`;
+
+        // Map ShipTxn -> TxnType for your right panel
+        const txnForForm: TxnType =
+          picked.txn === 'RENEW' ? 'RENEW' : picked.txn === 'MOD' ? 'MOD' : 'NEW';
+
+        finalize(finalText, txnForForm);
       });
+      return;
+    }
 
-      refLvl.afterClosed().subscribe((resLvl) => {
-        if (!resLvl?.value) {
-          cancel();
-          return;
-        }
+    // ===================================================
+    // 2) SHIP EARTH STATION LICENSE (NO subtype, NO txn dialogs)
+    // ===================================================
+    if (main === 'SHIP_EARTH_STATION_LICENSE') {
+      finalize('SHIP EARTH STATION LICENSE'); // ✅ txn undefined
+      return;
+    }
 
-        const level = resLvl.value as ShipLevel;
+    // ===================================================
+    // 3) DELETION CERTIFICATE (NO subtype, NO txn dialogs)
+    // ===================================================
+    if (main === 'DELETION_CERTIFICATE') {
+      finalize('DELETION CERTIFICATE'); // ✅ txn undefined
+      return;
+    }
 
-        const refTxn = dialog.open(TxnTypeDialogComponent, {
-          width: '460px',
-          disableClose: true,
-          autoFocus: false,
-          restoreFocus: false,
-        });
+    // ===================================================
+    // 4) COASTAL STATION LICENSE
+    // ===================================================
+    if (main === 'COASTAL_STATION_LICENSE') {
+      openCoastalParticularsFlow(dialog, cancel, finalize);
+      return;
+    }
 
-        refTxn.afterClosed().subscribe((resTxn) => {
-          if (!resTxn?.value) {
-            cancel();
-            return;
-          }
-
-          const txn = resTxn.value as TxnType;
-          const needsNewOptions =
-            txn === 'NEW' && (sub === 'DOMESTIC_TRADE' || sub === 'INTERNATIONAL_TRADE');
-
-          const finalizeText = (withEquip: boolean, units: number) => {
-            const parts: string[] = [];
-            parts.push('ShipStation');
-            parts.push(String(main));
-            parts.push(String(sub));
-            parts.push(String(level));
-
-            if (txn === 'NEW' && withEquip) {
-              parts.push('WITH_EQUIPMENT');
-              parts.push(`UNITS_${Math.max(1, Math.floor(units || 1))}`);
-            }
-
-            parts.push(txn === 'MOD' ? 'MODIFICATION' : txn);
-
-            finalize(parts.join(' - '), txn);
-          };
-
-          if (!needsNewOptions) {
-            finalizeText(false, 1);
-            return;
-          }
-
-          const refOpt = dialog.open(ShipStationNewOptionsDialogComponent, {
-            width: '560px',
-            disableClose: true,
-            autoFocus: false,
-            restoreFocus: false,
-          });
-
-          refOpt.afterClosed().subscribe((opt) => {
-            finalizeText(!!opt?.withEquipment, Number(opt?.units || 1));
-          });
-        });
-      });
-    });
+    cancel();
   });
 }
