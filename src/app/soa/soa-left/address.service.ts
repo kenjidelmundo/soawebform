@@ -7,7 +7,8 @@ export type AddressProvinceDto = { province: string; towns: AddressTownDto[] };
 
 @Injectable({ providedIn: 'root' })
 export class AddressService {
-  private baseUrl = '/api/Address';
+  private readonly baseUrl = 'https://localhost:7172/api/Address';
+
 
   constructor(private http: HttpClient) {}
 

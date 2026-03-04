@@ -49,7 +49,6 @@ export type CoastalTelephonyOptionsDialogResult = {
           </label>
         </div>
 
-        <!-- POWER -->
         <div class="col">
           <div class="colHead">Band</div>
 

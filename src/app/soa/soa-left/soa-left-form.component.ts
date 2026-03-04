@@ -9,24 +9,23 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule, AbstractControl } from '@angular/forms';
-import { SoaService } from '../soa.service';
 import { Subject, combineLatest } from 'rxjs';
 import { startWith, takeUntil } from 'rxjs/operators';
 
-// ✅ dialogs (NO HTML change)
+import { SoaService } from '../soa.service';
+
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { AddressDialogComponent } from './address-dialog.component';
 import { ParticularsDialogComponent } from './particulars-dialog.component';
-
-// ✅ txn dialog
 import { TxnTypeDialogComponent, TxnType } from './txn-type-dialog.component';
 
-// ✅ ROUTED FLOWS (separate files)
 import { openRocParticularsFlow } from './particulars-roc.flow';
 import { openShipStationParticularsFlow } from './particulars-ship.flow';
 import { openAmateurParticularsFlow } from './particulars-amateur.flow';
 
-// ✅ DB address service
+// ✅ NEW: Coastal Station License flow (Subtype -> Option -> TXN)
+import { openCoastalLicenseParticularsFlow } from './particulars-c.license.flow';
+
 import { AddressService } from './address.service';
 
 type PayeeItem = { id: number; name: string };
@@ -71,14 +70,12 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadPayees();
     this.setupPeriodCovered();
     this.setupPayeeSelectionAutoFill();
-
-    // ✅ keep this (it helps if particulars updated manually)
     this.setupAutoTxnFromParticulars();
   }
 
   ngAfterViewInit(): void {
     // ==========================
-    // Address click hook
+    // Address click hook (readonly input -> opens dialog)
     // ==========================
     const addressInput = this.el.nativeElement.querySelector(
       'input[formControlName="address"]'
@@ -98,7 +95,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // ==========================
-    // Particulars click hook
+    // Particulars click hook (readonly input/textarea -> opens dialog)
     // ==========================
     const partInput = this.el.nativeElement.querySelector(
       'input[formControlName="particulars"], textarea[formControlName="particulars"]'
@@ -113,7 +110,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
         ev.preventDefault();
         ev.stopPropagation();
         if (Date.now() < this.particularsCoolDownUntil) return;
-        this.openParticularsDialog(); // ✅ NOW WORKS (implemented below)
+        this.openParticularsDialog();
       });
     }
   }
@@ -126,8 +123,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // ======================================================
-  // ✅ AUTO CHECK RIGHT PANEL: NEW / RENEW / MOD
-  // ✅ ALSO AUTO-SET catROC/catMA for computations
+  // ✅ AUTO TXN + CATEGORY from particulars (for computations)
   // ======================================================
   private setupAutoTxnFromParticulars(): void {
     const ctrl = this.form?.get('particulars');
@@ -384,6 +380,9 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       });
   }
 
+  // =========================
+  // PERIOD COVERED
+  // =========================
   private setupPeriodCovered(): void {
     const fromCtrl = this.form.get('periodFrom');
     const toCtrl = this.form.get('periodTo');
@@ -409,7 +408,8 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const t = new Date(to);
     if (isNaN(f.getTime()) || isNaN(t.getTime())) return '';
     if (t < f) return '';
-    const fmt = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const fmt = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
     return `${fmt(f)}-${fmt(t)}`;
   }
 
@@ -426,10 +426,13 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // ======================================================
-  // ✅ ADDRESS DIALOG (DB ONLY - NO HARD CODED)
+  // ✅ ADDRESS DIALOG (DB fetch -> dialog -> patch address)
   // ======================================================
   private openAddressDialog(): void {
     if (this.addressDialogOpen) return;
+
+    // cooldown immediately to prevent double-open spam
+    this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
     this.addressDialogOpen = true;
 
     this.addressSvc.getProvinces().subscribe({
@@ -437,21 +440,26 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
         if (!Array.isArray(provinces) || provinces.length === 0) {
           console.error('❌ Address API returned EMPTY list', provinces);
           alert('Address list is empty. Check /api/Address/provinces');
-          this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
           this.addressDialogOpen = false;
           return;
         }
+
+        const init = {
+          province: String(this.form.get('province')?.value ?? '').trim() || undefined,
+          townCity: String(this.form.get('townCity')?.value ?? '').trim() || undefined,
+          brgy: String(this.form.get('brgy')?.value ?? '').trim() || undefined,
+          line4: String(this.form.get('line4')?.value ?? '').trim() || undefined,
+        };
 
         const ref = this.dialog.open(AddressDialogComponent, {
           width: '560px',
           disableClose: true,
           autoFocus: false,
           restoreFocus: false,
-          data: { provinces: provinces as any },
+          data: { provinces: provinces as any, initial: init },
         });
 
         ref.afterClosed().subscribe((res) => {
-          this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
           this.addressDialogOpen = false;
 
           const addressInput = this.el.nativeElement.querySelector(
@@ -460,24 +468,36 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           addressInput?.blur();
 
           if (!res) return;
+
+          // Keep original behavior: store full address in address control
           this.form.patchValue({ address: res.fullAddress }, { emitEvent: true });
+
+          // Optional separate fields if they exist
+          if (this.form.get('province')) this.form.get('province')?.setValue(res.province, { emitEvent: false });
+          if (this.form.get('townCity')) this.form.get('townCity')?.setValue(res.townCity, { emitEvent: false });
+          if (this.form.get('brgy')) this.form.get('brgy')?.setValue(res.brgy, { emitEvent: false });
+          if (this.form.get('line4')) this.form.get('line4')?.setValue(res.line4, { emitEvent: false });
+
+          // extra cooldown at close
+          this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
         });
       },
       error: (err) => {
         console.error('❌ Address API ERROR:', err);
         alert('Failed to load address list from API. Check console/network.');
-
-        this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
         this.addressDialogOpen = false;
+        this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
       },
     });
   }
 
   // ======================================================
-  // ✅ PARTICULARS DIALOG (FIXED) -> routes to proper flows
+  // ✅ PARTICULARS DIALOG -> routes to proper flows
   // ======================================================
   private openParticularsDialog(): void {
     if (this.particularsDialogOpen) return;
+
+    this.particularsCoolDownUntil = Date.now() + this.COOLDOWN_MS;
     this.particularsDialogOpen = true;
 
     const ref = this.dialog.open(ParticularsDialogComponent, {
@@ -490,7 +510,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     });
 
     ref.afterClosed().subscribe((res: any) => {
-      this.particularsCoolDownUntil = Date.now() + this.COOLDOWN_MS;
       this.particularsDialogOpen = false;
 
       const partInput = this.el.nativeElement.querySelector(
@@ -500,7 +519,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
       if (!res) return;
 
-      // ✅ accept many possible shapes so it won't break
       const kindRaw =
         res?.value ??
         res?.type ??
@@ -511,7 +529,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
       const kind = String(kindRaw ?? '').toUpperCase().trim();
 
-      // Route safely
       if (kind.includes('ROC')) {
         openRocParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
           this.applyFinalParticulars(finalText, txn);
@@ -533,33 +550,41 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
 
-      // ✅ fallback: if dialog returns direct text
+      // ✅ NEW: COASTAL STATION LICENSE
+      if (kind.includes('COASTAL')) {
+        openCoastalLicenseParticularsFlow(
+          this.dialog,
+          () => {},
+          (finalText: string, txn?: TxnType) => {
+            this.applyFinalParticulars(finalText, txn);
+          }
+        );
+        return;
+      }
+
       const txt = String(res?.finalText ?? res?.text ?? '').trim();
       if (txt) this.applyFinalParticulars(txt, undefined);
+
+      this.particularsCoolDownUntil = Date.now() + this.COOLDOWN_MS;
     });
   }
 
   private applyFinalParticulars(finalText: string, txn?: TxnType): void {
     const patch: any = { particulars: finalText };
 
-    // if you have txnType or transactionType control, patch it
     if (txn) {
       if (this.form.get('txnType')) patch.txnType = txn;
       if (this.form.get('transactionType')) patch.transactionType = txn;
       this.applyTxnFromTxnChoice(txn);
     }
 
-    // ✅ emitEvent TRUE to trigger computations
+    // MUST emitEvent true so computations run
     this.form.patchValue(patch, { emitEvent: true });
     this.form.get('particulars')?.updateValueAndValidity({ emitEvent: true });
 
-    // category auto-set for computations
     this.applyCategoryFromParticulars(finalText);
   }
 
-  // ======================================================
-  // ✅ TXN TYPE DIALOG HELPER (if you still use it elsewhere)
-  // ======================================================
   private openTxnTypeDialogAndFinalize(
     baseText: string,
     finalize: (finalText: string, txn: TxnType) => void,
@@ -588,18 +613,18 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // ======================================================
-  // ✅ helpers you left blank (now complete)
+  // helpers (date parsing + tree search)
   // ======================================================
   private periodCoveredToDates(periodCovered: any): { periodFrom?: string; periodTo?: string } {
     const s = String(periodCovered ?? '').trim();
     if (!s) return {};
 
-    // common formats: "DD/MM/YYYY-DD/MM/YYYY" or "YYYY-MM-DD - YYYY-MM-DD"
+    // "DD/MM/YYYY-DD/MM/YYYY"
     const parts = s.split('-').map((x) => x.trim());
     if (parts.length < 2) return {};
 
     const p1 = this.parseToYmd(parts[0]);
-    const p2 = this.parseToYmd(parts.slice(1).join('-')); // in case date contains '-'
+    const p2 = this.parseToYmd(parts[1]);
 
     const out: any = {};
     if (p1) out.periodFrom = p1;
@@ -611,7 +636,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const v = String(raw ?? '').trim();
     if (!v) return '';
 
-    // already y-m-d
     if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
 
     // dd/mm/yyyy
@@ -623,17 +647,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       return this.toYmdFromParts(y, m, d);
     }
 
-    // mm/dd/yyyy
-    const m2 = v.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-    if (m2) {
-      const a = Number(m2[1]);
-      const b = Number(m2[2]);
-      const y = Number(m2[3]);
-      // assume a=month b=day
-      return this.toYmdFromParts(y, a, b);
-    }
-
-    // Date string
     const d = new Date(v);
     if (!isNaN(d.getTime())) return this.toYmd(d);
 
@@ -672,6 +685,12 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const targets = (keywords ?? []).map((k) => String(k).toLowerCase());
     let found = false;
 
+    // direct first
+    for (const k of targets) {
+      const direct = this.form?.get(k);
+      if (direct && typeof direct.value === 'boolean') return !!direct.value;
+    }
+
     const walk = (ctrl: any, path: string) => {
       if (!ctrl || found) return;
 
@@ -695,12 +714,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
         walk(child, full);
       }
     };
-
-    // direct check first (fast)
-    for (const k of targets) {
-      const direct = this.form?.get(k);
-      if (direct && typeof direct.value === 'boolean') return !!direct.value;
-    }
 
     walk(root as any, '');
     return found;

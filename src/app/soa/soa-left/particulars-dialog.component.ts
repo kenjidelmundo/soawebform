@@ -2,7 +2,9 @@ import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 
-export type ParticularsDialogResult = { value: 'ROC' | 'Amateur' | 'ShipStation' };
+export type ParticularsDialogResult = {
+  value: 'ROC' | 'Amateur' | 'ShipStation' | 'Coastal';
+};
 
 @Component({
   selector: 'app-particulars-dialog',
@@ -24,6 +26,11 @@ export type ParticularsDialogResult = { value: 'ROC' | 'Amateur' | 'ShipStation'
         <button type="button" class="pickBtn" (click)="pick('ShipStation')">
           <span class="txt">Ship Station</span>
         </button>
+
+        <!-- ✅ NEW -->
+        <button type="button" class="pickBtn" (click)="pick('Coastal')">
+          <span class="txt">Coastal Station License</span>
+        </button>
       </div>
 
       <div class="dlgFoot">
@@ -39,7 +46,7 @@ export type ParticularsDialogResult = { value: 'ROC' | 'Amateur' | 'ShipStation'
     .pickBtn{ height:70px; border:1px solid #bbb; border-radius:10px; background:#fff;
               cursor:pointer; display:grid; place-items:center; }
     .pickBtn:hover{ border-color:#2f74ff; }
-    .txt{ font-size:14px; font-weight:700; }
+    .txt{ font-size:14px; font-weight:700; text-align:center; padding:0 8px; }
     .dlgFoot{ margin-top:14px; display:flex; justify-content:flex-end; }
     .btn{ height:34px; padding:0 12px; border:1px solid #999; background:#fff; border-radius:6px; cursor:pointer; }
   `]
@@ -49,7 +56,7 @@ export class ParticularsDialogComponent {
     private ref: MatDialogRef<ParticularsDialogComponent, ParticularsDialogResult>
   ) {}
 
-  pick(value: 'ROC' | 'Amateur' | 'ShipStation') {
+  pick(value: 'ROC' | 'Amateur' | 'ShipStation' | 'Coastal') {
     this.ref.close({ value });
   }
 

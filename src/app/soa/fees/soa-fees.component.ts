@@ -16,6 +16,9 @@ import {
   SHIP_STATION,
 } from './shipstation.compute';
 
+// ✅ NEW: COASTAL compute
+import { computeCoastal, CoastalSurchargeMode } from './coastal.compute';
+
 // ROC
 import { computeROC, RocOperatorRow, TxnFlags as RocTxnFlags } from './roc.compute';
 
@@ -98,7 +101,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
 
     const shipUnitsCtrl = this.ctrl('shipUnits');
     const withEquipCtrl = this.ctrl('withEquipment');
-    const sur100Ctrl = this.ctrl('sur100');
+    const sur100Ctrl = this.ctrl('sur100'); // reused for coastal surcharge selection
 
     const txnNewCtrl = this.ctrl('txnNew');
     const txnRenewCtrl = this.ctrl('txnRenew');
@@ -154,15 +157,10 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
 
           const res = computeROC(text, YEARS, flags, this.ROC_OPERATOR, this.ROC_DEFAULT, this.ROC_MOD_FEE);
 
-          // ROC shows in AM/ROC block:
-          // - Radio Operator's Cert = ROC*YR
-          // - Surcharges for renew/mod
-          // - DST
           this.patch(res.rocRadioStationLicense, 'amRadioOperatorsCert');
           this.patch(res.rocSurcharges, 'amSurcharges');
           this.patch(res.rocDST, 'dst');
 
-          // keep Radio Station License 0 for ROC-only
           this.patch(0, 'amRadioStationLicense');
           this.patch(0, 'amApplicationFee');
           this.patch(0, 'amFilingFee');
@@ -177,8 +175,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         // =========================
         if (text.toUpperCase().startsWith('AMATEUR')) {
           this.clearShipFields();
-          // computeAmateur needs cls letter
-          const cls = this.extractAmateurClass(text); // A/B/C/D default A
+          const cls = this.extractAmateurClass(text);
 
           const flags: AmateurTxnFlags = {
             txnNew: txn === 'NEW',
@@ -188,12 +185,9 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
 
           const res = computeAmateur(text, cls, YEARS, flags, this.AMATEUR_RATES);
 
-          // AMATEUR block
           this.patch(res.maRadioStationLicense, 'amRadioStationLicense');
-          // Operators cert is NOT used by amateur compute, keep 0
           this.patch(0, 'amRadioOperatorsCert');
           this.patch(res.maFilingFee, 'amFilingFee');
-          // application/seminar not included in your compute; keep 0
           this.patch(0, 'amApplicationFee');
           this.patch(0, 'amSeminarFee');
 
@@ -205,13 +199,54 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         }
 
         // =========================
-        // 3) SHIP / COASTAL / DELETION
+        // ✅ 3) COASTAL STATION LICENSE
+        // =========================
+        if (text.toUpperCase().includes('COASTAL')) {
+          this.clearAmateurFields(); // coastal uses LICENSE fields + dst
+
+          // sur mode:
+          // - for NEW/MOD: surcharge ignored
+          // - for RENEW: if checkbox sur100 true -> SUR100 else SUR50
+          const surMode: CoastalSurchargeMode =
+            txn === 'RENEW' ? (s100 ? 'SUR100' : 'SUR50') : 'NONE';
+
+          const res = computeCoastal(text, txn as any, YEARS, surMode);
+
+          // Map to your existing "licenses" fields
+          // Purchase/Possess are present in table, but your HTML has only these license fields.
+          this.patch(res.purchase, 'licPermitToPurchase');
+          this.patch(res.possess, 'licPermitToPossess');
+
+          // Filing fee field: your coastal table doesn't have FF for filing; it has "ff" (FF column).
+          // We store it to licFilingFee so it still shows (and totals).
+          this.patch(res.ff, 'licFilingFee');
+
+          this.patch(res.cp, 'licConstructionPermitFee');
+
+          // License fee + Inspection fee:
+          // Your form already has licRadioStationLicense (we put LF here)
+          // If you have licInspectionFee control, we fill it too.
+          this.patch(res.lf, 'licRadioStationLicense');
+          this.patch(res.ifee, 'licInspectionFee');
+
+          // Surcharge goes to licSurcharges
+          this.patch(res.surcharge, 'licSurcharges');
+
+          // DST control
+          this.patch(res.dst, 'dst');
+
+          this.patch(this.computeTotalAmount(), 'totalAmount');
+          return;
+        }
+
+        // =========================
+        // 4) SHIP / COASTAL / DELETION (existing)
         // =========================
         const parsedShip = parseParticularsText(text);
         if (parsedShip) {
-          this.clearAmateurFields(); // ship uses LICENSE fields + dst
+          this.clearAmateurFields();
 
-          const pickedTxn: PickedTxn = txn; // NEW/RENEW/MOD
+          const pickedTxn: PickedTxn = txn;
           const rowKey = rowKeyFromParsed(parsedShip);
 
           const ship = buildShipParse(rowKey, !!wEq, SHIP_UNITS, !!s100);
@@ -224,7 +259,6 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
             SHIP_STATION as Record<string, ShipStationRow>
           );
 
-          // ✅ PATCH EXACTLY YOUR HTML FORMCONTROLNAMES
           this.patch(res.PUR, 'licPermitToPurchase');
           this.patch(res.FF, 'licFilingFee');
           this.patch(res.POS, 'licPermitToPossess');
@@ -295,6 +329,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     this.patch(0, 'licPermitToPossess');
     this.patch(0, 'licConstructionPermitFee');
     this.patch(0, 'licRadioStationLicense');
+    this.patch(0, 'licInspectionFee');
     this.patch(0, 'licSurcharges');
   }
 
