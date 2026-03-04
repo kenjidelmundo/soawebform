@@ -3,10 +3,10 @@ import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 
 export type ParticularsDialogResult = {
-  value: 'ROC' | 'Amateur' | 'ShipStation' | 'Coastal';
+  value: 'ROC' | 'Amateur' | 'ShipStation' | 'Coastal' | 'VHFUHF';
 };
 
-@Component({
+@Component({  
   selector: 'app-particulars-dialog',
   standalone: true,
   imports: [CommonModule],
@@ -27,9 +27,13 @@ export type ParticularsDialogResult = {
           <span class="txt">Ship Station</span>
         </button>
 
-        <!-- ✅ NEW -->
         <button type="button" class="pickBtn" (click)="pick('Coastal')">
           <span class="txt">Coastal Station License</span>
+        </button>
+
+        <!-- ✅ NEW -->
+        <button type="button" class="pickBtn" (click)="pick('VHFUHF')">
+          <span class="txt">VHF/UHF Radio Stations</span>
         </button>
       </div>
 
@@ -49,14 +53,14 @@ export type ParticularsDialogResult = {
     .txt{ font-size:14px; font-weight:700; text-align:center; padding:0 8px; }
     .dlgFoot{ margin-top:14px; display:flex; justify-content:flex-end; }
     .btn{ height:34px; padding:0 12px; border:1px solid #999; background:#fff; border-radius:6px; cursor:pointer; }
-  `]
+  `],
 })
 export class ParticularsDialogComponent {
   constructor(
     private ref: MatDialogRef<ParticularsDialogComponent, ParticularsDialogResult>
   ) {}
 
-  pick(value: 'ROC' | 'Amateur' | 'ShipStation' | 'Coastal') {
+  pick(value: 'ROC' | 'Amateur' | 'ShipStation' | 'Coastal' | 'VHFUHF') {
     this.ref.close({ value });
   }
 

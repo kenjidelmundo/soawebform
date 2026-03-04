@@ -25,6 +25,9 @@ import { computeROC, RocOperatorRow, TxnFlags as RocTxnFlags } from './roc.compu
 // AMATEUR
 import { computeAmateur, AmateurRates, TxnFlags as AmateurTxnFlags } from './amateur.compute';
 
+// ✅ NEW: VHF/UHF compute
+import { computeVhfUhf } from './vhfuhf.compute';
+
 @Component({
   selector: 'app-soa-fees',
   standalone: true,
@@ -199,7 +202,42 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         }
 
         // =========================
-        // ✅ 3) COASTAL STATION LICENSE
+        // ✅ 3) VHF/UHF
+        // =========================
+        const vhf = computeVhfUhf(text);
+        if (vhf) {
+          // uses LICENSE + APP fields + DST
+          this.clearAmateurFields();
+          this.clearShipFields();
+          this.clearAppFields();
+
+          // Map core license fees
+          this.patch(vhf.purchase, 'licPermitToPurchase');
+          this.patch(vhf.possess, 'licPermitToPossess');
+          this.patch(vhf.filingFee, 'licFilingFee');
+          this.patch(vhf.constructionPermit, 'licConstructionPermitFee');
+          this.patch(vhf.licenseFee, 'licRadioStationLicense');
+          this.patch(vhf.inspectionFee, 'licInspectionFee');
+          this.patch(vhf.supervisionFee, 'licSUF');
+
+          // Map "Reg" + "MOD" to existing APP fields (so they still show + total)
+          this.patch(vhf.registrationFee, 'appRegistrationFee');
+          this.patch(vhf.modificationFee, 'appModificationFee');
+
+          // Surcharge rule (same UX as Coastal): only apply on RENEW,
+          // checkbox sur100 decides SUR100 vs SUR50
+          const surcharge = txn === 'RENEW' ? (s100 ? vhf.surLf100 : vhf.surLf50) : 0;
+          this.patch(surcharge, 'licSurcharges');
+
+          // DST
+          this.patch(vhf.dst, 'dst');
+
+          this.patch(this.computeTotalAmount(), 'totalAmount');
+          return;
+        }
+
+        // =========================
+        // ✅ 4) COASTAL STATION LICENSE
         // =========================
         if (text.toUpperCase().includes('COASTAL')) {
           this.clearAmateurFields(); // coastal uses LICENSE fields + dst
@@ -213,26 +251,13 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
           const res = computeCoastal(text, txn as any, YEARS, surMode);
 
           // Map to your existing "licenses" fields
-          // Purchase/Possess are present in table, but your HTML has only these license fields.
           this.patch(res.purchase, 'licPermitToPurchase');
           this.patch(res.possess, 'licPermitToPossess');
-
-          // Filing fee field: your coastal table doesn't have FF for filing; it has "ff" (FF column).
-          // We store it to licFilingFee so it still shows (and totals).
           this.patch(res.ff, 'licFilingFee');
-
           this.patch(res.cp, 'licConstructionPermitFee');
-
-          // License fee + Inspection fee:
-          // Your form already has licRadioStationLicense (we put LF here)
-          // If you have licInspectionFee control, we fill it too.
           this.patch(res.lf, 'licRadioStationLicense');
           this.patch(res.ifee, 'licInspectionFee');
-
-          // Surcharge goes to licSurcharges
           this.patch(res.surcharge, 'licSurcharges');
-
-          // DST control
           this.patch(res.dst, 'dst');
 
           this.patch(this.computeTotalAmount(), 'totalAmount');
@@ -240,7 +265,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         }
 
         // =========================
-        // 4) SHIP / COASTAL / DELETION (existing)
+        // 5) SHIP / COASTAL / DELETION (existing)
         // =========================
         const parsedShip = parseParticularsText(text);
         if (parsedShip) {
@@ -331,6 +356,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     this.patch(0, 'licRadioStationLicense');
     this.patch(0, 'licInspectionFee');
     this.patch(0, 'licSurcharges');
+    this.patch(0, 'licSUF');
   }
 
   private clearAmateurFields(): void {
@@ -340,6 +366,12 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     this.patch(0, 'amFilingFee');
     this.patch(0, 'amSeminarFee');
     this.patch(0, 'amSurcharges');
+  }
+
+  // ✅ used by VHF/UHF to avoid leaving old APP values
+  private clearAppFields(): void {
+    this.patch(0, 'appRegistrationFee');
+    this.patch(0, 'appModificationFee');
   }
 
   // This matches your TOTAL AMOUNT expression

@@ -23,8 +23,11 @@ import { openRocParticularsFlow } from './particulars-roc.flow';
 import { openShipStationParticularsFlow } from './particulars-ship.flow';
 import { openAmateurParticularsFlow } from './particulars-amateur.flow';
 
-// ✅ NEW: Coastal Station License flow (Subtype -> Option -> TXN)
+// ✅ Coastal Station License flow
 import { openCoastalLicenseParticularsFlow } from './particulars-c.license.flow';
+
+// ✅ VHF/UHF flow (NO TXN)
+import { openVhfUhfParticularsFlow } from './particulars-vhfuhf.flow';
 
 import { AddressService } from './address.service';
 
@@ -75,7 +78,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     // ==========================
-    // Address click hook (readonly input -> opens dialog)
+    // Address click hook
     // ==========================
     const addressInput = this.el.nativeElement.querySelector(
       'input[formControlName="address"]'
@@ -95,7 +98,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // ==========================
-    // Particulars click hook (readonly input/textarea -> opens dialog)
+    // Particulars click hook
     // ==========================
     const partInput = this.el.nativeElement.querySelector(
       'input[formControlName="particulars"], textarea[formControlName="particulars"]'
@@ -123,7 +126,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // ======================================================
-  // ✅ AUTO TXN + CATEGORY from particulars (for computations)
+  // AUTO TXN + CATEGORY from particulars (for computations)
   // ======================================================
   private setupAutoTxnFromParticulars(): void {
     const ctrl = this.form?.get('particulars');
@@ -142,6 +145,11 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private applyTxnFromParticulars(particularsText: string): void {
     const t = String(particularsText ?? '').toUpperCase();
+
+    // IMPORTANT: VHF/UHF has NO TXN in your table
+    if (t.includes('VHF') || t.includes('UHF') || t.includes('VHF/UHF') || t.includes('RADIO STATIONS')) {
+      return;
+    }
 
     const hasMod =
       /\bMOD\b/.test(t) ||
@@ -191,7 +199,11 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.setStringDeep('transactionType', txn);
   }
 
-  private setTxnEverywhere(v: { txnNew: boolean; txnRenew: boolean; txnModification: boolean }): void {
+  private setTxnEverywhere(v: {
+    txnNew: boolean;
+    txnRenew: boolean;
+    txnModification: boolean;
+  }): void {
     this.setBoolDeep('txnNew', v.txnNew);
     this.setBoolDeep('txnRenew', v.txnRenew);
     this.setBoolDeep('txnModification', v.txnModification);
@@ -426,12 +438,11 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // ======================================================
-  // ✅ ADDRESS DIALOG (DB fetch -> dialog -> patch address)
+  // ADDRESS DIALOG (DB fetch -> dialog -> patch address)
   // ======================================================
   private openAddressDialog(): void {
     if (this.addressDialogOpen) return;
 
-    // cooldown immediately to prevent double-open spam
     this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
     this.addressDialogOpen = true;
 
@@ -469,16 +480,16 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
           if (!res) return;
 
-          // Keep original behavior: store full address in address control
           this.form.patchValue({ address: res.fullAddress }, { emitEvent: true });
 
-          // Optional separate fields if they exist
-          if (this.form.get('province')) this.form.get('province')?.setValue(res.province, { emitEvent: false });
-          if (this.form.get('townCity')) this.form.get('townCity')?.setValue(res.townCity, { emitEvent: false });
+          if (this.form.get('province'))
+            this.form.get('province')?.setValue(res.province, { emitEvent: false });
+          if (this.form.get('townCity'))
+            this.form.get('townCity')?.setValue(res.townCity, { emitEvent: false });
           if (this.form.get('brgy')) this.form.get('brgy')?.setValue(res.brgy, { emitEvent: false });
-          if (this.form.get('line4')) this.form.get('line4')?.setValue(res.line4, { emitEvent: false });
+          if (this.form.get('line4'))
+            this.form.get('line4')?.setValue(res.line4, { emitEvent: false });
 
-          // extra cooldown at close
           this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
         });
       },
@@ -492,7 +503,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // ======================================================
-  // ✅ PARTICULARS DIALOG -> routes to proper flows
+  // PARTICULARS DIALOG -> routes to proper flows
   // ======================================================
   private openParticularsDialog(): void {
     if (this.particularsDialogOpen) return;
@@ -550,13 +561,21 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
 
-      // ✅ NEW: COASTAL STATION LICENSE
       if (kind.includes('COASTAL')) {
-        openCoastalLicenseParticularsFlow(
+        openCoastalLicenseParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
+          this.applyFinalParticulars(finalText, txn);
+        });
+        return;
+      }
+
+      // ✅ VHF/UHF (NO TXN)  ✅ FIXED SIGNATURE (finalText: string)
+      if (kind === 'VHFUHF' || kind.includes('VHF') || kind.includes('UHF')) {
+        openVhfUhfParticularsFlow(
           this.dialog,
           () => {},
-          (finalText: string, txn?: TxnType) => {
-            this.applyFinalParticulars(finalText, txn);
+          (finalText: string) => {
+            // finalText already built by the flow
+            this.applyFinalParticulars(finalText, undefined);
           }
         );
         return;
@@ -578,7 +597,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       this.applyTxnFromTxnChoice(txn);
     }
 
-    // MUST emitEvent true so computations run
     this.form.patchValue(patch, { emitEvent: true });
     this.form.get('particulars')?.updateValueAndValidity({ emitEvent: true });
 
@@ -619,7 +637,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const s = String(periodCovered ?? '').trim();
     if (!s) return {};
 
-    // "DD/MM/YYYY-DD/MM/YYYY"
     const parts = s.split('-').map((x) => x.trim());
     if (parts.length < 2) return {};
 
@@ -638,7 +655,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
     if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
 
-    // dd/mm/yyyy
     const m1 = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (m1) {
       const d = Number(m1[1]);
@@ -679,13 +695,15 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.toYmd(dt);
   }
 
-  private findBoolInFormTree(root: AbstractControl | null | undefined, keywords: string[]): boolean {
+  private findBoolInFormTree(
+    root: AbstractControl | null | undefined,
+    keywords: string[]
+  ): boolean {
     if (!root) return false;
 
     const targets = (keywords ?? []).map((k) => String(k).toLowerCase());
     let found = false;
 
-    // direct first
     for (const k of targets) {
       const direct = this.form?.get(k);
       if (direct && typeof direct.value === 'boolean') return !!direct.value;
