@@ -28,6 +28,12 @@ import { computeAmateur, AmateurRates, TxnFlags as AmateurTxnFlags } from './ama
 // ✅ NEW: VHF/UHF compute
 import { computeVhfUhf } from './vhfuhf.compute';
 
+// ✅ NEW: MOBILE PHONE PERMITS compute
+import { computeMobilePhone, TxnFlags as MobileTxnFlags } from './mobilephone.compute';
+
+// ✅ NEW: TVRO/CATV compute  ✅ ADD
+import { computeTvroCatv } from './tvrocatv.compute';
+
 @Component({
   selector: 'app-soa-fees',
   standalone: true,
@@ -265,7 +271,67 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         }
 
         // =========================
-        // 5) SHIP / COASTAL / DELETION (existing)
+        // ✅ 5) MOBILE PHONE PERMITS
+        // =========================
+        if (text.toUpperCase().includes('MOBILE PHONE') || text.toUpperCase().includes('MOBILEPHONE')) {
+          this.clearAmateurFields();
+          this.clearShipFields();
+          this.clearAppFields();
+
+          const flags: MobileTxnFlags = {
+            isNew: txn === 'NEW',
+            isRenew: txn === 'RENEW',
+            isMod: txn === 'MOD',
+          };
+
+          const mp = computeMobilePhone(text, YEARS, flags);
+          if (mp?.ok) {
+            // Map to existing fields:
+            // - FF/PF/IF go to LICENSE inputs you already display (same as your screenshot: FF PF IF MOD DST SUR)
+            this.patch(mp.ff, 'licFilingFee');            // FF
+            this.patch(mp.pf, 'licRadioStationLicense'); // PF
+            this.patch(mp.ifee, 'licInspectionFee');     // IF
+            this.patch(mp.mod, 'appModificationFee');    // MOD (reuse existing MOD field)
+            this.patch(mp.dst, 'dst');                   // DST
+            this.patch(mp.sur, 'licSurcharges');         // SUR
+
+            this.patch(this.computeTotalAmount(), 'totalAmount');
+            return;
+          }
+          // if subtype not detected, fallthrough to ship parse/others
+        }
+
+        // =========================
+        // ✅ 6) TVRO / CATV  ✅ NEW
+        // =========================
+        if (text.toUpperCase().includes('TVRO/CATV') || text.toUpperCase().includes('TVRO') || text.toUpperCase().includes('CATV')) {
+          this.clearAmateurFields();
+          this.clearShipFields();
+          this.clearAppFields();
+
+          const tv = computeTvroCatv(text, YEARS, txn as any, !!s100);
+          if (tv?.ok) {
+            // Map based on your table:
+            // TVRO: LF(+SUR on renew) + DST; MOD: MOD + DST
+            // CATV NEW: FF + CPF + LF + IF + DST; RENEW: LF + IF + SUR + DST; MOD: MOD + DST
+            this.patch(tv.ff, 'licFilingFee');                 // FF
+            this.patch(tv.cpf, 'licConstructionPermitFee');    // CPF/CPF
+            this.patch(tv.lf, 'licRadioStationLicense');       // LF total for years
+            this.patch(tv.ifee, 'licInspectionFee');           // IF total for years
+
+            this.patch(tv.sur, 'licSurcharges');               // SUR (renew only)
+            this.patch(tv.dst, 'dst');                         // DST
+
+            // MOD is shown in your APP MOD field (same as Mobile Phone)
+            this.patch(tv.mod, 'appModificationFee');          // MOD
+
+            this.patch(this.computeTotalAmount(), 'totalAmount');
+            return;
+          }
+        }
+
+        // =========================
+        // 7) SHIP / COASTAL / DELETION (existing)
         // =========================
         const parsedShip = parseParticularsText(text);
         if (parsedShip) {
@@ -368,7 +434,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     this.patch(0, 'amSurcharges');
   }
 
-  // ✅ used by VHF/UHF to avoid leaving old APP values
+  // ✅ used by VHF/UHF + Mobile Phone to avoid leaving old APP values
   private clearAppFields(): void {
     this.patch(0, 'appRegistrationFee');
     this.patch(0, 'appModificationFee');

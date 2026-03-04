@@ -29,6 +29,12 @@ import { openCoastalLicenseParticularsFlow } from './particulars-c.license.flow'
 // ✅ VHF/UHF flow (NO TXN)
 import { openVhfUhfParticularsFlow } from './particulars-vhfuhf.flow';
 
+// ✅ Mobile Phone Permits flow
+import { openMobilePhoneParticularsFlow } from './particulars-mobilephone.flow';
+
+// ✅ TVRO/CATV flow ✅ NEW
+import { openTvroCatvParticularsFlow } from './particulars-tvrocatv.flow';
+
 import { AddressService } from './address.service';
 
 type PayeeItem = { id: number; name: string };
@@ -147,7 +153,12 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const t = String(particularsText ?? '').toUpperCase();
 
     // IMPORTANT: VHF/UHF has NO TXN in your table
-    if (t.includes('VHF') || t.includes('UHF') || t.includes('VHF/UHF') || t.includes('RADIO STATIONS')) {
+    if (
+      t.includes('VHF') ||
+      t.includes('UHF') ||
+      t.includes('VHF/UHF') ||
+      t.includes('RADIO STATIONS')
+    ) {
       return;
     }
 
@@ -540,13 +551,72 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
       const kind = String(kindRaw ?? '').toUpperCase().trim();
 
-      if (kind.includes('ROC')) {
-        openRocParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
-          this.applyFinalParticulars(finalText, txn);
-        });
-        return;
+      // ✅ FIX: Strict service keys first (prevents TVROCATV matching ROC)
+      switch (kind) {
+        case 'ROC':
+          openRocParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
+            this.applyFinalParticulars(finalText, txn);
+          });
+          return;
+
+        case 'SHIPSTATION':
+          openShipStationParticularsFlow(
+            this.dialog,
+            () => {},
+            (finalText: string, txn?: TxnType) => {
+              this.applyFinalParticulars(finalText, txn);
+            }
+          );
+          return;
+
+        case 'AMATEUR':
+          openAmateurParticularsFlow(
+            this.dialog,
+            () => {},
+            (finalText: string, txn?: TxnType) => {
+              this.applyFinalParticulars(finalText, txn);
+            }
+          );
+          return;
+
+        case 'COASTAL':
+          openCoastalLicenseParticularsFlow(
+            this.dialog,
+            () => {},
+            (finalText: string, txn?: TxnType) => {
+              this.applyFinalParticulars(finalText, txn);
+            }
+          );
+          return;
+
+        case 'VHFUHF':
+          openVhfUhfParticularsFlow(this.dialog, () => {}, (finalText: string) => {
+            this.applyFinalParticulars(finalText, undefined);
+          });
+          return;
+
+        case 'MOBILEPHONE':
+          openMobilePhoneParticularsFlow(
+            this.dialog,
+            () => {},
+            (finalText: string, txn?: TxnType) => {
+              this.applyFinalParticulars(finalText, txn);
+            }
+          );
+          return;
+
+        case 'TVROCATV':
+          openTvroCatvParticularsFlow(
+            this.dialog,
+            () => {},
+            (finalText: string, txn?: TxnType) => {
+              this.applyFinalParticulars(finalText, txn);
+            }
+          );
+          return;
       }
 
+      // Fallback for non-standard strings (keeps your flexibility)
       if (kind.includes('SHIP')) {
         openShipStationParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
           this.applyFinalParticulars(finalText, txn);
@@ -562,22 +632,50 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       if (kind.includes('COASTAL')) {
-        openCoastalLicenseParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
-          this.applyFinalParticulars(finalText, txn);
+        openCoastalLicenseParticularsFlow(
+          this.dialog,
+          () => {},
+          (finalText: string, txn?: TxnType) => {
+            this.applyFinalParticulars(finalText, txn);
+          }
+        );
+        return;
+      }
+
+      if (kind.includes('VHF') || kind.includes('UHF')) {
+        openVhfUhfParticularsFlow(this.dialog, () => {}, (finalText: string) => {
+          this.applyFinalParticulars(finalText, undefined);
         });
         return;
       }
 
-      // ✅ VHF/UHF (NO TXN)  ✅ FIXED SIGNATURE (finalText: string)
-      if (kind === 'VHFUHF' || kind.includes('VHF') || kind.includes('UHF')) {
-        openVhfUhfParticularsFlow(
+      if (kind.includes('MOBILE')) {
+        openMobilePhoneParticularsFlow(
           this.dialog,
           () => {},
-          (finalText: string) => {
-            // finalText already built by the flow
-            this.applyFinalParticulars(finalText, undefined);
+          (finalText: string, txn?: TxnType) => {
+            this.applyFinalParticulars(finalText, txn);
           }
         );
+        return;
+      }
+
+      if (kind.includes('TVRO') || kind.includes('CATV')) {
+        openTvroCatvParticularsFlow(
+          this.dialog,
+          () => {},
+          (finalText: string, txn?: TxnType) => {
+            this.applyFinalParticulars(finalText, txn);
+          }
+        );
+        return;
+      }
+
+      // ✅ ROC fallback MUST be last and word-boundary only
+      if (/\bROC\b/.test(kind)) {
+        openRocParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
+          this.applyFinalParticulars(finalText, txn);
+        });
         return;
       }
 
