@@ -4,7 +4,6 @@ import { MatDialogRef } from '@angular/material/dialog';
 
 export type ShipTxn = 'NEW' | 'RENEW' | 'MOD' | 'DUPLICATE';
 
-// ✅ shared union so flow accepts international option too
 export type ShipPower =
   | 'HIGH_POWERED'
   | 'MEDIUM_POWERED'
@@ -16,7 +15,6 @@ export type ShipStationLicenseOptionsResult = {
   power: ShipPower;
 };
 
-// ✅ alias (if any file still imports DialogResult)
 export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsResult;
 
 @Component({
@@ -29,7 +27,7 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
       <div class="sub">Choose transaction + power (Domestic)</div>
 
       <div class="grid">
-        <!-- LEFT: TRANSACTION -->
+        <!-- TRANSACTION -->
         <div class="col">
           <div class="head">Transaction</div>
 
@@ -58,7 +56,7 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
           </label>
         </div>
 
-        <!-- RIGHT: POWER -->
+        <!-- POWER -->
         <div class="col">
           <div class="head">Powered</div>
 
@@ -89,21 +87,84 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
     </div>
   `,
   styles: [`
-    .dlg{ width: 760px; max-width: 92vw; padding: 14px 16px; box-sizing: border-box; font-family: Arial, sans-serif; background:#fff; }
-    .title{ font-size: 22px; font-weight: 800; margin: 2px 0 2px; }
-    .sub{ font-size: 13px; color:#333; margin: 0 0 10px; }
-    .grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items:start; margin-top: 4px; }
-    .head{ font-weight: 800; font-size: 14px; margin-bottom: 6px; }
-    .col{ display:grid; gap: 6px; }
-    .row{ display:flex; align-items:center; gap: 10px; cursor:pointer; user-select:none; font-weight: 700; font-size: 14px; }
-    .cb{ position:absolute; opacity:0; width:0; height:0; pointer-events:none; }
-    .box{ width: 14px; height: 14px; border: 1px solid #333; border-radius: 2px; background:#fff; display:inline-block; position:relative; flex: 0 0 14px; }
-    .box.on::after{
-      content:""; position:absolute; left: 3px; top: 3px; width: 7px; height: 4px;
-      border-left: 2px solid #2f74ff; border-bottom: 2px solid #2f74ff; transform: rotate(-45deg);
+    /* ✅ component itself is compact */
+    .dlg{
+      width: 460px;
+      max-width: 92vw;
+      padding: 12px 14px;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+      background:#fff;
+      overflow: hidden;
     }
-    .foot{ display:flex; justify-content:flex-end; gap: 10px; margin-top: 16px; }
-    .btn{ height: 34px; padding: 0 14px; border: 1px solid #999; background:#fff; border-radius: 6px; cursor:pointer; }
+
+    .title{ font-size: 26px; font-weight: 800; margin: 0; }
+    .sub{ font-size: 13px; color:#333; margin: 2px 0 10px; }
+
+    .grid{
+      display:grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 22px;
+      align-items:start;
+      margin-top: 2px;
+    }
+
+    .head{ font-weight: 800; font-size: 15px; margin: 0 0 6px; }
+    .col{ display:grid; gap: 6px; min-width: 0; }
+
+    .row{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      cursor:pointer;
+      user-select:none;
+      font-weight: 700;
+      font-size: 14px;
+      line-height: 1.1;
+      margin: 0;
+      padding: 0;
+      min-width: 0;
+    }
+
+    .txt{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .cb{ position:absolute; opacity:0; width:0; height:0; pointer-events:none; }
+
+    .box{
+      width: 14px; height: 14px;
+      border: 1px solid #333;
+      border-radius: 2px;
+      background:#fff;
+      display:inline-block;
+      position:relative;
+      flex: 0 0 14px;
+    }
+
+    .box.on::after{
+      content:"";
+      position:absolute;
+      left: 3px; top: 3px;
+      width: 7px; height: 4px;
+      border-left: 2px solid #2f74ff;
+      border-bottom: 2px solid #2f74ff;
+      transform: rotate(-45deg);
+    }
+
+    .foot{
+      display:flex;
+      justify-content:flex-end;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .btn{
+      height: 34px;
+      padding: 0 16px;
+      border: 1px solid #999;
+      background:#fff;
+      border-radius: 6px;
+      cursor:pointer;
+    }
     .btn.primary{ border-color:#2f74ff; background:#2f74ff; color:#fff; }
     .btn:disabled{ opacity:.55; cursor:not-allowed; }
   `],
@@ -113,7 +174,10 @@ export class ShipStationLicenseOptionsDialogComponent {
   power: ShipPower | null = null;
 
   constructor(
-    private ref: MatDialogRef<ShipStationLicenseOptionsDialogComponent, ShipStationLicenseOptionsResult>
+    private ref: MatDialogRef<
+      ShipStationLicenseOptionsDialogComponent,
+      ShipStationLicenseOptionsResult
+    >
   ) {}
 
   pickTxn(v: ShipTxn) { this.txn = v; }
