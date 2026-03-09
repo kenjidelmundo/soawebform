@@ -21,12 +21,19 @@ export function openAmateurParticularsFlow(
     }
 
     const choice = String(resAm.amateurChoice ?? '').trim();
+    const choiceUpper = choice.toUpperCase();
+    const isAtRoc = choiceUpper === 'AT-ROC';
+    const isSpecialPermit = choiceUpper.includes('SPECIAL PERMIT');
 
     const refTxn = dialog.open(TxnTypeDialogComponent, {
       width: '460px',
       disableClose: true,
       autoFocus: false,
       restoreFocus: false,
+      data: {
+        showPurchasePossess: !isAtRoc && !isSpecialPermit,
+        contextTitle: choice,
+      },
     });
 
     refTxn.afterClosed().subscribe((resTxn) => {
@@ -35,9 +42,20 @@ export function openAmateurParticularsFlow(
         return;
       }
 
-      const txn = resTxn.value as TxnType;
+      const picked = Array.isArray(resTxn.value) ? resTxn.value : [resTxn.value];
+      const txn =
+        (picked.includes('NEW') && 'NEW') ||
+        (picked.includes('RENEW') && 'RENEW') ||
+        (picked.includes('MOD') && 'MOD');
+
+      if (!txn) {
+        cancel();
+        return;
+      }
+
       const txnText = txn === 'MOD' ? 'MODIFICATION' : txn;
-      const finalText = `Amateur - ${choice} - ${txnText}`;
+      const ppText = resTxn.purchasePossess ? ' - Purchase and Possess' : '';
+      const finalText = `Amateur - ${choice}${ppText} - ${txnText}`;
       finalize(finalText, txn);
     });
   });
