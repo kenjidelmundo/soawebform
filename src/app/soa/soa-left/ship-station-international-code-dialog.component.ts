@@ -52,7 +52,7 @@ export type ShipStationInternationalTelegraphyDialogResult = {
             <span class="box" [class.on]="txn==='DUPLICATE'"></span>
             <span class="txt">Duplicate</span>
           </label>
-        </div>
+        </div>  
 
         <!-- RIGHT -->
         <div class="col">

@@ -1,8 +1,11 @@
-// amateur.compute.ts
+// src/app/.../soa-fees/compute/amateur.compute.ts
 
-export type TxnFlags = { txnNew: boolean; txnRenew: boolean; txnMod: boolean };
+export type TxnFlags = {
+  txnNew: boolean;
+  txnRenew: boolean;
+  txnMod: boolean;
+};
 
-// ✅ row shape (from your sheet)
 export type AmateurRow = {
   Purchase: number;
   Possess: number;
@@ -15,7 +18,7 @@ export type AmateurRow = {
   DST: number;
   SUR50: number;
   SUR100: number;
-  SP?: number; // Vanity/Special event
+  SP?: number;
 };
 
 export type AmateurRates = {
@@ -31,6 +34,8 @@ export type AmateurRates = {
   AT_CLUB_SIMPLEX: AmateurRow;
   AT_CLUB_REPEATER: AmateurRow;
 
+  TEMPORARY: AmateurRow;
+
   SPECIAL_EVENT: AmateurRow;
   VANITY: AmateurRow;
 
@@ -38,10 +43,19 @@ export type AmateurRates = {
 };
 
 export type AmateurResult = {
-  maRadioStationLicense: number; // LF + ROC
-  maFilingFee: number;           // Purchase + Possess + STF + FF + CPF
-  maSurcharges: number;          // MOD + SUR
+  maPermitPurchase: number;
+  maPermitPossess: number;
+  maStf: number;
+
+  maRadioStationLicense: number; // LF / club / vanity / temporary / special event
+  maRadioOperatorsCert: number;  // ROC only
+
+  maApplicationFee: number;
+  maFilingFee: number;
+  maConstructionPermitFee: number;
+  maSurcharges: number;
   maDST: number;
+  maModificationFee: number;
   total: number;
   kind: string;
 };
@@ -50,163 +64,297 @@ const num = (v: any): number => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
+
 const round2 = (n: number): number =>
   Math.round((num(n) + Number.EPSILON) * 100) / 100;
 
+const AMATEUR_RATES: AmateurRates = {
+  AT_ROC: {
+    Purchase: 0, Possess: 0, STF: 0, FF: 0, CPF: 0, LF: 0, ROC: 60, MOD: 50, DST: 30, SUR50: 30, SUR100: 60,
+  },
+
+  AT_RSL_A: {
+    Purchase: 50, Possess: 50, STF: 50, FF: 60, CPF: 0, LF: 120, ROC: 60, MOD: 50, DST: 30, SUR50: 60, SUR100: 120,
+  },
+  AT_RSL_B: {
+    Purchase: 50, Possess: 50, STF: 50, FF: 60, CPF: 0, LF: 132, ROC: 60, MOD: 50, DST: 30, SUR50: 66, SUR100: 132,
+  },
+  AT_RSL_C: {
+    Purchase: 50, Possess: 50, STF: 50, FF: 60, CPF: 0, LF: 144, ROC: 60, MOD: 50, DST: 30, SUR50: 72, SUR100: 144,
+  },
+  AT_RSL_D: {
+    Purchase: 50, Possess: 50, STF: 50, FF: 60, CPF: 0, LF: 144, ROC: 60, MOD: 50, DST: 30, SUR50: 72, SUR100: 144,
+  },
+
+  AT_LIFETIME: {
+    Purchase: 50, Possess: 50, STF: 0, FF: 60, CPF: 0, LF: 50, ROC: 0, MOD: 50, DST: 30, SUR50: 0, SUR100: 0,
+  },
+
+  AT_CLUB_SIMPLEX: {
+    Purchase: 50, Possess: 50, STF: 50, FF: 180, CPF: 600, LF: 700, ROC: 0, MOD: 50, DST: 30, SUR50: 350, SUR100: 700,
+  },
+  AT_CLUB_REPEATER: {
+    Purchase: 50, Possess: 50, STF: 50, FF: 180, CPF: 600, LF: 1320, ROC: 0, MOD: 50, DST: 30, SUR50: 660, SUR100: 1320,
+  },
+
+  TEMPORARY: {
+    Purchase: 50, Possess: 50, STF: 0, FF: 60, CPF: 0, LF: 120, ROC: 60, MOD: 0, DST: 30, SUR50: 0, SUR100: 0,
+  },
+
+  SPECIAL_EVENT: {
+    Purchase: 0, Possess: 0, STF: 0, FF: 0, CPF: 0, LF: 0, ROC: 0, MOD: 0, DST: 30, SUR50: 0, SUR100: 0, SP: 120,
+  },
+
+  VANITY: {
+    Purchase: 0, Possess: 0, STF: 0, FF: 0, CPF: 0, LF: 0, ROC: 0, MOD: 0, DST: 30, SUR50: 0, SUR100: 0, SP: 1000,
+  },
+
+  POSSESS_STORAGE: {
+    Purchase: 0, Possess: 50, STF: 0, FF: 0, CPF: 0, LF: 0, ROC: 0, MOD: 0, DST: 30, SUR50: 0, SUR100: 0,
+  },
+};
+
+function normalize(text: string): string {
+  return String(text ?? '').toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
 function parseUnits(particulars: string): number {
-  const up = String(particulars ?? '').toUpperCase();
+  const up = normalize(particulars);
+
   const m1 = /UNITS?_([0-9]+)/.exec(up);
   if (m1?.[1]) return Math.max(1, Math.floor(Number(m1[1])));
+
   const m2 = /([0-9]+)\s*UNITS?/.exec(up);
   if (m2?.[1]) return Math.max(1, Math.floor(Number(m2[1])));
+
   return 1;
 }
 
-function wantsSUR100(particulars: string): boolean {
-  const up = String(particulars ?? '').toUpperCase();
-  return up.includes('SUR100') || up.includes('100%');
-}
-
-function pickSUR(row: AmateurRow, particulars: string): number {
-  return wantsSUR100(particulars) ? num(row.SUR100) : num(row.SUR50);
-}
-
 function detectKey(particulars: string, cls: string): keyof AmateurRates {
-  const P = String(particulars ?? '').toUpperCase();
-  const C = String(cls ?? 'A').trim().toUpperCase();
+  const p = normalize(particulars);
+  const c = String(cls ?? 'A').trim().toUpperCase();
 
-  if (P.includes('VANITY')) return 'VANITY';
-  if (P.includes('SPECIAL EVENT') || P.includes('SPECIAL-EVENT')) return 'SPECIAL_EVENT';
+  if (p.includes('SPECIAL EVENT')) return 'SPECIAL_EVENT';
+  if (p.includes('VANITY')) return 'VANITY';
+  if (p.includes('TEMPORARY') || p.includes('FOREIGN VISITOR')) return 'TEMPORARY';
 
-  if (P.includes('POSSESS') && (P.includes('STORAGE') || P.includes('STATION'))) return 'POSSESS_STORAGE';
+  if (p.includes('POSSESS') && (p.includes('STORAGE') || p.includes('RADIO STATIONS'))) {
+    return 'POSSESS_STORAGE';
+  }
 
-  if (P.includes('AT-CLUB') || (P.includes('CLUB') && P.includes('RSL'))) {
-    if (P.includes('REPEATER')) return 'AT_CLUB_REPEATER';
+  if (p.includes('AT-CLUB') || (p.includes('CLUB') && p.includes('RSL'))) {
+    if (p.includes('REPEATER')) return 'AT_CLUB_REPEATER';
     return 'AT_CLUB_SIMPLEX';
   }
 
-  if (P.includes('LIFETIME')) return 'AT_LIFETIME';
-  if (P.includes('AT-ROC') || (P.includes('AT') && P.includes('ROC'))) return 'AT_ROC';
+  if (p.includes('LIFETIME')) return 'AT_LIFETIME';
+  if (p.includes('AT-ROC') || (p.includes('AT') && p.includes('ROC'))) return 'AT_ROC';
 
-  // default AT-RSL class
-  if (C === 'B') return 'AT_RSL_B';
-  if (C === 'C') return 'AT_RSL_C';
-  if (C === 'D') return 'AT_RSL_D';
+  if (c === 'B') return 'AT_RSL_B';
+  if (c === 'C') return 'AT_RSL_C';
+  if (c === 'D') return 'AT_RSL_D';
   return 'AT_RSL_A';
 }
 
-// ✅ COMPUTE using Citizen Charter formulas
+export function computeAmateurRenewalSurcharge(
+  baseAmount: number,
+  delayMonths: number
+): number {
+  const base = num(baseAmount);
+  const months = Math.max(0, num(delayMonths));
+
+  if (months <= 0) return 0;
+  if (months <= 6) return round2(base * 0.5);
+  if (months <= 12) return round2(base * 1.0);
+
+  const extraMonths = months - 12;
+  const extraHalfYears = Math.ceil(extraMonths / 6);
+
+  return round2(base * (1 + extraHalfYears * 0.5));
+}
+
 export function computeAmateur(
   particulars: string,
   cls: string,
   years: number,
   txn: TxnFlags,
-  rates: AmateurRates
+  delayMonths: number = 0
 ): AmateurResult {
   const yr = Math.max(1, Math.floor(num(years) || 1));
   const unit = parseUnits(particulars);
   const key = detectKey(particulars, cls);
-  const row = rates[key];
-
-  const P = String(particulars ?? '').toUpperCase();
+  const row = AMATEUR_RATES[key];
+  const p = normalize(particulars);
 
   const isPermitPurchasePossess =
-    P.includes('PERMIT TO PURCHASE') ||
-    P.includes('PERMIT TO POSSESS') ||
-    P.includes('PURCHASE/POSSESS') ||
-    (P.includes('PURCHASE') && P.includes('POSSESS'));
+    p.includes('PERMIT TO PURCHASE') ||
+    p.includes('PERMIT TO POSSESS') ||
+    p.includes('PURCHASE/POSSESS') ||
+    (p.includes('PURCHASE') && p.includes('POSSESS'));
 
-  const isSTF = P.includes('STF') || P.includes('SELFTRANSFER') || P.includes('SELF TRANSFER');
+  const isSellTransfer =
+    p.includes('SELL/TRANSFER') ||
+    p.includes('SELL / TRANSFER') ||
+    p.includes('TRANSFER');
 
-  let purchase = 0;
-  let possess = 0;
-  let stf = 0;
-  let ff = 0;
-  let cpf = 0;
-  let lf = 0;
-  let roc = 0;
-  let mod = 0;
-  const dst = num(row.DST);
-  let sur = 0;
+  let maPermitPurchase = 0;
+  let maPermitPossess = 0;
+  let maStf = 0;
 
-  // A) AT-ROC: NEW (ROC*YR)+DST | RENEW add SUR | MOD = MOD + DST
+  let maRadioStationLicense = 0;
+  let maRadioOperatorsCert = 0;
+
+  let maApplicationFee = 0;
+  let maFilingFee = 0;
+  let maConstructionPermitFee = 0;
+  let maSurcharges = 0;
+  let maModificationFee = 0;
+  const maDST = num(row.DST);
+
   if (key === 'AT_ROC') {
-    if (txn.txnMod) {
-      mod = num(row.MOD);
-    } else {
-      roc = num(row.ROC) * yr;
-      if (txn.txnRenew) sur = pickSUR(row, particulars);
+    if (txn.txnNew) {
+      maRadioOperatorsCert = num(row.ROC) * yr;
     }
-  }
 
-  // AT-RSL class: Permit or STF or normal new/renew/mod
-  else if (key.startsWith('AT_RSL_')) {
-    if (isSTF) {
-      stf = num(row.STF) * unit; // (STF*UNIT)+DST
-    } else if (isPermitPurchasePossess) {
-      purchase = num(row.Purchase) * unit;
-      possess = num(row.Possess) * unit; // (PUR*UNIT)+(POS*UNIT)+DST
-    } else {
-      ff = num(row.FF);
+    if (txn.txnRenew) {
+      maRadioOperatorsCert = num(row.ROC) * yr;
+      maSurcharges = computeAmateurRenewalSurcharge(num(row.ROC), delayMonths);
+    }
 
-      if (txn.txnMod) {
-        mod = num(row.MOD); // FF + MOD + DST
-      } else {
-        lf = num(row.LF) * yr; // FF + (LF*YR) + DST
-        if (txn.txnRenew) sur = pickSUR(row, particulars); // + SUR
+    if (txn.txnMod) {
+      maModificationFee = num(row.MOD);
+      if (!txn.txnNew && !txn.txnRenew) {
+        maRadioOperatorsCert = 0;
+        maSurcharges = 0;
       }
     }
   }
 
-  // AT-LIFETIME: NEW LF + DST | MOD FF+MOD+DST | Permit (PUR+POS)+DST
+  else if (key.startsWith('AT_RSL_')) {
+    if (isSellTransfer) {
+      maStf = num(row.STF) * unit;
+    } else if (isPermitPurchasePossess) {
+      maPermitPurchase = num(row.Purchase) * unit;
+      maPermitPossess = num(row.Possess) * unit;
+    } else {
+      if (txn.txnNew) {
+        maFilingFee = num(row.FF);
+        maRadioStationLicense = num(row.LF) * yr;
+      }
+
+      if (txn.txnRenew) {
+        maRadioStationLicense = num(row.LF) * yr;
+        maSurcharges = computeAmateurRenewalSurcharge(num(row.LF), delayMonths);
+      }
+
+      if (txn.txnMod) {
+        maFilingFee = num(row.FF);
+        maModificationFee = num(row.MOD);
+
+        if (!txn.txnNew && !txn.txnRenew) {
+          maRadioStationLicense = 0;
+          maSurcharges = 0;
+        }
+      }
+    }
+  }
+
   else if (key === 'AT_LIFETIME') {
     if (isPermitPurchasePossess) {
-      purchase = num(row.Purchase) * unit;
-      possess = num(row.Possess) * unit;
-    } else if (txn.txnMod) {
-      ff = num(row.FF);
-      mod = num(row.MOD);
+      maPermitPurchase = num(row.Purchase) * unit;
+      maPermitPossess = num(row.Possess) * unit;
     } else {
-      lf = num(row.LF); // lifetime single LF (no * yr)
+      if (txn.txnNew) {
+        maRadioStationLicense = num(row.LF);
+      }
+
+      if (txn.txnMod) {
+        maFilingFee = num(row.FF);
+        maModificationFee = num(row.MOD);
+
+        if (!txn.txnNew) {
+          maRadioStationLicense = 0;
+        }
+      }
     }
   }
 
-  // AT-CLUB: NEW FF+CPF+(LF*YR)+DST | RENEW FF+(LF*YR)+DST+SUR | MOD FF+CPF+MOD+DST
   else if (key === 'AT_CLUB_SIMPLEX' || key === 'AT_CLUB_REPEATER') {
-    ff = num(row.FF);
-
-    if (txn.txnMod) {
-      cpf = num(row.CPF);
-      mod = num(row.MOD);
+    if (isPermitPurchasePossess) {
+      maPermitPurchase = num(row.Purchase) * unit;
+      maPermitPossess = num(row.Possess) * unit;
     } else {
-      lf = num(row.LF) * yr;
-      if (txn.txnNew) cpf = num(row.CPF);
-      if (txn.txnRenew) sur = pickSUR(row, particulars);
+      if (txn.txnNew) {
+        maFilingFee = num(row.FF);
+        maConstructionPermitFee = num(row.CPF);
+        maRadioStationLicense = num(row.LF) * yr;
+      }
+
+      if (txn.txnRenew) {
+        maRadioStationLicense = num(row.LF) * yr;
+        maSurcharges = computeAmateurRenewalSurcharge(num(row.LF), delayMonths);
+      }
+
+      if (txn.txnMod) {
+        maFilingFee = num(row.FF);
+        maConstructionPermitFee = num(row.CPF);
+        maModificationFee = num(row.MOD);
+
+        if (!txn.txnNew && !txn.txnRenew) {
+          maRadioStationLicense = 0;
+          maSurcharges = 0;
+        }
+      }
     }
   }
 
-  // Vanity (per year): (SP*YR)+DST
+  else if (key === 'TEMPORARY') {
+    maFilingFee = num(row.FF);
+    maPermitPurchase = num(row.Purchase) * unit;
+    maPermitPossess = num(row.Possess) * unit;
+
+    maRadioOperatorsCert = num(row.ROC) * yr;
+    maRadioStationLicense = num(row.LF) * yr;
+  }
+
   else if (key === 'VANITY') {
-    lf = num(row.SP) * yr;
+    maRadioStationLicense = num(row.SP) * yr;
   }
 
-  // Special event (per event): SP + DST
   else if (key === 'SPECIAL_EVENT') {
-    lf = num(row.SP);
+    maRadioStationLicense = num(row.SP);
   }
 
-  // Possess/storage: (POS*UNIT)+DST
   else if (key === 'POSSESS_STORAGE') {
-    possess = num(row.Possess) * unit;
+    maPermitPossess = num(row.Possess) * unit;
   }
 
-  const total = round2(purchase + possess + stf + ff + cpf + lf + roc + mod + dst + sur);
+  const total = round2(
+    maPermitPurchase +
+    maPermitPossess +
+    maStf +
+    maRadioStationLicense +
+    maRadioOperatorsCert +
+    maApplicationFee +
+    maFilingFee +
+    maConstructionPermitFee +
+    maSurcharges +
+    maModificationFee +
+    maDST
+  );
 
   return {
-    maRadioStationLicense: round2(lf + roc),
-    maFilingFee: round2(purchase + possess + stf + ff + cpf),
-    maSurcharges: round2(mod + sur),
-    maDST: round2(dst),
+    maPermitPurchase: round2(maPermitPurchase),
+    maPermitPossess: round2(maPermitPossess),
+    maStf: round2(maStf),
+    maRadioStationLicense: round2(maRadioStationLicense),
+    maRadioOperatorsCert: round2(maRadioOperatorsCert),
+    maApplicationFee: round2(maApplicationFee),
+    maFilingFee: round2(maFilingFee),
+    maConstructionPermitFee: round2(maConstructionPermitFee),
+    maSurcharges: round2(maSurcharges),
+    maDST: round2(maDST),
+    maModificationFee: round2(maModificationFee),
     total,
     kind: String(key),
   };

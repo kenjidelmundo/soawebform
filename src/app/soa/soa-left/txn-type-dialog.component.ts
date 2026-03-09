@@ -3,7 +3,7 @@ import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 
 export type TxnType = 'NEW' | 'RENEW' | 'MOD';
-export type TxnTypeDialogResult = { value: TxnType };
+export type TxnTypeDialogResult = { value: TxnType[] };
 
 @Component({
   selector: 'app-txn-type-dialog',
@@ -14,54 +14,78 @@ export type TxnTypeDialogResult = { value: TxnType };
       <div class="dlgHead">Transaction Type</div>
 
       <div class="list">
-        <label class="row" (click)="$event.preventDefault(); select('NEW')">
+        <label class="row" (click)="$event.preventDefault(); toggle('NEW')">
           <input
             type="checkbox"
             class="cb"
-            [checked]="selected==='NEW'"
+            [checked]="isChecked('NEW')"
             tabindex="-1"
             aria-hidden="true"
           />
-          <span class="box" [class.on]="selected==='NEW'"></span>
+          <span class="box" [class.on]="isChecked('NEW')"></span>
           <span class="txt">New</span>
         </label>
 
-        <label class="row" (click)="$event.preventDefault(); select('RENEW')">
+        <label class="row" (click)="$event.preventDefault(); toggle('RENEW')">
           <input
             type="checkbox"
             class="cb"
-            [checked]="selected==='RENEW'"
+            [checked]="isChecked('RENEW')"
             tabindex="-1"
             aria-hidden="true"
           />
-          <span class="box" [class.on]="selected==='RENEW'"></span>
+          <span class="box" [class.on]="isChecked('RENEW')"></span>
           <span class="txt">Renew</span>
         </label>
 
-        <label class="row" (click)="$event.preventDefault(); select('MOD')">
+        <label class="row" (click)="$event.preventDefault(); toggle('MOD')">
           <input
             type="checkbox"
             class="cb"
-            [checked]="selected==='MOD'"
+            [checked]="isChecked('MOD')"
             tabindex="-1"
             aria-hidden="true"
           />
-          <span class="box" [class.on]="selected==='MOD'"></span>
+          <span class="box" [class.on]="isChecked('MOD')"></span>
           <span class="txt">Modification</span>
         </label>
       </div>
 
       <div class="dlgFoot">
         <button type="button" class="btn" (click)="close()">Cancel</button>
-        <button type="button" class="btn primary" [disabled]="!selected" (click)="submit()">Submit</button>
+        <button
+          type="button"
+          class="btn primary"
+          [disabled]="selected.length === 0"
+          (click)="submit()"
+        >
+          Submit
+        </button>
       </div>
     </div>
   `,
   styles: [`
-    .dlg { width: 420px; max-width: 92vw; padding: 14px; font-family: Arial, sans-serif; background: #fff; }
-    .dlgHead { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
+    .dlg {
+      width: 420px;
+      max-width: 92vw;
+      padding: 14px;
+      font-family: Arial, sans-serif;
+      background: #fff;
+      box-sizing: border-box;
+    }
 
-    .list { display: grid; gap: 6px; padding-left: 2px; }
+    .dlgHead {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .list {
+      display: grid;
+      gap: 6px;
+      padding-left: 2px;
+    }
+
     .row {
       display: flex;
       align-items: center;
@@ -76,8 +100,7 @@ export type TxnTypeDialogResult = { value: TxnType };
       background: transparent;
     }
 
-    /* hide the real checkbox completely (global css can't break our drawn checkmark) */
-    .cb{
+    .cb {
       position: absolute;
       opacity: 0;
       width: 0;
@@ -85,8 +108,7 @@ export type TxnTypeDialogResult = { value: TxnType };
       pointer-events: none;
     }
 
-    /* visible checkbox box */
-    .box{
+    .box {
       width: 14px;
       height: 14px;
       border: 1px solid #333;
@@ -97,8 +119,7 @@ export type TxnTypeDialogResult = { value: TxnType };
       flex: 0 0 14px;
     }
 
-    /* draw the checkmark on the span (this ALWAYS works) */
-    .box.on::after{
+    .box.on::after {
       content: "";
       position: absolute;
       left: 3px;
@@ -116,6 +137,7 @@ export type TxnTypeDialogResult = { value: TxnType };
       justify-content: flex-end;
       gap: 8px;
     }
+
     .btn {
       height: 34px;
       padding: 0 12px;
@@ -124,29 +146,61 @@ export type TxnTypeDialogResult = { value: TxnType };
       border-radius: 6px;
       cursor: pointer;
     }
+
     .btn.primary {
       border-color: #2f74ff;
       background: #2f74ff;
       color: #fff;
     }
-    .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    .btn:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
   `],
 })
 export class TxnTypeDialogComponent {
-  selected: TxnType | null = null;
+  selected: TxnType[] = [];
 
-  constructor(private ref: MatDialogRef<TxnTypeDialogComponent, TxnTypeDialogResult>) {}
+  constructor(
+    private ref: MatDialogRef<TxnTypeDialogComponent, TxnTypeDialogResult>
+  ) {}
 
-  select(v: TxnType) {
-    this.selected = this.selected === v ? null : v;
+  isChecked(v: TxnType): boolean {
+    return this.selected.includes(v);
   }
 
-  submit() {
-    if (!this.selected) return;
+  toggle(v: TxnType): void {
+    const has = this.selected.includes(v);
+
+    if (has) {
+      this.selected = this.selected.filter(x => x !== v);
+      return;
+    }
+
+    // ✅ NEW and RENEW are mutually exclusive
+    if (v === 'NEW') {
+      this.selected = this.selected.filter(x => x !== 'RENEW');
+      this.selected = [...this.selected, 'NEW'];
+      return;
+    }
+
+    if (v === 'RENEW') {
+      this.selected = this.selected.filter(x => x !== 'NEW');
+      this.selected = [...this.selected, 'RENEW'];
+      return;
+    }
+
+    // ✅ MOD can be combined with either NEW or RENEW
+    this.selected = [...this.selected, v];
+  }
+
+  submit(): void {
+    if (this.selected.length === 0) return;
     this.ref.close({ value: this.selected });
   }
 
-  close() {
+  close(): void {
     this.ref.close();
   }
 }

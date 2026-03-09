@@ -22,17 +22,9 @@ import { TxnTypeDialogComponent, TxnType } from './txn-type-dialog.component';
 import { openRocParticularsFlow } from './particulars-roc.flow';
 import { openShipStationParticularsFlow } from './particulars-ship.flow';
 import { openAmateurParticularsFlow } from './particulars-amateur.flow';
-
-// ✅ Coastal Station License flow
 import { openCoastalLicenseParticularsFlow } from './particulars-c.license.flow';
-
-// ✅ VHF/UHF flow (NO TXN)
 import { openVhfUhfParticularsFlow } from './particulars-vhfuhf.flow';
-
-// ✅ Mobile Phone Permits flow
 import { openMobilePhoneParticularsFlow } from './particulars-mobilephone.flow';
-
-// ✅ TVRO/CATV flow ✅ NEW
 import { openTvroCatvParticularsFlow } from './particulars-tvrocatv.flow';
 
 import { AddressService } from './address.service';
@@ -63,8 +55,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private particularsCoolDownUntil = 0;
   private readonly COOLDOWN_MS = 350;
 
-  private readonly START_NEXT_PERIOD_NEXT_DAY = true;
-
   constructor(
     private soaService: SoaService,
     private el: ElementRef<HTMLElement>,
@@ -83,9 +73,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    // ==========================
-    // Address click hook
-    // ==========================
     const addressInput = this.el.nativeElement.querySelector(
       'input[formControlName="address"]'
     ) as HTMLInputElement | null;
@@ -103,9 +90,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }
 
-    // ==========================
-    // Particulars click hook
-    // ==========================
     const partInput = this.el.nativeElement.querySelector(
       'input[formControlName="particulars"], textarea[formControlName="particulars"]'
     ) as (HTMLInputElement | HTMLTextAreaElement) | null;
@@ -122,6 +106,39 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
         this.openParticularsDialog();
       });
     }
+
+    // ✅ date = calendar again
+    const dateInput = this.el.nativeElement.querySelector(
+      'input[formControlName="date"]'
+    ) as HTMLInputElement | null;
+
+    if (dateInput) {
+      this.renderer.setAttribute(dateInput, 'type', 'date');
+      this.renderer.removeAttribute(dateInput, 'readonly');
+      this.renderer.setStyle(dateInput, 'cursor', 'pointer');
+    }
+
+    // ✅ periodFrom = calendar again
+    const periodFromInput = this.el.nativeElement.querySelector(
+      'input[formControlName="periodFrom"]'
+    ) as HTMLInputElement | null;
+
+    if (periodFromInput) {
+      this.renderer.setAttribute(periodFromInput, 'type', 'date');
+      this.renderer.removeAttribute(periodFromInput, 'readonly');
+      this.renderer.setStyle(periodFromInput, 'cursor', 'pointer');
+    }
+
+    // ✅ periodTo = calendar again
+    const periodToInput = this.el.nativeElement.querySelector(
+      'input[formControlName="periodTo"]'
+    ) as HTMLInputElement | null;
+
+    if (periodToInput) {
+      this.renderer.setAttribute(periodToInput, 'type', 'date');
+      this.renderer.removeAttribute(periodToInput, 'readonly');
+      this.renderer.setStyle(periodToInput, 'cursor', 'pointer');
+    }
   }
 
   ngOnDestroy(): void {
@@ -131,9 +148,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  // ======================================================
-  // AUTO TXN + CATEGORY from particulars (for computations)
-  // ======================================================
   private setupAutoTxnFromParticulars(): void {
     const ctrl = this.form?.get('particulars');
     if (!ctrl) return;
@@ -152,7 +166,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private applyTxnFromParticulars(particularsText: string): void {
     const t = String(particularsText ?? '').toUpperCase();
 
-    // IMPORTANT: VHF/UHF has NO TXN in your table
     if (
       t.includes('VHF') ||
       t.includes('UHF') ||
@@ -314,9 +327,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  // =========================
-  // PAYEES
-  // =========================
   private loadPayees(): void {
     const selectedId = Number(this.form?.get('payeeName')?.value || 0);
 
@@ -331,7 +341,9 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           .filter((x) => x.id > 0 && x.name.length > 0);
 
         const uniq = new Map<number, PayeeItem>();
-        for (const item of list) if (!uniq.has(item.id)) uniq.set(item.id, item);
+        for (const item of list) {
+          if (!uniq.has(item.id)) uniq.set(item.id, item);
+        }
 
         this.payees = Array.from(uniq.values()).sort((a, b) => a.name.localeCompare(b.name));
 
@@ -360,6 +372,11 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           next: (dto: any) => {
             const realId = Number(dto?.id ?? dto?.ID ?? dto?.Id ?? id);
 
+            // ✅ fetch saved date from DB, not today's date
+            const savedDate =
+              this.toYmd(dto?.dateIssued ?? dto?.DateIssued ?? dto?.date ?? dto?.Date) || '';
+
+            // ✅ fetch saved current periodTo from DB
             const directTo =
               this.toYmd(dto?.periodTo ?? dto?.PeriodTo) || this.toYmd(dto?.to ?? dto?.To);
 
@@ -367,11 +384,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
             const parsedTo = parsed.periodTo ?? '';
 
             const oldTo = directTo || parsedTo || '';
-            let newFrom = oldTo;
-
-            if (this.START_NEXT_PERIOD_NEXT_DAY && oldTo) {
-              newFrom = this.addDays(oldTo, 1);
-            }
 
             this.form.patchValue(
               {
@@ -386,11 +398,13 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
                 catMS: false,
                 catOTHERS: false,
 
-                date: (dto?.dateIssued ?? dto?.DateIssued)
-                  ? String(dto?.dateIssued ?? dto?.DateIssued).slice(0, 10)
-                  : this.form.get('date')?.value,
+                // ✅ date = saved DB date
+                date: savedDate || this.form.get('date')?.value || '',
 
-                periodFrom: newFrom || this.form.get('periodFrom')?.value,
+                // ✅ periodFrom = saved current dateTo from DB
+                periodFrom: oldTo,
+
+                // ✅ periodTo = computed from years input
                 periodTo: '',
               },
               { emitEvent: true }
@@ -403,9 +417,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       });
   }
 
-  // =========================
-  // PERIOD COVERED
-  // =========================
   private setupPeriodCovered(): void {
     const fromCtrl = this.form.get('periodFrom');
     const toCtrl = this.form.get('periodTo');
@@ -416,41 +427,41 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
     combineLatest([
       fromCtrl.valueChanges.pipe(startWith(fromCtrl.value)),
-      toCtrl.valueChanges.pipe(startWith(toCtrl.value)),
+      yearsCtrl.valueChanges.pipe(startWith(yearsCtrl.value)),
     ])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(([from, to]) => {
-        yearsCtrl.setValue(this.computeYears(from, to), { emitEvent: false });
-        coveredCtrl.setValue(this.computeDateRange(from, to), { emitEvent: false });
+      .subscribe(([from, years]) => {
+        const computedTo = this.computeDateToFromYears(from, years);
+
+        toCtrl.setValue(computedTo, { emitEvent: false });
+        coveredCtrl.setValue(this.computeDateRange(from, computedTo), { emitEvent: false });
       });
   }
 
   private computeDateRange(from: any, to: any): string {
-    if (!from || !to) return '';
-    const f = new Date(from);
-    const t = new Date(to);
-    if (isNaN(f.getTime()) || isNaN(t.getTime())) return '';
+    const f = this.parseDisplayOrYmdToDate(from);
+    const t = this.parseDisplayOrYmdToDate(to);
+
+    if (!f || !t) return '';
     if (t < f) return '';
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const fmt = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-    return `${fmt(f)}-${fmt(t)}`;
+
+    return `${this.toDisplayDate(f)}-${this.toDisplayDate(t)}`;
   }
 
   private computeYears(from: any, to: any): number {
-    if (!from || !to) return 0;
-    const f = new Date(from);
-    const t = new Date(to);
-    if (isNaN(f.getTime()) || isNaN(t.getTime())) return 0;
+    const f = this.parseDisplayOrYmdToDate(from);
+    const t = this.parseDisplayOrYmdToDate(to);
+
+    if (!f || !t) return 0;
     if (t < f) return 0;
+
     const diffMs = t.getTime() - f.getTime();
     const diffDays = diffMs / (1000 * 60 * 60 * 24);
     const years = diffDays / 365.25;
+
     return Number(years.toFixed(2));
   }
 
-  // ======================================================
-  // ADDRESS DIALOG (DB fetch -> dialog -> patch address)
-  // ======================================================
   private openAddressDialog(): void {
     if (this.addressDialogOpen) return;
 
@@ -493,13 +504,18 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
           this.form.patchValue({ address: res.fullAddress }, { emitEvent: true });
 
-          if (this.form.get('province'))
+          if (this.form.get('province')) {
             this.form.get('province')?.setValue(res.province, { emitEvent: false });
-          if (this.form.get('townCity'))
+          }
+          if (this.form.get('townCity')) {
             this.form.get('townCity')?.setValue(res.townCity, { emitEvent: false });
-          if (this.form.get('brgy')) this.form.get('brgy')?.setValue(res.brgy, { emitEvent: false });
-          if (this.form.get('line4'))
+          }
+          if (this.form.get('brgy')) {
+            this.form.get('brgy')?.setValue(res.brgy, { emitEvent: false });
+          }
+          if (this.form.get('line4')) {
             this.form.get('line4')?.setValue(res.line4, { emitEvent: false });
+          }
 
           this.addressCoolDownUntil = Date.now() + this.COOLDOWN_MS;
         });
@@ -513,9 +529,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  // ======================================================
-  // PARTICULARS DIALOG -> routes to proper flows
-  // ======================================================
   private openParticularsDialog(): void {
     if (this.particularsDialogOpen) return;
 
@@ -551,7 +564,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
       const kind = String(kindRaw ?? '').toUpperCase().trim();
 
-      // ✅ FIX: Strict service keys first (prevents TVROCATV matching ROC)
       switch (kind) {
         case 'ROC':
           openRocParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
@@ -616,11 +628,14 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           return;
       }
 
-      // Fallback for non-standard strings (keeps your flexibility)
       if (kind.includes('SHIP')) {
-        openShipStationParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
-          this.applyFinalParticulars(finalText, txn);
-        });
+        openShipStationParticularsFlow(
+          this.dialog,
+          () => {},
+          (finalText: string, txn?: TxnType) => {
+            this.applyFinalParticulars(finalText, txn);
+          }
+        );
         return;
       }
 
@@ -671,7 +686,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
 
-      // ✅ ROC fallback MUST be last and word-boundary only
       if (/\bROC\b/.test(kind)) {
         openRocParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
           this.applyFinalParticulars(finalText, txn);
@@ -687,7 +701,9 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private applyFinalParticulars(finalText: string, txn?: TxnType): void {
-    const patch: any = { particulars: finalText };
+    const patch: any = {
+      particulars: finalText,
+    };
 
     if (txn) {
       if (this.form.get('txnType')) patch.txnType = txn;
@@ -728,9 +744,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  // ======================================================
-  // helpers (date parsing + tree search)
-  // ======================================================
   private periodCoveredToDates(periodCovered: any): { periodFrom?: string; periodTo?: string } {
     const s = String(periodCovered ?? '').trim();
     if (!s) return {};
@@ -755,10 +768,10 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const m1 = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (m1) {
-      const d = Number(m1[1]);
-      const m = Number(m1[2]);
+      const mm = Number(m1[1]);
+      const dd = Number(m1[2]);
       const y = Number(m1[3]);
-      return this.toYmdFromParts(y, m, d);
+      return this.toYmdFromParts(y, mm, dd);
     }
 
     const d = new Date(v);
@@ -777,6 +790,16 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     return `${yyyy}-${mm}-${dd}`;
   }
 
+  private toDisplayDate(value: any): string {
+    if (!value) return '';
+    const d = value instanceof Date ? value : new Date(value);
+    if (isNaN(d.getTime())) return '';
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
+  }
+
   private toYmdFromParts(y: number, m: number, d: number): string {
     if (!y || !m || !d) return '';
     const mm = String(m).padStart(2, '0');
@@ -791,6 +814,51 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     if (isNaN(dt.getTime())) return yyyyMmDd;
     dt.setDate(dt.getDate() + Number(days || 0));
     return this.toYmd(dt);
+  }
+
+  private computeDateToFromYears(from: any, years: any): string {
+    const f = this.parseDisplayOrYmdToDate(from);
+    const y = Number(years ?? 0);
+
+    if (!f || !isFinite(y) || y <= 0) return '';
+
+    const wholeYears = Math.floor(y);
+    const fraction = y - wholeYears;
+
+    const d = new Date(f);
+    d.setFullYear(d.getFullYear() + wholeYears);
+
+    if (fraction > 0) {
+      const extraDays = Math.round(fraction * 365.25);
+      d.setDate(d.getDate() + extraDays);
+    }
+
+    // ✅ return yyyy-MM-dd because periodTo is calendar input
+    return this.toYmd(d);
+  }
+
+  private parseDisplayOrYmdToDate(value: any): Date | null {
+    const v = String(value ?? '').trim();
+    if (!v) return null;
+
+    // MM/dd/yyyy
+    const m1 = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m1) {
+      const mm = Number(m1[1]) - 1;
+      const dd = Number(m1[2]);
+      const yyyy = Number(m1[3]);
+      const d = new Date(yyyy, mm, dd);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    // yyyy-MM-dd
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      const d = new Date(v + 'T00:00:00');
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
   }
 
   private findBoolInFormTree(

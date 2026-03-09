@@ -1,4 +1,13 @@
-import { Component, EventEmitter, Input, Output, OnInit, OnDestroy } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  OnInit,
+  OnDestroy,
+  AfterViewInit,
+  ElementRef,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule, AbstractControl } from '@angular/forms';
 import { SoaPdfService } from '../soa-pdf/soa-pdf.service';
@@ -14,7 +23,7 @@ type TxnKey = 'NEW' | 'RENEW' | 'MOD';
   templateUrl: './soa-right-panel.component.html',
   styleUrls: ['./soa-right-panel.component.css'],
 })
-export class SoaRightPanelComponent implements OnInit, OnDestroy {
+export class SoaRightPanelComponent implements OnInit, AfterViewInit, OnDestroy {
   @Input() form!: FormGroup;
 
   @Output() onSave = new EventEmitter<void>();
@@ -26,11 +35,18 @@ export class SoaRightPanelComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   private txnGuard = false;
 
-  constructor(private soaPdf: SoaPdfService) {}
+  constructor(
+    private soaPdf: SoaPdfService,
+    private elRef: ElementRef<HTMLElement>
+  ) {}
 
   ngOnInit(): void {
-    this.setupTxnSingleSelect();     // ✅ user clicking right panel still behaves like radio
-    this.setupTxnAutoSyncPolling();  // ✅ always sync from particulars even if emitEvent:false
+    this.setupTxnSingleSelect();
+    this.setupTxnAutoSyncPolling();
+  }
+
+  ngAfterViewInit(): void {
+    this.forcePayOnOrBeforeAsDateInput();
   }
 
   ngOnDestroy(): void {
@@ -43,6 +59,21 @@ export class SoaRightPanelComponent implements OnInit, OnDestroy {
   printSoa(): void { this.onPrintSOA.emit(); }
   assessment(): void { this.onAssessment.emit(); }
   printOp(): void { this.onPrintOP.emit(); }
+
+  // ======================================================
+  // ✅ Make "To be paid on or before" use calendar
+  // HTML remains unchanged
+  // ======================================================
+  private forcePayOnOrBeforeAsDateInput(): void {
+    const host = this.elRef?.nativeElement;
+    if (!host) return;
+
+    const input = host.querySelector('.noteIn') as HTMLInputElement | null;
+    if (!input) return;
+
+    input.type = 'date';
+    input.setAttribute('type', 'date');
+  }
 
   // ======================================================
   // ✅ Right panel NEW/RENEW/MOD must be SINGLE SELECT
@@ -65,14 +96,13 @@ export class SoaRightPanelComponent implements OnInit, OnDestroy {
     stream$
       .pipe(takeUntil(this.destroy$), filter(() => !this.txnGuard))
       .subscribe(({ key, v }) => {
-        if (!v) return; // only when user turns one ON
+        if (!v) return;
         this.applyTxnKey(key);
       });
   }
 
   // ======================================================
   // ✅ HARD FIX: Poll the form and sync txn checkboxes
-  // This works even if Particulars is patched with emitEvent:false
   // ======================================================
   private setupTxnAutoSyncPolling(): void {
     if (!this.form) return;
@@ -82,15 +112,12 @@ export class SoaRightPanelComponent implements OnInit, OnDestroy {
         takeUntil(this.destroy$),
         filter(() => !this.txnGuard),
         map(() => {
-          // read raw values (works even if controls are disabled)
           const raw: any = this.form.getRawValue?.() ?? this.form.value ?? {};
 
-          // ✅ get PARTICULARS text from any control containing "particular"
           const particularsText =
             this.findStringInFormTree(this.form, ['particular']) ||
             String(raw.particulars ?? '');
 
-          // also allow dedicated txn-type controls if you have them
           const txnTypeAny =
             raw.txnType ??
             raw.transactionType ??
@@ -99,7 +126,6 @@ export class SoaRightPanelComponent implements OnInit, OnDestroy {
             this.findStringInFormTree(this.form, ['txn', 'type']) ??
             this.findStringInFormTree(this.form, ['transaction', 'type']);
 
-          // decide from txnType control first, then from particulars text
           return this.normalizeTxn(txnTypeAny) || this.normalizeTxn(particularsText);
         }),
         distinctUntilChanged()
@@ -111,8 +137,7 @@ export class SoaRightPanelComponent implements OnInit, OnDestroy {
   }
 
   // ======================================================
-  // ✅ Apply txn selection to right panel checkboxes
-  // Also writes txnType/transactionType if those controls exist
+  // ✅ Apply txn selection
   // ======================================================
   private applyTxnKey(key: TxnKey): void {
     const cNew = this.form.get('txnNew');
@@ -129,12 +154,10 @@ export class SoaRightPanelComponent implements OnInit, OnDestroy {
       txnModification: key === 'MOD',
     };
 
-    // patch only if those controls exist
     if (!cNew) delete patch.txnNew;
     if (!cRen) delete patch.txnRenew;
     if (!cMod) delete patch.txnModification;
 
-    // optional: keep a string txnType control in sync if present
     if (this.form.get('txnType')) patch.txnType = key;
     if (this.form.get('transactionType')) patch.transactionType = key;
 
@@ -144,19 +167,17 @@ export class SoaRightPanelComponent implements OnInit, OnDestroy {
   }
 
   // ======================================================
-  // ✅ FIX: RENEW must NOT become NEW (word-boundary + RENEW-first)
+  // ✅ FIX: RENEW must NOT become NEW
   // ======================================================
   private normalizeTxn(v: any): TxnKey | null {
     if (v === null || v === undefined) return null;
 
     const s = String(v).trim().toUpperCase();
 
-    // exact
     if (s === 'RENEW' || s === 'RENEWAL') return 'RENEW';
     if (s === 'MOD' || s === 'MODIFICATION') return 'MOD';
     if (s === 'NEW') return 'NEW';
 
-    // ✅ word boundaries; check RENEW first
     if (/\bRENEW(AL)?\b/.test(s)) return 'RENEW';
     if (/\bMOD(IFICATION)?\b/.test(s)) return 'MOD';
     if (/\bNEW\b/.test(s)) return 'NEW';
@@ -165,7 +186,7 @@ export class SoaRightPanelComponent implements OnInit, OnDestroy {
   }
 
   // -----------------------
-  // helpers (unchanged)
+  // helpers
   // -----------------------
   private num(v: any): number {
     const n = Number(v);
@@ -229,7 +250,6 @@ export class SoaRightPanelComponent implements OnInit, OnDestroy {
           const child = anyCtrl.controls[name] as AbstractControl;
           const nameLower = String(name).toLowerCase();
 
-          // ✅ if keywords = ['particular'] then it matches any name containing that
           const match = keys.every((k) => nameLower.includes(k));
           if (match) {
             const v = (child as any)?.value;
@@ -247,7 +267,9 @@ export class SoaRightPanelComponent implements OnInit, OnDestroy {
     return r === null ? '' : r;
   }
 
-  // ✅ pdfMake SOA preview button should call this
+  // ======================================================
+  // ✅ pdfMake SOA preview
+  // ======================================================
   printSOAPreview(): void {
     if (!this.form) {
       alert('Form not found.');
