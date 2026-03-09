@@ -5,7 +5,7 @@ import { AmateurParticularsDialogComponent } from './amateur-particulars-dialog.
 export function openAmateurParticularsFlow(
   dialog: MatDialog,
   cancel: () => void,
-  finalize: (finalText: string, txn: TxnType) => void
+  finalize: (finalText: string, txn?: TxnType) => void
 ) {
   const refAm = dialog.open(AmateurParticularsDialogComponent, {
     width: '560px',
@@ -26,7 +26,7 @@ export function openAmateurParticularsFlow(
     const isSpecialPermit = choiceUpper.includes('SPECIAL PERMIT');
 
     const refTxn = dialog.open(TxnTypeDialogComponent, {
-      width: '460px',
+      width: '520px',
       disableClose: true,
       autoFocus: false,
       restoreFocus: false,
@@ -37,25 +37,36 @@ export function openAmateurParticularsFlow(
     });
 
     refTxn.afterClosed().subscribe((resTxn) => {
-      if (!resTxn?.value) {
+      if (!resTxn) {
         cancel();
         return;
       }
 
-      const picked = Array.isArray(resTxn.value) ? resTxn.value : [resTxn.value];
-      const txn =
+      const picked = Array.isArray(resTxn.value) ? resTxn.value : [];
+      const purchasePossess = !!resTxn.purchasePossess;
+      const units = Math.max(1, Math.floor(Number(resTxn.purchasePossessUnits || 1)));
+
+      const txn: TxnType | undefined =
         (picked.includes('NEW') && 'NEW') ||
         (picked.includes('RENEW') && 'RENEW') ||
-        (picked.includes('MOD') && 'MOD');
+        (picked.includes('MOD') && 'MOD') ||
+        undefined;
 
-      if (!txn) {
+      if (!txn && !purchasePossess) {
         cancel();
         return;
       }
 
-      const txnText = txn === 'MOD' ? 'MODIFICATION' : txn;
-      const ppText = resTxn.purchasePossess ? ' - Purchase and Possess' : '';
-      const finalText = `Amateur - ${choice}${ppText} - ${txnText}`;
+      let finalText = `Amateur - ${choice}`;
+
+      if (purchasePossess) {
+        finalText += ` - Purchase and Possess - UNITS_${units}`;
+      }
+
+      if (txn) {
+        finalText += ` - ${txn === 'MOD' ? 'MODIFICATION' : txn}`;
+      }
+
       finalize(finalText, txn);
     });
   });

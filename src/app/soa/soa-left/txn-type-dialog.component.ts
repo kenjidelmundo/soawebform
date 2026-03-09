@@ -3,8 +3,17 @@ import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 export type TxnType = 'NEW' | 'RENEW' | 'MOD';
-export type TxnTypeDialogResult = { value: TxnType[]; purchasePossess?: boolean };
-type TxnTypeDialogData = { showPurchasePossess?: boolean; contextTitle?: string };
+
+export type TxnTypeDialogResult = {
+  value: TxnType[];
+  purchasePossess?: boolean;
+  purchasePossessUnits?: number;
+};
+
+type TxnTypeDialogData = {
+  showPurchasePossess?: boolean;
+  contextTitle?: string;
+};
 
 @Component({
   selector: 'app-txn-type-dialog',
@@ -28,21 +37,36 @@ type TxnTypeDialogData = { showPurchasePossess?: boolean; contextTitle?: string 
           <span class="txt">New</span>
         </label>
 
-        <label
-          class="row"
-          *ngIf="showPurchasePossess"
-          (click)="$event.preventDefault(); togglePurchasePossess()"
-        >
-          <input
-            type="checkbox"
-            class="cb"
-            [checked]="purchasePossess"
-            tabindex="-1"
-            aria-hidden="true"
-          />
-          <span class="box" [class.on]="purchasePossess"></span>
-          <span class="txt">Purchase and Possess</span>
-        </label>
+        <div class="ppWrap" *ngIf="showPurchasePossess">
+          <label
+            class="row"
+            (click)="$event.preventDefault(); togglePurchasePossess()"
+          >
+            <input
+              type="checkbox"
+              class="cb"
+              [checked]="purchasePossess"
+              tabindex="-1"
+              aria-hidden="true"
+            />
+            <span class="box" [class.on]="purchasePossess"></span>
+            <span class="txt">Purchase and Possess</span>
+          </label>
+
+          <div class="unitsRow" *ngIf="purchasePossess">
+            <label class="unitsLabel" for="ppUnits">Unit:</label>
+            <input
+              id="ppUnits"
+              type="number"
+              class="unitsInput"
+              min="1"
+              step="1"
+              [value]="purchasePossessUnits"
+              (click)="$event.stopPropagation()"
+              (input)="onUnitsInput($event)"
+            />
+          </div>
+        </div>
 
         <label class="row" (click)="$event.preventDefault(); toggle('RENEW')">
           <input
@@ -74,7 +98,7 @@ type TxnTypeDialogData = { showPurchasePossess?: boolean; contextTitle?: string 
         <button
           type="button"
           class="btn primary"
-          [disabled]="selected.length === 0"
+          [disabled]="!canSubmit()"
           (click)="submit()"
         >
           Submit
@@ -84,7 +108,7 @@ type TxnTypeDialogData = { showPurchasePossess?: boolean; contextTitle?: string 
   `,
   styles: [`
     .dlg {
-      width: 420px;
+      width: 520px;
       max-width: 92vw;
       padding: 14px;
       font-family: Arial, sans-serif;
@@ -107,12 +131,13 @@ type TxnTypeDialogData = { showPurchasePossess?: boolean; contextTitle?: string 
 
     .list {
       display: grid;
-      gap: 6px;
+      gap: 6px 18px;
       padding-left: 2px;
     }
 
     .list.twoCol {
       grid-template-columns: 1fr 1fr;
+      align-items: start;
     }
 
     .row {
@@ -127,6 +152,36 @@ type TxnTypeDialogData = { showPurchasePossess?: boolean; contextTitle?: string 
       padding: 0;
       border: none;
       background: transparent;
+    }
+
+    .ppWrap {
+      display: grid;
+      gap: 6px;
+      align-content: start;
+    }
+
+    .unitsRow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-left: 22px;
+      margin-top: -2px;
+    }
+
+    .unitsLabel {
+      font-size: 13px;
+      font-weight: 700;
+      min-width: 34px;
+    }
+
+    .unitsInput {
+      width: 90px;
+      height: 28px;
+      border: 1px solid #999;
+      border-radius: 4px;
+      padding: 0 8px;
+      font-size: 13px;
+      box-sizing: border-box;
     }
 
     .cb {
@@ -191,6 +246,8 @@ type TxnTypeDialogData = { showPurchasePossess?: boolean; contextTitle?: string 
 export class TxnTypeDialogComponent {
   selected: TxnType[] = [];
   purchasePossess = false;
+  purchasePossessUnits = 1;
+
   readonly showPurchasePossess: boolean;
   readonly contextTitle: string;
 
@@ -206,6 +263,13 @@ export class TxnTypeDialogComponent {
     return this.selected.includes(v);
   }
 
+  canSubmit(): boolean {
+    if (this.purchasePossess) {
+      return Number.isFinite(this.purchasePossessUnits) && this.purchasePossessUnits >= 1;
+    }
+    return this.selected.length > 0;
+  }
+
   toggle(v: TxnType): void {
     const has = this.selected.includes(v);
 
@@ -214,7 +278,6 @@ export class TxnTypeDialogComponent {
       return;
     }
 
-    // ✅ NEW and RENEW are mutually exclusive
     if (v === 'NEW') {
       this.selected = this.selected.filter(x => x !== 'RENEW');
       this.selected = [...this.selected, 'NEW'];
@@ -227,19 +290,30 @@ export class TxnTypeDialogComponent {
       return;
     }
 
-    // ✅ MOD can be combined with either NEW or RENEW
     this.selected = [...this.selected, v];
   }
 
   togglePurchasePossess(): void {
     this.purchasePossess = !this.purchasePossess;
+
+    if (!this.purchasePossess) {
+      this.purchasePossessUnits = 1;
+    }
+  }
+
+  onUnitsInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const n = Math.floor(Number(input.value));
+    this.purchasePossessUnits = Number.isFinite(n) && n >= 1 ? n : 1;
   }
 
   submit(): void {
-    if (this.selected.length === 0) return;
+    if (!this.canSubmit()) return;
+
     this.ref.close({
       value: this.selected,
       purchasePossess: this.purchasePossess,
+      purchasePossessUnits: this.purchasePossess ? this.purchasePossessUnits : undefined,
     });
   }
 
