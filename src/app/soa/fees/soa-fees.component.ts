@@ -69,6 +69,11 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     const txnRenewCtrl = this.ctrl('txnRenew');
     const txnModCtrl = this.ctrl('txnModification');
 
+    // IMPORTANT:
+    // delayMonths must come from parent form / left form
+    // left form computes it from periodFrom (expiry date) up to now
+    const delayMonthsCtrl = this.ctrl('delayMonths');
+
     if (!particulars || !yearsCtrl) return;
 
     const particulars$ = particulars.valueChanges.pipe(startWith(particulars.value));
@@ -76,27 +81,31 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
 
     const shipUnits$ = shipUnitsCtrl
       ? shipUnitsCtrl.valueChanges.pipe(startWith(shipUnitsCtrl.value))
-      : of(1).pipe(startWith(1));
+      : of(1);
 
     const withEquip$ = withEquipCtrl
       ? withEquipCtrl.valueChanges.pipe(startWith(withEquipCtrl.value))
-      : of(false).pipe(startWith(false));
+      : of(false);
 
     const sur100$ = sur100Ctrl
       ? sur100Ctrl.valueChanges.pipe(startWith(sur100Ctrl.value))
-      : of(false).pipe(startWith(false));
+      : of(false);
 
     const txnNew$ = txnNewCtrl
       ? txnNewCtrl.valueChanges.pipe(startWith(txnNewCtrl.value))
-      : of(false).pipe(startWith(false));
+      : of(false);
 
     const txnRenew$ = txnRenewCtrl
       ? txnRenewCtrl.valueChanges.pipe(startWith(txnRenewCtrl.value))
-      : of(false).pipe(startWith(false));
+      : of(false);
 
     const txnMod$ = txnModCtrl
       ? txnModCtrl.valueChanges.pipe(startWith(txnModCtrl.value))
-      : of(false).pipe(startWith(false));
+      : of(false);
+
+    const delayMonths$ = delayMonthsCtrl
+      ? delayMonthsCtrl.valueChanges.pipe(startWith(delayMonthsCtrl.value))
+      : of(0);
 
     combineLatest([
       particulars$,
@@ -107,9 +116,10 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
       txnNew$,
       txnRenew$,
       txnMod$,
+      delayMonths$,
     ])
       .pipe(debounceTime(30), takeUntil(this.destroy$))
-      .subscribe(([pText, y, shipU, wEq, s100, tNew, tRen, tMod]) => {
+      .subscribe(([pText, y, shipU, wEq, s100, tNew, tRen, tMod, delayMonthsRaw]) => {
         const text = String(pText || '').trim();
         const up = text.toUpperCase();
 
@@ -121,14 +131,14 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
 
         const YEARS = Math.max(1, Math.floor(this.num(y, 1)));
         const SHIP_UNITS = Math.max(1, Math.floor(this.num(shipU, 1)));
+        const DELAY_MONTHS = Math.max(0, Math.floor(this.num(delayMonthsRaw, 0)));
 
-        // single txn for modules that do NOT support combined RENEW + MOD
         const txnFromChecks = this.txnFromChecks(!!tNew, !!tRen, !!tMod);
         const txnForText = this.txnFromText(text);
         const txn = txnFromChecks ?? txnForText;
 
         // =====================================================
-        // 1) ROC (supports combined RENEW + MOD)
+        // 1) ROC
         // =====================================================
         if (up.startsWith('ROC')) {
           this.clearAllComputedFields();
@@ -139,8 +149,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
             txnMod: !!tMod || up.includes('MOD'),
           };
 
-          const delayMonths = this.getDelayMonths();
-          const res = computeROC(text, YEARS, rocFlags, delayMonths);
+          const res = computeROC(text, YEARS, rocFlags, DELAY_MONTHS);
 
           this.patch(0, 'amRadioStationLicense');
           this.patch(res.rocRadioOperatorsCert, 'amRadioOperatorsCert');
@@ -148,10 +157,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
           this.patch(res.rocFF, 'amFilingFee');
           this.patch(res.rocSemFee, 'amSeminarFee');
           this.patch(res.rocSurcharges, 'amSurcharges');
-
-          // MOD always goes to Other Application -> Modification Fee
           this.patch(res.rocModificationFee, 'appModificationFee');
-
           this.patch(res.rocDST, 'dst');
 
           this.patch(this.computeTotalAmount(), 'totalAmount');
@@ -172,25 +178,17 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
             txnMod: !!tMod || up.includes('MOD'),
           };
 
-          const delayMonths = this.getDelayMonths();
-          const res = computeAmateur(text, cls, YEARS, flags, delayMonths);
+          const res = computeAmateur(text, cls, YEARS, flags, DELAY_MONTHS);
 
-          // permit / purchase / possess
           this.patch(res.maPermitPurchase, 'licPermitToPurchase');
           this.patch(res.maPermitPossess, 'licPermitToPossess');
-
-          // sell/transfer
           this.patch(res.maStf, 'appOthers');
-
-          // Correct field placement
           this.patch(res.maRadioStationLicense, 'amRadioStationLicense');
           this.patch(res.maRadioOperatorsCert, 'amRadioOperatorsCert');
-
           this.patch(res.maApplicationFee, 'amApplicationFee');
           this.patch(res.maFilingFee, 'amFilingFee');
           this.patch(0, 'amSeminarFee');
           this.patch(res.maSurcharges, 'amSurcharges');
-
           this.patch(res.maConstructionPermitFee, 'licConstructionPermitFee');
           this.patch(res.maModificationFee, 'appModificationFee');
           this.patch(res.maDST, 'dst');
@@ -213,14 +211,16 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
           this.patch(vhf.licenseFee, 'licRadioStationLicense');
           this.patch(vhf.inspectionFee, 'licInspectionFee');
           this.patch(vhf.supervisionFee, 'licSUF');
-
           this.patch(vhf.registrationFee, 'appRegistrationFee');
           this.patch(vhf.modificationFee, 'appModificationFee');
 
-          const surcharge = txn === 'RENEW' ? (s100 ? vhf.surLf100 : vhf.surLf50) : 0;
-          this.patch(surcharge, 'licSurcharges');
+          const surcharge = txn === 'RENEW'
+            ? (s100 ? vhf.surLf100 : vhf.surLf50)
+            : 0;
 
+          this.patch(surcharge, 'licSurcharges');
           this.patch(vhf.dst, 'dst');
+
           this.patch(this.computeTotalAmount(), 'totalAmount');
           return;
         }
@@ -232,7 +232,9 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
           this.clearAllComputedFields();
 
           const surMode: CoastalSurchargeMode =
-            txn === 'RENEW' ? (s100 ? 'SUR100' : 'SUR50') : 'NONE';
+            txn === 'RENEW'
+              ? (s100 ? 'SUR100' : 'SUR50')
+              : 'NONE';
 
           const res = computeCoastal(text, txn as any, YEARS, surMode);
 
@@ -299,7 +301,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         }
 
         // =====================================================
-        // 7) SHIP / parsed ship flow
+        // 7) SHIP
         // =====================================================
         const parsedShip = parseParticularsText(text);
         if (parsedShip) {
@@ -377,32 +379,6 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     if (up.includes('CLASS D') || up.includes('AT-RSL D') || up.includes('RSL D')) return 'D';
 
     return 'A';
-  }
-
-  private getDelayMonths(): number {
-    const direct = this.ctrl('lateMonths');
-    if (direct) return Math.max(0, Math.floor(this.num(direct.value, 0)));
-
-    const expiredYears =
-      this.ctrl('expiredYears') ??
-      this.ctrl('delayYears') ??
-      this.ctrl('lateYears');
-
-    const expiredMonths =
-      this.ctrl('expiredMonths') ??
-      this.ctrl('delayMonthsOnly') ??
-      this.ctrl('lateMonthsOnly');
-
-    const expiredDays =
-      this.ctrl('expiredDays') ??
-      this.ctrl('delayDays') ??
-      this.ctrl('lateDays');
-
-    const y = this.num(expiredYears?.value, 0);
-    const m = this.num(expiredMonths?.value, 0);
-    const d = this.num(expiredDays?.value, 0);
-
-    return Math.max(0, Math.floor(y * 12 + m + (d > 0 ? 1 : 0)));
   }
 
   private clearShipFields(): void {

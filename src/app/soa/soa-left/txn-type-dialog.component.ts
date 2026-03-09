@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
-import { MatDialogRef } from '@angular/material/dialog';
+import { Component, Inject } from '@angular/core';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 export type TxnType = 'NEW' | 'RENEW' | 'MOD';
-export type TxnTypeDialogResult = { value: TxnType[] };
+export type TxnTypeDialogResult = { value: TxnType[]; purchasePossess?: boolean };
+type TxnTypeDialogData = { showPurchasePossess?: boolean; contextTitle?: string };
 
 @Component({
   selector: 'app-txn-type-dialog',
@@ -12,8 +13,9 @@ export type TxnTypeDialogResult = { value: TxnType[] };
   template: `
     <div class="dlg">
       <div class="dlgHead">Transaction Type</div>
+      <div class="contextTitle" *ngIf="contextTitle">{{ contextTitle }}</div>
 
-      <div class="list">
+      <div class="list" [class.twoCol]="showPurchasePossess">
         <label class="row" (click)="$event.preventDefault(); toggle('NEW')">
           <input
             type="checkbox"
@@ -24,6 +26,22 @@ export type TxnTypeDialogResult = { value: TxnType[] };
           />
           <span class="box" [class.on]="isChecked('NEW')"></span>
           <span class="txt">New</span>
+        </label>
+
+        <label
+          class="row"
+          *ngIf="showPurchasePossess"
+          (click)="$event.preventDefault(); togglePurchasePossess()"
+        >
+          <input
+            type="checkbox"
+            class="cb"
+            [checked]="purchasePossess"
+            tabindex="-1"
+            aria-hidden="true"
+          />
+          <span class="box" [class.on]="purchasePossess"></span>
+          <span class="txt">Purchase and Possess</span>
         </label>
 
         <label class="row" (click)="$event.preventDefault(); toggle('RENEW')">
@@ -80,10 +98,21 @@ export type TxnTypeDialogResult = { value: TxnType[] };
       margin-bottom: 10px;
     }
 
+    .contextTitle {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
     .list {
       display: grid;
       gap: 6px;
       padding-left: 2px;
+    }
+
+    .list.twoCol {
+      grid-template-columns: 1fr 1fr;
     }
 
     .row {
@@ -161,10 +190,17 @@ export type TxnTypeDialogResult = { value: TxnType[] };
 })
 export class TxnTypeDialogComponent {
   selected: TxnType[] = [];
+  purchasePossess = false;
+  readonly showPurchasePossess: boolean;
+  readonly contextTitle: string;
 
   constructor(
-    private ref: MatDialogRef<TxnTypeDialogComponent, TxnTypeDialogResult>
-  ) {}
+    private ref: MatDialogRef<TxnTypeDialogComponent, TxnTypeDialogResult>,
+    @Inject(MAT_DIALOG_DATA) private data: TxnTypeDialogData | null
+  ) {
+    this.showPurchasePossess = !!this.data?.showPurchasePossess;
+    this.contextTitle = String(this.data?.contextTitle ?? '').trim();
+  }
 
   isChecked(v: TxnType): boolean {
     return this.selected.includes(v);
@@ -195,9 +231,16 @@ export class TxnTypeDialogComponent {
     this.selected = [...this.selected, v];
   }
 
+  togglePurchasePossess(): void {
+    this.purchasePossess = !this.purchasePossess;
+  }
+
   submit(): void {
     if (this.selected.length === 0) return;
-    this.ref.close({ value: this.selected });
+    this.ref.close({
+      value: this.selected,
+      purchasePossess: this.purchasePossess,
+    });
   }
 
   close(): void {

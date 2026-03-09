@@ -8,7 +8,7 @@ import {
   Renderer2,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormGroup, ReactiveFormsModule, AbstractControl } from '@angular/forms';
+import { FormGroup, ReactiveFormsModule, AbstractControl, FormControl } from '@angular/forms';
 import { Subject, combineLatest } from 'rxjs';
 import { startWith, takeUntil } from 'rxjs/operators';
 
@@ -66,10 +66,12 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     if (!this.form) return;
 
+    this.ensureDelayMonthsControl();
     this.loadPayees();
     this.setupPeriodCovered();
     this.setupPayeeSelectionAutoFill();
     this.setupAutoTxnFromParticulars();
+    this.setupDelayMonthsComputation();
   }
 
   ngAfterViewInit(): void {
@@ -107,7 +109,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }
 
-    // ✅ date = calendar again
     const dateInput = this.el.nativeElement.querySelector(
       'input[formControlName="date"]'
     ) as HTMLInputElement | null;
@@ -118,7 +119,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       this.renderer.setStyle(dateInput, 'cursor', 'pointer');
     }
 
-    // ✅ periodFrom = calendar again
     const periodFromInput = this.el.nativeElement.querySelector(
       'input[formControlName="periodFrom"]'
     ) as HTMLInputElement | null;
@@ -129,7 +129,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       this.renderer.setStyle(periodFromInput, 'cursor', 'pointer');
     }
 
-    // ✅ periodTo = calendar again
     const periodToInput = this.el.nativeElement.querySelector(
       'input[formControlName="periodTo"]'
     ) as HTMLInputElement | null;
@@ -148,6 +147,12 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  private ensureDelayMonthsControl(): void {
+    if (!this.form.get('delayMonths')) {
+      this.form.addControl('delayMonths', new FormControl(0));
+    }
+  }
+
   private setupAutoTxnFromParticulars(): void {
     const ctrl = this.form?.get('particulars');
     if (!ctrl) return;
@@ -161,6 +166,39 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
         this.applyTxnFromParticulars(text);
         this.applyCategoryFromParticulars(text);
       });
+  }
+
+  private setupDelayMonthsComputation(): void {
+    const periodFromCtrl = this.form.get('periodFrom');
+    if (!periodFromCtrl) return;
+
+    periodFromCtrl.valueChanges
+      .pipe(startWith(periodFromCtrl.value), takeUntil(this.destroy$))
+      .subscribe((expiryDate) => {
+        const delayMonths = this.computeDelayMonthsFromNow(expiryDate);
+        this.form.get('delayMonths')?.setValue(delayMonths, { emitEvent: true });
+      });
+  }
+
+  private computeDelayMonthsFromNow(expiryRaw: any): number {
+    const expiry = this.parseDisplayOrYmdToDate(expiryRaw);
+    if (!expiry) return 0;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    if (today <= expiry) return 0;
+
+    let months =
+      (today.getFullYear() - expiry.getFullYear()) * 12 +
+      (today.getMonth() - expiry.getMonth());
+
+    // count any started extra month as another late month
+    if (today.getDate() >= expiry.getDate()) {
+      months += 1;
+    }
+
+    return Math.max(0, months);
   }
 
   private applyTxnFromParticulars(particularsText: string): void {
@@ -372,43 +410,42 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           next: (dto: any) => {
             const realId = Number(dto?.id ?? dto?.ID ?? dto?.Id ?? id);
 
-            // ✅ fetch saved date from DB, not today's date
             const savedDate =
               this.toYmd(dto?.dateIssued ?? dto?.DateIssued ?? dto?.date ?? dto?.Date) || '';
 
-            // ✅ fetch saved current periodTo from DB
             const directTo =
               this.toYmd(dto?.periodTo ?? dto?.PeriodTo) || this.toYmd(dto?.to ?? dto?.To);
 
             const parsed = this.periodCoveredToDates(dto?.periodCovered ?? dto?.PeriodCovered);
             const parsedTo = parsed.periodTo ?? '';
 
-            const oldTo = directTo || parsedTo || '';
+            const oldExpiryDate = directTo || parsedTo || '';
 
             this.form.patchValue(
               {
                 id: realId,
                 licensee: String(dto?.licensee ?? dto?.Licensee ?? '').trim(),
                 address: String(dto?.address ?? dto?.Address ?? ''),
-
                 particulars: '',
-
                 catROC: false,
                 catMA: false,
                 catMS: false,
                 catOTHERS: false,
 
-                // ✅ date = saved DB date
+                // top date stays as DB/display date only
                 date: savedDate || this.form.get('date')?.value || '',
 
-                // ✅ periodFrom = saved current dateTo from DB
-                periodFrom: oldTo,
+                // renewal basis / expiry date
+                periodFrom: oldExpiryDate,
 
-                // ✅ periodTo = computed from years input
+                // renewed end date will be computed from years
                 periodTo: '',
               },
               { emitEvent: true }
             );
+
+            const delayMonths = this.computeDelayMonthsFromNow(oldExpiryDate);
+            this.form.get('delayMonths')?.setValue(delayMonths, { emitEvent: true });
 
             this.setTxnEverywhere({ txnNew: true, txnRenew: false, txnModification: false });
           },
@@ -435,6 +472,9 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
         toCtrl.setValue(computedTo, { emitEvent: false });
         coveredCtrl.setValue(this.computeDateRange(from, computedTo), { emitEvent: false });
+
+        const delayMonths = this.computeDelayMonthsFromNow(from);
+        this.form.get('delayMonths')?.setValue(delayMonths, { emitEvent: true });
       });
   }
 
@@ -446,20 +486,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     if (t < f) return '';
 
     return `${this.toDisplayDate(f)}-${this.toDisplayDate(t)}`;
-  }
-
-  private computeYears(from: any, to: any): number {
-    const f = this.parseDisplayOrYmdToDate(from);
-    const t = this.parseDisplayOrYmdToDate(to);
-
-    if (!f || !t) return 0;
-    if (t < f) return 0;
-
-    const diffMs = t.getTime() - f.getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    const years = diffDays / 365.25;
-
-    return Number(years.toFixed(2));
   }
 
   private openAddressDialog(): void {
@@ -717,33 +743,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.applyCategoryFromParticulars(finalText);
   }
 
-  private openTxnTypeDialogAndFinalize(
-    baseText: string,
-    finalize: (finalText: string, txn: TxnType) => void,
-    cancel: () => void
-  ): void {
-    const ref = this.dialog.open(TxnTypeDialogComponent, {
-      width: '420px',
-      maxWidth: '92vw',
-      panelClass: 'soa-dlg',
-      disableClose: true,
-      autoFocus: false,
-      restoreFocus: false,
-    });
-
-    ref.afterClosed().subscribe((r: any) => {
-      const txn: TxnType | undefined = r?.value ?? r?.txn ?? r;
-      if (!txn) {
-        cancel();
-        return;
-      }
-
-      const txnText = txn === 'MOD' ? 'MODIFICATION' : txn;
-      const finalText = `${baseText} - ${txnText}`;
-      finalize(finalText, txn);
-    });
-  }
-
   private periodCoveredToDates(periodCovered: any): { periodFrom?: string; periodTo?: string } {
     const s = String(periodCovered ?? '').trim();
     if (!s) return {};
@@ -807,15 +806,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     return `${y}-${mm}-${dd}`;
   }
 
-  private addDays(yyyyMmDd: string, days: number): string {
-    const s = String(yyyyMmDd ?? '').slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return yyyyMmDd;
-    const dt = new Date(s + 'T00:00:00');
-    if (isNaN(dt.getTime())) return yyyyMmDd;
-    dt.setDate(dt.getDate() + Number(days || 0));
-    return this.toYmd(dt);
-  }
-
   private computeDateToFromYears(from: any, years: any): string {
     const f = this.parseDisplayOrYmdToDate(from);
     const y = Number(years ?? 0);
@@ -833,7 +823,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       d.setDate(d.getDate() + extraDays);
     }
 
-    // ✅ return yyyy-MM-dd because periodTo is calendar input
     return this.toYmd(d);
   }
 
@@ -841,7 +830,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const v = String(value ?? '').trim();
     if (!v) return null;
 
-    // MM/dd/yyyy
     const m1 = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (m1) {
       const mm = Number(m1[1]) - 1;
@@ -851,7 +839,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       return isNaN(d.getTime()) ? null : d;
     }
 
-    // yyyy-MM-dd
     if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
       const d = new Date(v + 'T00:00:00');
       return isNaN(d.getTime()) ? null : d;
