@@ -29,6 +29,7 @@ export function openRocParticularsFlow(
         disableClose: true,
         autoFocus: false,
         restoreFocus: false,
+        data: { contextTitle: base },
       });
 
       refTxn.afterClosed().subscribe((resTxn) => {

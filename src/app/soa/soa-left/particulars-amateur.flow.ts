@@ -25,6 +25,7 @@ export function openAmateurParticularsFlow(
     const isAtRoc = choiceUpper === 'AT-ROC';
     const isSpecialPermit = choiceUpper.includes('SPECIAL PERMIT');
     const isAtRslClass = /^AT-RSL CLASS [ABCD]$/.test(choiceUpper);
+    const isTemporary = choiceUpper.includes('TEMPORARY PERMIT');
 
     const refTxn = dialog.open(TxnTypeDialogComponent, {
       width: '520px',
@@ -32,9 +33,10 @@ export function openAmateurParticularsFlow(
       autoFocus: false,
       restoreFocus: false,
       data: {
-        showPurchasePossess: !isAtRoc && !isSpecialPermit,
-        showSellTransfer: isAtRslClass,
-        showPossessStorage: isAtRslClass,
+        showPurchasePossess: !isAtRoc && !isSpecialPermit && !isTemporary,
+        showSellTransfer: isAtRslClass && !isTemporary,
+        showPossessStorage: isAtRslClass && !isTemporary,
+        showStandaloneUnits: isTemporary,
         contextTitle: choice,
       },
     });
@@ -49,9 +51,11 @@ export function openAmateurParticularsFlow(
       const purchasePossess = !!resTxn.purchasePossess;
       const sellTransfer = !!resTxn.sellTransfer;
       const possessStorage = !!resTxn.possessStorage;
+      const standaloneUnits = Math.max(1, Math.floor(Number(resTxn.standaloneUnits || 1)));
       const purchasePossessUnits = Math.max(1, Math.floor(Number(resTxn.purchasePossessUnits || 1)));
       const sellTransferUnits = Math.max(1, Math.floor(Number(resTxn.sellTransferUnits || 1)));
       const possessStorageUnits = Math.max(1, Math.floor(Number(resTxn.possessStorageUnits || 1)));
+      const modificationUnits = Math.max(1, Math.floor(Number(resTxn.modificationUnits || 1)));
 
       const txn: TxnType | undefined =
         (picked.includes('NEW') && 'NEW') ||
@@ -65,6 +69,10 @@ export function openAmateurParticularsFlow(
       }
 
       let finalText = `Amateur - ${choice}`;
+
+      if (isTemporary) {
+        finalText += ` - UNITS_${standaloneUnits}`;
+      }
 
       if (purchasePossess) {
         finalText += ` - Purchase and Possess - UNITS_${purchasePossessUnits}`;
@@ -80,6 +88,10 @@ export function openAmateurParticularsFlow(
 
       if (txn) {
         finalText += ` - ${txn === 'MOD' ? 'MODIFICATION' : txn}`;
+
+        if (txn === 'MOD') {
+          finalText += ` - UNITS_${modificationUnits}`;
+        }
       }
 
       finalize(finalText, txn);

@@ -12,12 +12,14 @@ export type TxnTypeDialogResult = {
   sellTransferUnits?: number;
   possessStorage?: boolean;
   possessStorageUnits?: number;
+  standaloneUnits?: number;
 };
 
 type TxnTypeDialogData = {
   showPurchasePossess?: boolean;
   showSellTransfer?: boolean;
   showPossessStorage?: boolean;
+  showStandaloneUnits?: boolean;
   contextTitle?: string;
 };
 
@@ -153,6 +155,20 @@ type TxnTypeDialogData = {
           <span class="box" [class.on]="isChecked('MOD')"></span>
           <span class="txt">Modification</span>
         </label>
+
+        <div class="unitsRow" *ngIf="showStandaloneUnits">
+          <label class="unitsLabel" for="standaloneUnits">Unit:</label>
+          <input
+            id="standaloneUnits"
+            type="number"
+            class="unitsInput"
+            min="1"
+            step="1"
+            [value]="standaloneUnits"
+            (click)="$event.stopPropagation()"
+            (input)="onStandaloneUnitsInput($event)"
+          />
+        </div>
       </div>
 
       <div class="dlgFoot">
@@ -319,10 +335,12 @@ export class TxnTypeDialogComponent {
   sellTransferUnits = 1;
   possessStorage = false;
   possessStorageUnits = 1;
+  standaloneUnits = 1;
 
   readonly showPurchasePossess: boolean;
   readonly showSellTransfer: boolean;
   readonly showPossessStorage: boolean;
+  readonly showStandaloneUnits: boolean;
   readonly contextTitle: string;
 
   constructor(
@@ -332,6 +350,7 @@ export class TxnTypeDialogComponent {
     this.showPurchasePossess = !!this.data?.showPurchasePossess;
     this.showSellTransfer = !!this.data?.showSellTransfer;
     this.showPossessStorage = !!this.data?.showPossessStorage;
+    this.showStandaloneUnits = !!this.data?.showStandaloneUnits;
     this.contextTitle = String(this.data?.contextTitle ?? '').trim();
   }
 
@@ -348,6 +367,9 @@ export class TxnTypeDialogComponent {
     }
     if (this.possessStorage) {
       return Number.isFinite(this.possessStorageUnits) && this.possessStorageUnits >= 1;
+    }
+    if (this.showStandaloneUnits) {
+      return Number.isFinite(this.standaloneUnits) && this.standaloneUnits >= 1;
     }
     return this.selected.length > 0 || this.sellTransfer || this.possessStorage;
   }
@@ -411,6 +433,12 @@ export class TxnTypeDialogComponent {
     this.possessStorageUnits = Number.isFinite(n) && n >= 1 ? n : 1;
   }
 
+  onStandaloneUnitsInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const n = Math.floor(Number(input.value));
+    this.standaloneUnits = Number.isFinite(n) && n >= 1 ? n : 1;
+  }
+
   onSellTransferUnitsInput(event: Event): void {
     const input = event.target as HTMLInputElement;
     const n = Math.floor(Number(input.value));
@@ -428,6 +456,7 @@ export class TxnTypeDialogComponent {
       sellTransferUnits: this.sellTransfer ? this.sellTransferUnits : undefined,
       possessStorage: this.possessStorage,
       possessStorageUnits: this.possessStorage ? this.possessStorageUnits : undefined,
+      standaloneUnits: this.showStandaloneUnits ? this.standaloneUnits : undefined,
     });
   }
 
