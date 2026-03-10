@@ -34,7 +34,9 @@ export type AmateurRates = {
   AT_CLUB_SIMPLEX: AmateurRow;
   AT_CLUB_REPEATER: AmateurRow;
 
-  TEMPORARY: AmateurRow;
+  TEMPORARY_A: AmateurRow;
+  TEMPORARY_B: AmateurRow;
+  TEMPORARY_C: AmateurRow;
 
   SPECIAL_EVENT: AmateurRow;
   VANITY: AmateurRow;
@@ -182,13 +184,39 @@ const AMATEUR_RATES: AmateurRates = {
   },
 
   // E
-  TEMPORARY: {
+  TEMPORARY_A: {
     Purchase: 50,
     Possess: 50,
     STF: 0,
     FF: 60,
     CPF: 0,
     LF: 120,
+    ROC: 60,
+    MOD: 0,
+    DST: 30,
+    SUR50: 0,
+    SUR100: 0,
+  },
+  TEMPORARY_B: {
+    Purchase: 50,
+    Possess: 50,
+    STF: 0,
+    FF: 60,
+    CPF: 0,
+    LF: 132,
+    ROC: 60,
+    MOD: 0,
+    DST: 30,
+    SUR50: 0,
+    SUR100: 0,
+  },
+  TEMPORARY_C: {
+    Purchase: 50,
+    Possess: 50,
+    STF: 0,
+    FF: 60,
+    CPF: 0,
+    LF: 144,
     ROC: 60,
     MOD: 0,
     DST: 30,
@@ -267,7 +295,11 @@ function detectKey(particulars: string, cls: string): keyof AmateurRates {
 
   if (p.includes('SPECIAL EVENT')) return 'SPECIAL_EVENT';
   if (p.includes('VANITY')) return 'VANITY';
-  if (p.includes('TEMPORARY') || p.includes('FOREIGN VISITOR')) return 'TEMPORARY';
+  if (p.includes('TEMPORARY') || p.includes('FOREIGN VISITOR')) {
+    if (c === 'B') return 'TEMPORARY_B';
+    if (c === 'C') return 'TEMPORARY_C';
+    return 'TEMPORARY_A';
+  }
 
   if (p.includes('POSSESS') && (p.includes('STORAGE') || p.includes('RADIO STATIONS'))) {
     return 'POSSESS_STORAGE';
@@ -526,7 +558,7 @@ export function computeAmateur(
   }
 
   // E
-  else if (key === 'TEMPORARY') {
+  else if (key === 'TEMPORARY_A' || key === 'TEMPORARY_B' || key === 'TEMPORARY_C') {
     maFilingFee = num(row.FF);
     maPermitPurchase = num(row.Purchase) * unit;
     maPermitPossess = num(row.Possess) * unit;

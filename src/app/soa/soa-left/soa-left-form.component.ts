@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule, AbstractControl, FormControl } from '@angular/forms';
-import { Subject, combineLatest } from 'rxjs';
+import { Subject, combineLatest, interval } from 'rxjs';
 import { startWith, takeUntil } from 'rxjs/operators';
 
 import { SoaService } from '../soa.service';
@@ -172,9 +172,12 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const periodFromCtrl = this.form.get('periodFrom');
     if (!periodFromCtrl) return;
 
-    periodFromCtrl.valueChanges
-      .pipe(startWith(periodFromCtrl.value), takeUntil(this.destroy$))
-      .subscribe((expiryDate) => {
+    combineLatest([
+      periodFromCtrl.valueChanges.pipe(startWith(periodFromCtrl.value)),
+      interval(60 * 1000).pipe(startWith(0)),
+    ])
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(([expiryDate]) => {
         const delayMonths = this.computeDelayMonthsFromNow(expiryDate);
         this.form.get('delayMonths')?.setValue(delayMonths, { emitEvent: true });
       });
@@ -238,8 +241,8 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
     if (hasMod || hasRenew || hasNew) {
       this.setTxnEverywhere({
-        txnNew: hasNew && !hasMod && !hasRenew,
-        txnRenew: hasRenew && !hasMod,
+        txnNew: hasNew && !hasRenew,
+        txnRenew: hasRenew,
         txnModification: hasMod,
       });
       return;
@@ -472,9 +475,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
         toCtrl.setValue(computedTo, { emitEvent: false });
         coveredCtrl.setValue(this.computeDateRange(from, computedTo), { emitEvent: false });
-
-        const delayMonths = this.computeDelayMonthsFromNow(from);
-        this.form.get('delayMonths')?.setValue(delayMonths, { emitEvent: true });
       });
   }
 
@@ -822,6 +822,9 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       const extraDays = Math.round(fraction * 365.25);
       d.setDate(d.getDate() + extraDays);
     }
+
+    // Inclusive coverage: a 1-year term starting on March 2 ends on March 1 next year.
+    d.setDate(d.getDate() - 1);
 
     return this.toYmd(d);
   }

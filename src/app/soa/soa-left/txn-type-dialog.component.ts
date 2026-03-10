@@ -8,10 +8,16 @@ export type TxnTypeDialogResult = {
   value: TxnType[];
   purchasePossess?: boolean;
   purchasePossessUnits?: number;
+  sellTransfer?: boolean;
+  sellTransferUnits?: number;
+  possessStorage?: boolean;
+  possessStorageUnits?: number;
 };
 
 type TxnTypeDialogData = {
   showPurchasePossess?: boolean;
+  showSellTransfer?: boolean;
+  showPossessStorage?: boolean;
   contextTitle?: string;
 };
 
@@ -80,6 +86,62 @@ type TxnTypeDialogData = {
           <span class="txt">Renew</span>
         </label>
 
+        <div class="ppWrap" *ngIf="showSellTransfer">
+          <label class="row" (click)="$event.preventDefault(); toggleSellTransfer()">
+            <input
+              type="checkbox"
+              class="cb"
+              [checked]="sellTransfer"
+              tabindex="-1"
+              aria-hidden="true"
+            />
+            <span class="box" [class.on]="sellTransfer"></span>
+            <span class="txt">Permit to Sell/Transfer</span>
+          </label>
+
+          <div class="unitsRow" *ngIf="sellTransfer">
+            <label class="unitsLabel" for="stUnits">Unit:</label>
+            <input
+              id="stUnits"
+              type="number"
+              class="unitsInput"
+              min="1"
+              step="1"
+              [value]="sellTransferUnits"
+              (click)="$event.stopPropagation()"
+              (input)="onSellTransferUnitsInput($event)"
+            />
+          </div>
+        </div>
+
+        <div class="ppWrap" *ngIf="showPossessStorage">
+          <label class="row" (click)="$event.preventDefault(); togglePossessStorage()">
+            <input
+              type="checkbox"
+              class="cb"
+              [checked]="possessStorage"
+              tabindex="-1"
+              aria-hidden="true"
+            />
+            <span class="box" [class.on]="possessStorage"></span>
+            <span class="txt">Possess(Storage)</span>
+          </label>
+
+          <div class="unitsRow" *ngIf="possessStorage">
+            <label class="unitsLabel" for="psUnits">Unit:</label>
+            <input
+              id="psUnits"
+              type="number"
+              class="unitsInput"
+              min="1"
+              step="1"
+              [value]="possessStorageUnits"
+              (click)="$event.stopPropagation()"
+              (input)="onPossessStorageUnitsInput($event)"
+            />
+          </div>
+        </div>
+
         <label class="row" (click)="$event.preventDefault(); toggle('MOD')">
           <input
             type="checkbox"
@@ -108,12 +170,13 @@ type TxnTypeDialogData = {
   `,
   styles: [`
     .dlg {
-      width: 520px;
-      max-width: 92vw;
+      width: 100%;
+      max-width: 100%;
       padding: 14px;
       font-family: Arial, sans-serif;
       background: #fff;
       box-sizing: border-box;
+      overflow-x: hidden;
     }
 
     .dlgHead {
@@ -136,7 +199,7 @@ type TxnTypeDialogData = {
     }
 
     .list.twoCol {
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       align-items: start;
     }
 
@@ -152,12 +215,14 @@ type TxnTypeDialogData = {
       padding: 0;
       border: none;
       background: transparent;
+      min-width: 0;
     }
 
     .ppWrap {
       display: grid;
       gap: 6px;
       align-content: start;
+      min-width: 0;
     }
 
     .unitsRow {
@@ -166,6 +231,7 @@ type TxnTypeDialogData = {
       gap: 8px;
       padding-left: 22px;
       margin-top: -2px;
+      min-width: 0;
     }
 
     .unitsLabel {
@@ -220,6 +286,7 @@ type TxnTypeDialogData = {
       display: flex;
       justify-content: flex-end;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .btn {
@@ -229,6 +296,7 @@ type TxnTypeDialogData = {
       background: #fff;
       border-radius: 6px;
       cursor: pointer;
+      flex: 0 0 auto;
     }
 
     .btn.primary {
@@ -247,8 +315,14 @@ export class TxnTypeDialogComponent {
   selected: TxnType[] = [];
   purchasePossess = false;
   purchasePossessUnits = 1;
+  sellTransfer = false;
+  sellTransferUnits = 1;
+  possessStorage = false;
+  possessStorageUnits = 1;
 
   readonly showPurchasePossess: boolean;
+  readonly showSellTransfer: boolean;
+  readonly showPossessStorage: boolean;
   readonly contextTitle: string;
 
   constructor(
@@ -256,6 +330,8 @@ export class TxnTypeDialogComponent {
     @Inject(MAT_DIALOG_DATA) private data: TxnTypeDialogData | null
   ) {
     this.showPurchasePossess = !!this.data?.showPurchasePossess;
+    this.showSellTransfer = !!this.data?.showSellTransfer;
+    this.showPossessStorage = !!this.data?.showPossessStorage;
     this.contextTitle = String(this.data?.contextTitle ?? '').trim();
   }
 
@@ -267,7 +343,13 @@ export class TxnTypeDialogComponent {
     if (this.purchasePossess) {
       return Number.isFinite(this.purchasePossessUnits) && this.purchasePossessUnits >= 1;
     }
-    return this.selected.length > 0;
+    if (this.sellTransfer) {
+      return Number.isFinite(this.sellTransferUnits) && this.sellTransferUnits >= 1;
+    }
+    if (this.possessStorage) {
+      return Number.isFinite(this.possessStorageUnits) && this.possessStorageUnits >= 1;
+    }
+    return this.selected.length > 0 || this.sellTransfer || this.possessStorage;
   }
 
   toggle(v: TxnType): void {
@@ -301,10 +383,38 @@ export class TxnTypeDialogComponent {
     }
   }
 
+  toggleSellTransfer(): void {
+    this.sellTransfer = !this.sellTransfer;
+
+    if (!this.sellTransfer) {
+      this.sellTransferUnits = 1;
+    }
+  }
+
+  togglePossessStorage(): void {
+    this.possessStorage = !this.possessStorage;
+
+    if (!this.possessStorage) {
+      this.possessStorageUnits = 1;
+    }
+  }
+
   onUnitsInput(event: Event): void {
     const input = event.target as HTMLInputElement;
     const n = Math.floor(Number(input.value));
     this.purchasePossessUnits = Number.isFinite(n) && n >= 1 ? n : 1;
+  }
+
+  onPossessStorageUnitsInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const n = Math.floor(Number(input.value));
+    this.possessStorageUnits = Number.isFinite(n) && n >= 1 ? n : 1;
+  }
+
+  onSellTransferUnitsInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const n = Math.floor(Number(input.value));
+    this.sellTransferUnits = Number.isFinite(n) && n >= 1 ? n : 1;
   }
 
   submit(): void {
@@ -314,6 +424,10 @@ export class TxnTypeDialogComponent {
       value: this.selected,
       purchasePossess: this.purchasePossess,
       purchasePossessUnits: this.purchasePossess ? this.purchasePossessUnits : undefined,
+      sellTransfer: this.sellTransfer,
+      sellTransferUnits: this.sellTransfer ? this.sellTransferUnits : undefined,
+      possessStorage: this.possessStorage,
+      possessStorageUnits: this.possessStorage ? this.possessStorageUnits : undefined,
     });
   }
 

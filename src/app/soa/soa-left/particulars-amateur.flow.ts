@@ -24,6 +24,7 @@ export function openAmateurParticularsFlow(
     const choiceUpper = choice.toUpperCase();
     const isAtRoc = choiceUpper === 'AT-ROC';
     const isSpecialPermit = choiceUpper.includes('SPECIAL PERMIT');
+    const isAtRslClass = /^AT-RSL CLASS [ABCD]$/.test(choiceUpper);
 
     const refTxn = dialog.open(TxnTypeDialogComponent, {
       width: '520px',
@@ -32,6 +33,8 @@ export function openAmateurParticularsFlow(
       restoreFocus: false,
       data: {
         showPurchasePossess: !isAtRoc && !isSpecialPermit,
+        showSellTransfer: isAtRslClass,
+        showPossessStorage: isAtRslClass,
         contextTitle: choice,
       },
     });
@@ -44,7 +47,11 @@ export function openAmateurParticularsFlow(
 
       const picked = Array.isArray(resTxn.value) ? resTxn.value : [];
       const purchasePossess = !!resTxn.purchasePossess;
-      const units = Math.max(1, Math.floor(Number(resTxn.purchasePossessUnits || 1)));
+      const sellTransfer = !!resTxn.sellTransfer;
+      const possessStorage = !!resTxn.possessStorage;
+      const purchasePossessUnits = Math.max(1, Math.floor(Number(resTxn.purchasePossessUnits || 1)));
+      const sellTransferUnits = Math.max(1, Math.floor(Number(resTxn.sellTransferUnits || 1)));
+      const possessStorageUnits = Math.max(1, Math.floor(Number(resTxn.possessStorageUnits || 1)));
 
       const txn: TxnType | undefined =
         (picked.includes('NEW') && 'NEW') ||
@@ -52,7 +59,7 @@ export function openAmateurParticularsFlow(
         (picked.includes('MOD') && 'MOD') ||
         undefined;
 
-      if (!txn && !purchasePossess) {
+      if (!txn && !purchasePossess && !sellTransfer && !possessStorage) {
         cancel();
         return;
       }
@@ -60,7 +67,15 @@ export function openAmateurParticularsFlow(
       let finalText = `Amateur - ${choice}`;
 
       if (purchasePossess) {
-        finalText += ` - Purchase and Possess - UNITS_${units}`;
+        finalText += ` - Purchase and Possess - UNITS_${purchasePossessUnits}`;
+      }
+
+      if (sellTransfer) {
+        finalText += ` - Permit to Sell/Transfer - UNITS_${sellTransferUnits}`;
+      }
+
+      if (possessStorage) {
+        finalText += ` - Permit to Possess for Storage of Amateur Radio Stations - UNITS_${possessStorageUnits}`;
       }
 
       if (txn) {

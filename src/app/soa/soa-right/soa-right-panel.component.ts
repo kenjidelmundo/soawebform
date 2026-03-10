@@ -14,8 +14,6 @@ import { SoaPdfService } from '../soa-pdf/soa-pdf.service';
 import { Subject, merge, interval } from 'rxjs';
 import { startWith, takeUntil, filter, map, distinctUntilChanged } from 'rxjs/operators';
 
-type TxnKey = 'NEW' | 'RENEW' | 'MOD';
-
 @Component({
   selector: 'app-soa-right-panel',
   standalone: true,
@@ -41,7 +39,7 @@ export class SoaRightPanelComponent implements OnInit, AfterViewInit, OnDestroy 
   ) {}
 
   ngOnInit(): void {
-    this.setupTxnSingleSelect();
+    this.setupTxnCheckboxRules();
     this.setupTxnAutoSyncPolling();
   }
 
@@ -76,9 +74,9 @@ export class SoaRightPanelComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   // ======================================================
-  // ✅ Right panel NEW/RENEW/MOD must be SINGLE SELECT
+  // Keep NEW and RENEW mutually exclusive. MOD is independent.
   // ======================================================
-  private setupTxnSingleSelect(): void {
+  private setupTxnCheckboxRules(): void {
     if (!this.form) return;
 
     const cNew = this.form.get('txnNew');
@@ -97,7 +95,35 @@ export class SoaRightPanelComponent implements OnInit, AfterViewInit, OnDestroy 
       .pipe(takeUntil(this.destroy$), filter(() => !this.txnGuard))
       .subscribe(({ key, v }) => {
         if (!v) return;
-        this.applyTxnKey(key);
+        const current = {
+          txnNew: !!cNew?.value,
+          txnRenew: !!cRen?.value,
+          txnModification: !!cMod?.value,
+        };
+
+        if (key === 'NEW') {
+          this.applyTxnState({
+            txnNew: true,
+            txnRenew: false,
+            txnModification: current.txnModification,
+          });
+          return;
+        }
+
+        if (key === 'RENEW') {
+          this.applyTxnState({
+            txnNew: false,
+            txnRenew: true,
+            txnModification: current.txnModification,
+          });
+          return;
+        }
+
+        this.applyTxnState({
+          txnNew: current.txnNew,
+          txnRenew: current.txnRenew,
+          txnModification: true,
+        });
       });
   }
 
@@ -126,20 +152,27 @@ export class SoaRightPanelComponent implements OnInit, AfterViewInit, OnDestroy 
             this.findStringInFormTree(this.form, ['txn', 'type']) ??
             this.findStringInFormTree(this.form, ['transaction', 'type']);
 
-          return this.normalizeTxn(txnTypeAny) || this.normalizeTxn(particularsText);
+          return this.normalizeTxnState(particularsText) || this.normalizeTxnState(txnTypeAny);
         }),
-        distinctUntilChanged()
+        distinctUntilChanged((a, b) =>
+          !!a &&
+          !!b &&
+          a.txnNew === b.txnNew &&
+          a.txnRenew === b.txnRenew &&
+          a.txnModification === b.txnModification
+        )
       )
-      .subscribe((key) => {
-        if (!key) return;
-        this.applyTxnKey(key);
+      .subscribe((state) => {
+        if (!state) return;
+        this.applyTxnState(state);
       });
   }
 
-  // ======================================================
-  // ✅ Apply txn selection
-  // ======================================================
-  private applyTxnKey(key: TxnKey): void {
+  private applyTxnState(state: {
+    txnNew: boolean;
+    txnRenew: boolean;
+    txnModification: boolean;
+  }): void {
     const cNew = this.form.get('txnNew');
     const cRen = this.form.get('txnRenew');
     const cMod = this.form.get('txnModification');
@@ -149,40 +182,65 @@ export class SoaRightPanelComponent implements OnInit, AfterViewInit, OnDestroy 
     this.txnGuard = true;
 
     const patch: any = {
-      txnNew: key === 'NEW',
-      txnRenew: key === 'RENEW',
-      txnModification: key === 'MOD',
+      txnNew: state.txnNew,
+      txnRenew: state.txnRenew,
+      txnModification: state.txnModification,
     };
 
     if (!cNew) delete patch.txnNew;
     if (!cRen) delete patch.txnRenew;
     if (!cMod) delete patch.txnModification;
 
-    if (this.form.get('txnType')) patch.txnType = key;
-    if (this.form.get('transactionType')) patch.transactionType = key;
+    if (this.form.get('txnType')) {
+      patch.txnType = state.txnRenew ? 'RENEW' : state.txnNew ? 'NEW' : state.txnModification ? 'MOD' : '';
+    }
+    if (this.form.get('transactionType')) {
+      patch.transactionType = state.txnRenew ? 'RENEW' : state.txnNew ? 'NEW' : state.txnModification ? 'MOD' : '';
+    }
 
     this.form.patchValue(patch, { emitEvent: false });
 
     this.txnGuard = false;
   }
 
-  // ======================================================
-  // ✅ FIX: RENEW must NOT become NEW
-  // ======================================================
-  private normalizeTxn(v: any): TxnKey | null {
+  private normalizeTxnState(v: any): {
+    txnNew: boolean;
+    txnRenew: boolean;
+    txnModification: boolean;
+  } | null {
     if (v === null || v === undefined) return null;
 
     const s = String(v).trim().toUpperCase();
+    if (!s) return null;
 
-    if (s === 'RENEW' || s === 'RENEWAL') return 'RENEW';
-    if (s === 'MOD' || s === 'MODIFICATION') return 'MOD';
-    if (s === 'NEW') return 'NEW';
+    const hasRenew =
+      s === 'RENEW' ||
+      s === 'RENEWAL' ||
+      /\bRENEW(AL)?\b/.test(s) ||
+      s.includes('REVALID') ||
+      s.includes('EXTEND') ||
+      s.includes('REISSUE') ||
+      s.includes('RE-ISSUE');
 
-    if (/\bRENEW(AL)?\b/.test(s)) return 'RENEW';
-    if (/\bMOD(IFICATION)?\b/.test(s)) return 'MOD';
-    if (/\bNEW\b/.test(s)) return 'NEW';
+    const hasMod =
+      s === 'MOD' ||
+      s === 'MODIFICATION' ||
+      /\bMOD(IFICATION)?\b/.test(s) ||
+      s.includes('MODIFIED') ||
+      s.includes('MODIF') ||
+      s.includes('AMEND') ||
+      s.includes('CHANGE') ||
+      s.includes('CORRECTION');
 
-    return null;
+    const hasNew = s === 'NEW' || /\bNEW\b/.test(s) || s.includes('NEW APPLICATION');
+
+    if (!hasNew && !hasRenew && !hasMod) return null;
+
+    return {
+      txnNew: hasNew && !hasRenew,
+      txnRenew: hasRenew,
+      txnModification: hasMod,
+    };
   }
 
   // -----------------------

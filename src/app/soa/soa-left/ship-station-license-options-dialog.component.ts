@@ -24,7 +24,7 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
   template: `
     <div class="dlg">
       <div class="title">Ship Station License</div>
-      <div class="sub">Choose transaction + power (Domestic)</div>
+      <div class="sub">Choose transaction + power / option</div>
 
       <div class="grid">
         <!-- TRANSACTION -->
@@ -56,9 +56,9 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
           </label>
         </div>
 
-        <!-- POWER -->
+        <!-- POWER / OPTION -->
         <div class="col">
-          <div class="head">Powered</div>
+          <div class="head">Powered / Option</div>
 
           <label class="row" (click)="pickPower('HIGH_POWERED')">
             <input class="cb" type="checkbox" [checked]="power==='HIGH_POWERED'" tabindex="-1" aria-hidden="true" />
@@ -77,6 +77,14 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
             <span class="box" [class.on]="power==='LOW_POWERED'"></span>
             <span class="txt">Low Powered</span>
           </label>
+
+          <div class="divider"></div>
+
+          <label class="row" (click)="pickPower('SESCL_LRIT_SSAS_SESFB')">
+            <input class="cb" type="checkbox" [checked]="power==='SESCL_LRIT_SSAS_SESFB'" tabindex="-1" aria-hidden="true" />
+            <span class="box" [class.on]="power==='SESCL_LRIT_SSAS_SESFB'"></span>
+            <span class="txt">SESCL / LRIT / SSAS / SESFB</span>
+          </label>
         </div>
       </div>
 
@@ -87,10 +95,9 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
     </div>
   `,
   styles: [`
-    /* ✅ component itself is compact */
     .dlg{
-      width: 460px;
-      max-width: 92vw;
+      width: 520px;
+      max-width: 94vw;
       padding: 12px 14px;
       box-sizing: border-box;
       font-family: Arial, sans-serif;
@@ -98,8 +105,17 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
       overflow: hidden;
     }
 
-    .title{ font-size: 26px; font-weight: 800; margin: 0; }
-    .sub{ font-size: 13px; color:#333; margin: 2px 0 10px; }
+    .title{
+      font-size: 26px;
+      font-weight: 800;
+      margin: 0;
+    }
+
+    .sub{
+      font-size: 13px;
+      color:#333;
+      margin: 2px 0 10px;
+    }
 
     .grid{
       display:grid;
@@ -109,8 +125,17 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
       margin-top: 2px;
     }
 
-    .head{ font-weight: 800; font-size: 15px; margin: 0 0 6px; }
-    .col{ display:grid; gap: 6px; min-width: 0; }
+    .head{
+      font-weight: 800;
+      font-size: 15px;
+      margin: 0 0 6px;
+    }
+
+    .col{
+      display:grid;
+      gap: 6px;
+      min-width: 0;
+    }
 
     .row{
       display:flex;
@@ -126,12 +151,23 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
       min-width: 0;
     }
 
-    .txt{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .txt{
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
 
-    .cb{ position:absolute; opacity:0; width:0; height:0; pointer-events:none; }
+    .cb{
+      position:absolute;
+      opacity:0;
+      width:0;
+      height:0;
+      pointer-events:none;
+    }
 
     .box{
-      width: 14px; height: 14px;
+      width: 14px;
+      height: 14px;
       border: 1px solid #333;
       border-radius: 2px;
       background:#fff;
@@ -143,11 +179,19 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
     .box.on::after{
       content:"";
       position:absolute;
-      left: 3px; top: 3px;
-      width: 7px; height: 4px;
+      left: 3px;
+      top: 3px;
+      width: 7px;
+      height: 4px;
       border-left: 2px solid #2f74ff;
       border-bottom: 2px solid #2f74ff;
       transform: rotate(-45deg);
+    }
+
+    .divider{
+      height: 1px;
+      background: #d9d9d9;
+      margin: 6px 0 4px;
     }
 
     .foot{
@@ -165,8 +209,17 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
       border-radius: 6px;
       cursor:pointer;
     }
-    .btn.primary{ border-color:#2f74ff; background:#2f74ff; color:#fff; }
-    .btn:disabled{ opacity:.55; cursor:not-allowed; }
+
+    .btn.primary{
+      border-color:#2f74ff;
+      background:#2f74ff;
+      color:#fff;
+    }
+
+    .btn:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+    }
   `],
 })
 export class ShipStationLicenseOptionsDialogComponent {
@@ -180,13 +233,20 @@ export class ShipStationLicenseOptionsDialogComponent {
     >
   ) {}
 
-  pickTxn(v: ShipTxn) { this.txn = v; }
-  pickPower(v: ShipPower) { this.power = v; }
+  pickTxn(v: ShipTxn): void {
+    this.txn = v;
+  }
 
-  submit() {
+  pickPower(v: ShipPower): void {
+    this.power = v;
+  }
+
+  submit(): void {
     if (!this.txn || !this.power) return;
     this.ref.close({ txn: this.txn, power: this.power });
   }
 
-  close() { this.ref.close(); }
+  close(): void {
+    this.ref.close();
+  }
 }

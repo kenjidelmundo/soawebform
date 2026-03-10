@@ -69,9 +69,6 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     const txnRenewCtrl = this.ctrl('txnRenew');
     const txnModCtrl = this.ctrl('txnModification');
 
-    // IMPORTANT:
-    // delayMonths must come from parent form / left form
-    // left form computes it from periodFrom (expiry date) up to now
     const delayMonthsCtrl = this.ctrl('delayMonths');
 
     if (!particulars || !yearsCtrl) return;
@@ -320,12 +317,26 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
             SHIP_STATION as Record<string, ShipStationRow>
           );
 
-          this.patch(res.PUR, 'licPermitToPurchase');
+          this.patch(res.Purchase, 'licPermitToPurchase');
           this.patch(res.FF, 'licFilingFee');
-          this.patch(res.POS, 'licPermitToPossess');
+          this.patch(res.Possess, 'licPermitToPossess');
           this.patch(res.CPF, 'licConstructionPermitFee');
-          this.patch(res.LFIF, 'licRadioStationLicense');
+
+          // ✅ FIXED: separate LF and IF
+          this.patch(res.LF, 'licRadioStationLicense');
+          this.patch(res.IF, 'licInspectionFee');
+
+          this.patch(0, 'licSUF');
+          this.patch(0, 'licFinesPenalties');
           this.patch(res.SUR, 'licSurcharges');
+          this.patch(0, 'appRegistrationFee');
+          this.patch(0, 'appSupervisionRegulationFee');
+          this.patch(0, 'appVerificationAuthFee');
+          this.patch(0, 'appExaminationFee');
+          this.patch(0, 'appClearanceCertificationFee');
+          this.patch(res.MOD, 'appModificationFee');
+          this.patch(0, 'appMiscIncome');
+          this.patch(0, 'appOthers');
           this.patch(res.DST, 'dst');
 
           this.patch(this.computeTotalAmount(), 'totalAmount');
@@ -366,6 +377,9 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
 
   private txnFromText(text: string): PickedTxn {
     const up = text.toUpperCase();
+
+    if (up.includes('PURCHASE') && up.includes('POSSESS')) return 'PURCHASE_POSSESS';
+    if (up.includes('DUPLICATE')) return 'DUPLICATE';
     if (up.includes('RENEW') || up.includes('REN')) return 'RENEW';
     if (up.includes('MOD')) return 'MOD';
     return 'NEW';

@@ -59,7 +59,7 @@ export type ShipResult = {
 export type ParsedShipText = {
   kind: 'SSL' | 'COASTAL_RT' | 'COASTAL_RP' | 'DEL';
   scope?: 'DOMESTIC' | 'INTERNATIONAL';
-  power?: 'HIGH' | 'MEDIUM' | 'LOW';
+  power?: 'HIGH' | 'MEDIUM' | 'LOW' | 'SESCL';
   band?: 'HF' | 'VHF';
   txn?: PickedTxn;
 };
@@ -131,13 +131,16 @@ export function parseParticularsText(text: string): ParsedShipText | null {
     const scope: 'DOMESTIC' | 'INTERNATIONAL' =
       t.includes('INTERNATIONAL') ? 'INTERNATIONAL' : 'DOMESTIC';
 
-    const power: 'HIGH' | 'MEDIUM' | 'LOW' | null = t.includes('HIGH POWERED')
-      ? 'HIGH'
-      : t.includes('MEDIUM POWERED')
-      ? 'MEDIUM'
-      : t.includes('LOW POWERED')
-      ? 'LOW'
-      : null;
+    const power: 'HIGH' | 'MEDIUM' | 'LOW' | 'SESCL' | null =
+      t.includes('SESCL/LRIT/SSAS/SESFB')
+        ? 'SESCL'
+        : t.includes('HIGH POWERED')
+        ? 'HIGH'
+        : t.includes('MEDIUM POWERED')
+        ? 'MEDIUM'
+        : t.includes('LOW POWERED')
+        ? 'LOW'
+        : null;
 
     if (!power || !txn) return null;
 
@@ -146,13 +149,14 @@ export function parseParticularsText(text: string): ParsedShipText | null {
 
   if (t.startsWith('COASTAL STATION LICENSE')) {
     if (t.includes('RADIO TELEGRAPHY')) {
-      const power: 'HIGH' | 'MEDIUM' | 'LOW' | null = t.includes('HIGH POWERED')
-        ? 'HIGH'
-        : t.includes('MEDIUM POWERED')
-        ? 'MEDIUM'
-        : t.includes('LOW POWERED')
-        ? 'LOW'
-        : null;
+      const power: 'HIGH' | 'MEDIUM' | 'LOW' | null =
+        t.includes('HIGH POWERED')
+          ? 'HIGH'
+          : t.includes('MEDIUM POWERED')
+          ? 'MEDIUM'
+          : t.includes('LOW POWERED')
+          ? 'LOW'
+          : null;
 
       if (!power || !txn) return null;
 
@@ -177,12 +181,28 @@ export function rowKeyFromParsed(p: ParsedShipText): string {
 
   if (p.kind === 'SSL') {
     const scope = p.scope === 'INTERNATIONAL' ? 'INT' : 'DOM';
-    const pow = p.power === 'HIGH' ? 'HIGH' : p.power === 'MEDIUM' ? 'MED' : 'LOW';
+
+    if (p.power === 'SESCL') {
+      return 'SSL-INT-SESCL';
+    }
+
+    const pow =
+      p.power === 'HIGH'
+        ? 'HIGH'
+        : p.power === 'MEDIUM'
+        ? 'MED'
+        : 'LOW';
+
     return `SSL-${scope}-${pow}`;
   }
 
   if (p.kind === 'COASTAL_RT') {
-    const pow = p.power === 'HIGH' ? 'HIGH' : p.power === 'MEDIUM' ? 'MED' : 'LOW';
+    const pow =
+      p.power === 'HIGH'
+        ? 'HIGH'
+        : p.power === 'MEDIUM'
+        ? 'MED'
+        : 'LOW';
     return `PCS-RT-${pow}`;
   }
 
@@ -190,31 +210,59 @@ export function rowKeyFromParsed(p: ParsedShipText): string {
 }
 
 // ----------------------------------------------------
-// COMPUTE
+// SURCHARGE BY DELAY
+// Note:
+// 1 day to 6 months after expiration     = 50% of LF
+// 6 months + 1 day to 12 months          = 100% of LF
+// thereafter, additional 50% every 6 mos
 // ----------------------------------------------------
-// Charter logic:
-// NEW without equipment  = CPF + LF + IF + DST
-// NEW with equipment     = FF + Purchase + Possess + CPF + LF + IF + DST
-// RENEW                  = LF + IF + DST + SUR
-// MOD                    = FF + CPF + MOD + DST
-// PURCHASE/POSSESS only  = FF + Purchase + Possess + DST
-// DELETION               = FF + CERT + DST
+export function getSurchargeFromDelay(lfTotal: number, delayMonths: number): number {
+  const months = Math.max(0, Math.floor(num(delayMonths)));
+  if (months <= 0) return 0;
+
+  const blocksOfSixMonths = Math.ceil(months / 6);
+  return round2(lfTotal * (blocksOfSixMonths * 0.5));
+}
+
+// ----------------------------------------------------
+// COMPUTE
+// A.1 / C.1 Purchase-Possess only
+//   = FF(unit) + Purchase(unit) + Possess(unit) + DST
 //
-// DUPLICATE is not clearly shown in your screenshot.
-// For now, safest implementation = FF + MOD + DST
-// You can change that later if your office uses another rule.
+// A.2 / C.2 New without equipment
+//   = CPF + LF(years) + IF(years) + DST
+//
+// A.3 / B.2 New with equipment
+//   = FF(unit) + Purchase(unit) + Possess(unit) + CPF + LF(years) + IF(years) + DST
+//
+// A.4 / B.1 / C.3 Renew
+//   = LF(years) + IF(years) + DST + SUR
+//
+// A.5 / C.4 Mod
+//   = FF + CPF + MOD + DST
+//
+// F. Deletion
+//   = FF + CERT + DST
+//
+// DUPLICATE
+//   = FF + MOD + DST
+// ----------------------------------------------------
 export function computeShipStation(
   ship: ShipParse,
   years: number,
   txn: TxnFlags,
-  SHIP_STATION: Record<string, ShipStationRow>
+  SHIP_STATION: Record<string, ShipStationRow>,
+  delayMonths: number = 0
 ): ShipResult {
-  const row = SHIP_STATION[ship.rowKey] ?? SHIP_STATION['SSL-DOM-HIGH'];
+  const row =
+    SHIP_STATION[ship.rowKey] ??
+    (ship.rowKey === 'SSL-INT-SESCL'
+      ? SHIP_STATION['SSL-INT-SESCL']
+      : SHIP_STATION['SSL-DOM-HIGH']);
 
   const units = Math.max(1, Math.floor(num(ship.units) || 1));
   const validYears = Math.max(1, Math.floor(num(years) || 1));
   const withEquip = !!ship.withEquipment;
-  const SUR_RATE = ship.sur100 ? num(row.SUR100) : num(row.SUR50);
 
   let FF = 0;
   let Purchase = 0;
@@ -243,7 +291,7 @@ export function computeShipStation(
   } else if (txn.txnRenew) {
     LF = num(row.LF) * validYears;
     IF = num(row.IF) * validYears;
-    SUR = SUR_RATE;
+    SUR = getSurchargeFromDelay(LF, delayMonths);
   } else if (txn.txnDuplicate) {
     FF = num(row.FF);
     MOD = num(row.MOD);
@@ -285,31 +333,175 @@ export function computeShipStation(
 }
 
 // ----------------------------------------------------
-// TABLE
+// RATE TABLE
 // ----------------------------------------------------
 export const SHIP_STATION: Record<string, ShipStationRow> = {
   // Ships in Domestic Trade
-  'SSL-DOM-HIGH': { FF: 180, Purchase: 240, Possess: 120, CPF: 720, LF: 840, IF: 720, MOD: 180, DST: 30, SUR50: 420, SUR100: 840 },
-  'SSL-DOM-MED':  { FF: 180, Purchase: 120, Possess: 96,  CPF: 600, LF: 720, IF: 720, MOD: 180, DST: 30, SUR50: 360, SUR100: 720 },
-  'SSL-DOM-LOW':  { FF: 180, Purchase: 96,  Possess: 60,  CPF: 480, LF: 600, IF: 720, MOD: 180, DST: 30, SUR50: 300, SUR100: 600 },
+  'SSL-DOM-HIGH': {
+    FF: 180,
+    Purchase: 240,
+    Possess: 120,
+    CPF: 720,
+    LF: 840,
+    IF: 720,
+    MOD: 180,
+    DST: 30,
+    SUR50: 420,
+    SUR100: 840,
+  },
+  'SSL-DOM-MED': {
+    FF: 180,
+    Purchase: 120,
+    Possess: 96,
+    CPF: 600,
+    LF: 720,
+    IF: 720,
+    MOD: 180,
+    DST: 30,
+    SUR50: 360,
+    SUR100: 720,
+  },
+  'SSL-DOM-LOW': {
+    FF: 180,
+    Purchase: 96,
+    Possess: 60,
+    CPF: 480,
+    LF: 600,
+    IF: 720,
+    MOD: 180,
+    DST: 30,
+    SUR50: 300,
+    SUR100: 600,
+  },
 
   // Ships in International Trade
-  'SSL-INT-HIGH': { FF: 180, Purchase: 240, Possess: 120, CPF: 1200, LF: 1500, IF: 1200, MOD: 180, DST: 30, SUR50: 750, SUR100: 1500 },
-  'SSL-INT-MED':  { FF: 180, Purchase: 120, Possess: 96,  CPF: 1200, LF: 1500, IF: 1200, MOD: 180, DST: 30, SUR50: 750, SUR100: 1500 },
-  'SSL-INT-LOW':  { FF: 180, Purchase: 96,  Possess: 60,  CPF: 1200, LF: 1500, IF: 1200, MOD: 180, DST: 30, SUR50: 750, SUR100: 1500 },
+  'SSL-INT-HIGH': {
+    FF: 180,
+    Purchase: 240,
+    Possess: 120,
+    CPF: 1200,
+    LF: 1500,
+    IF: 1200,
+    MOD: 180,
+    DST: 30,
+    SUR50: 750,
+    SUR100: 1500,
+  },
+  'SSL-INT-MED': {
+    FF: 180,
+    Purchase: 120,
+    Possess: 96,
+    CPF: 1200,
+    LF: 1500,
+    IF: 1200,
+    MOD: 180,
+    DST: 30,
+    SUR50: 750,
+    SUR100: 1500,
+  },
+  'SSL-INT-LOW': {
+    FF: 180,
+    Purchase: 96,
+    Possess: 60,
+    CPF: 1200,
+    LF: 1500,
+    IF: 1200,
+    MOD: 180,
+    DST: 30,
+    SUR50: 750,
+    SUR100: 1500,
+  },
 
-  // SESCL/LRIT/SSAS/SESFB
-  'SSL-INT-SESCL': { FF: 180, Purchase: 360, Possess: 360, CPF: 1200, LF: 1440, IF: 1200, MOD: 180, DST: 30, SUR50: 720, SUR100: 1440 },
+  // International SESCL / LRIT / SSAS / SESFB
+  'SSL-INT-SESCL': {
+    FF: 180,
+    Purchase: 360,
+    Possess: 360,
+    CPF: 1200,
+    LF: 1440,
+    IF: 1200,
+    MOD: 180,
+    DST: 30,
+    SUR50: 720,
+    SUR100: 1440,
+  },
 
   // Private Coastal Station: Radio Telegraphy
-  'PCS-RT-HIGH': { FF: 180, Purchase: 240, Possess: 120, CPF: 1320, LF: 1440, IF: 720, MOD: 180, DST: 30, SUR50: 720, SUR100: 1440 },
-  'PCS-RT-MED':  { FF: 180, Purchase: 120, Possess: 96,  CPF: 960,  LF: 1200, IF: 720, MOD: 180, DST: 30, SUR50: 600, SUR100: 1200 },
-  'PCS-RT-LOW':  { FF: 180, Purchase: 96,  Possess: 60,  CPF: 600,  LF: 1080, IF: 720, MOD: 180, DST: 30, SUR50: 540, SUR100: 1080 },
+  'PCS-RT-HIGH': {
+    FF: 180,
+    Purchase: 240,
+    Possess: 120,
+    CPF: 1320,
+    LF: 1440,
+    IF: 720,
+    MOD: 180,
+    DST: 30,
+    SUR50: 720,
+    SUR100: 1440,
+  },
+  'PCS-RT-MED': {
+    FF: 180,
+    Purchase: 120,
+    Possess: 96,
+    CPF: 960,
+    LF: 1200,
+    IF: 720,
+    MOD: 180,
+    DST: 30,
+    SUR50: 600,
+    SUR100: 1200,
+  },
+  'PCS-RT-LOW': {
+    FF: 180,
+    Purchase: 96,
+    Possess: 60,
+    CPF: 600,
+    LF: 1080,
+    IF: 720,
+    MOD: 180,
+    DST: 30,
+    SUR50: 540,
+    SUR100: 1080,
+  },
 
   // Private Coastal Station: Radio Telephony
-  'PCS-RP-HF':  { FF: 180, Purchase: 120, Possess: 96, CPF: 480, LF: 720, IF: 720, MOD: 180, DST: 30, SUR50: 360, SUR100: 720 },
-  'PCS-RP-VHF': { FF: 180, Purchase: 120, Possess: 96, CPF: 480, LF: 480, IF: 480, MOD: 180, DST: 30, SUR50: 240, SUR100: 480 },
+  'PCS-RP-HF': {
+    FF: 180,
+    Purchase: 120,
+    Possess: 96,
+    CPF: 480,
+    LF: 720,
+    IF: 720,
+    MOD: 180,
+    DST: 30,
+    SUR50: 360,
+    SUR100: 720,
+  },
+  'PCS-RP-VHF': {
+    FF: 180,
+    Purchase: 120,
+    Possess: 96,
+    CPF: 480,
+    LF: 480,
+    IF: 480,
+    MOD: 180,
+    DST: 30,
+    SUR50: 240,
+    SUR100: 480,
+  },
 
   // Certificate Fees
-  'CERT-DEL': { FF: 180, Purchase: 0, Possess: 0, CPF: 0, LF: 0, IF: 0, MOD: 0, DST: 30, SUR50: 0, SUR100: 0, CERT: 200 },
+  'CERT-DEL': {
+    FF: 180,
+    Purchase: 0,
+    Possess: 0,
+    CPF: 0,
+    LF: 0,
+    IF: 0,
+    MOD: 0,
+    DST: 30,
+    SUR50: 0,
+    SUR100: 0,
+    CERT: 200,
+  },
 };
