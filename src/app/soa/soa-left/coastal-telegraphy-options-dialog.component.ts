@@ -3,11 +3,18 @@ import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 
 export type ShipTxn = 'NEW' | 'RENEW' | 'MOD' | 'DUPLICATE';
-export type CoastalTelegraphyPower = 'HIGH_POWERED' | 'MEDIUM_POWERED' | 'LOW_POWERED';
+export type CoastalService = 'RADIO_TELEGRAPHY' | 'RADIO_TELEPHONY';
+export type CoastalPower =
+  | 'HIGH_POWERED'
+  | 'MEDIUM_POWERED'
+  | 'LOW_POWERED'
+  | 'HF'
+  | 'VHF';
 
 export type CoastalTelegraphyOptionsResult = {
   txn: ShipTxn;
-  power: CoastalTelegraphyPower;
+  power: CoastalPower;
+  service: CoastalService;
 };
 
 @Component({
@@ -16,8 +23,8 @@ export type CoastalTelegraphyOptionsResult = {
   imports: [CommonModule],
   template: `
     <div class="dlg">
-      <div class="title">Coastal Station - Radio Telegraphy</div>
-      <div class="sub">Choose transaction + powered</div>
+      <div class="title">Coastal Station License</div>
+      <div class="sub">Choose service + transaction + powered/band</div>
 
       <div class="grid">
         <!-- LEFT -->
@@ -49,26 +56,59 @@ export type CoastalTelegraphyOptionsResult = {
           </label>
         </div>
 
-        <!-- RIGHT -->
+        <!-- POWER / BAND -->
         <div class="col">
-          <div class="head">Powered</div>
+          <div class="head">{{ service === 'RADIO_TELEGRAPHY' ? 'Powered' : 'Band' }}</div>
 
-          <label class="row" (click)="pickPower('HIGH_POWERED')">
-            <input class="cb" type="checkbox" [checked]="power==='HIGH_POWERED'" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="power==='HIGH_POWERED'"></span>
-            <span class="txt">High Powered</span>
+          <ng-container *ngIf="service === 'RADIO_TELEGRAPHY'; else telephony">
+            <label class="row" (click)="pickPower('HIGH_POWERED')">
+              <input class="cb" type="checkbox" [checked]="power==='HIGH_POWERED'" tabindex="-1" aria-hidden="true" />
+              <span class="box" [class.on]="power==='HIGH_POWERED'"></span>
+              <span class="txt">High Powered</span>
+            </label>
+
+            <label class="row" (click)="pickPower('MEDIUM_POWERED')">
+              <input class="cb" type="checkbox" [checked]="power==='MEDIUM_POWERED'" tabindex="-1" aria-hidden="true" />
+              <span class="box" [class.on]="power==='MEDIUM_POWERED'"></span>
+              <span class="txt">Medium Powered</span>
+            </label>
+
+            <label class="row" (click)="pickPower('LOW_POWERED')">
+              <input class="cb" type="checkbox" [checked]="power==='LOW_POWERED'" tabindex="-1" aria-hidden="true" />
+              <span class="box" [class.on]="power==='LOW_POWERED'"></span>
+              <span class="txt">Low Powered</span>
+            </label>
+          </ng-container>
+
+          <ng-template #telephony>
+            <label class="row" (click)="pickPower('HF')">
+              <input class="cb" type="checkbox" [checked]="power==='HF'" tabindex="-1" aria-hidden="true" />
+              <span class="box" [class.on]="power==='HF'"></span>
+              <span class="txt">HF</span>
+            </label>
+
+            <label class="row" (click)="pickPower('VHF')">
+              <input class="cb" type="checkbox" [checked]="power==='VHF'" tabindex="-1" aria-hidden="true" />
+              <span class="box" [class.on]="power==='VHF'"></span>
+              <span class="txt">VHF</span>
+            </label>
+          </ng-template>
+        </div>
+
+        <!-- SERVICE -->
+        <div class="col">
+          <div class="head">Service</div>
+
+          <label class="row" (click)="pickService('RADIO_TELEGRAPHY')">
+            <input class="cb" type="checkbox" [checked]="service==='RADIO_TELEGRAPHY'" tabindex="-1" aria-hidden="true" />
+            <span class="box" [class.on]="service==='RADIO_TELEGRAPHY'"></span>
+            <span class="txt">Radio Telegraphy</span>
           </label>
 
-          <label class="row" (click)="pickPower('MEDIUM_POWERED')">
-            <input class="cb" type="checkbox" [checked]="power==='MEDIUM_POWERED'" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="power==='MEDIUM_POWERED'"></span>
-            <span class="txt">Medium Powered</span>
-          </label>
-
-          <label class="row" (click)="pickPower('LOW_POWERED')">
-            <input class="cb" type="checkbox" [checked]="power==='LOW_POWERED'" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="power==='LOW_POWERED'"></span>
-            <span class="txt">Low Powered</span>
+          <label class="row" (click)="pickService('RADIO_TELEPHONY')">
+            <input class="cb" type="checkbox" [checked]="service==='RADIO_TELEPHONY'" tabindex="-1" aria-hidden="true" />
+            <span class="box" [class.on]="service==='RADIO_TELEPHONY'"></span>
+            <span class="txt">Radio Telephony</span>
           </label>
         </div>
       </div>
@@ -94,7 +134,7 @@ export type CoastalTelegraphyOptionsResult = {
     .title{ font-size: 22px; font-weight: 800; margin: 2px 0; }
     .sub{ font-size: 13px; margin: 0 0 10px; opacity:.9; }
 
-    .grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items:start; }
+    .grid{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; align-items:start; }
     .col{ display:grid; gap: 6px; }
     .head{ font-weight: 800; font-size: 14px; margin-bottom: 6px; }
     .row{ display:flex; align-items:center; gap: 10px; cursor:pointer; user-select:none; font-weight:700; font-size:14px; }
@@ -111,18 +151,25 @@ export type CoastalTelegraphyOptionsResult = {
 })
 export class CoastalTelegraphyOptionsDialogComponent {
   txn: ShipTxn | null = null;
-  power: CoastalTelegraphyPower | null = null;
+  power: CoastalPower | null = null;
+  service: CoastalService = 'RADIO_TELEGRAPHY';
 
   constructor(
     private ref: MatDialogRef<CoastalTelegraphyOptionsDialogComponent, CoastalTelegraphyOptionsResult>
   ) {}
 
   pickTxn(v: ShipTxn) { this.txn = v; }
-  pickPower(v: CoastalTelegraphyPower) { this.power = v; }
+  pickPower(v: CoastalPower) { this.power = v; }
+
+  pickService(v: CoastalService) {
+    this.service = v;
+    // reset power when switching services
+    this.power = null;
+  }
 
   submit() {
-    if (!this.txn || !this.power) return;
-    this.ref.close({ txn: this.txn, power: this.power });
+    if (!this.txn || !this.power || !this.service) return;
+    this.ref.close({ txn: this.txn, power: this.power, service: this.service });
   }
 
   close() { this.ref.close(); }

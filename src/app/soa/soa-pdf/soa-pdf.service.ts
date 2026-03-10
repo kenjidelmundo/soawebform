@@ -189,32 +189,19 @@ export class SoaPdfService {
 
         this.createSoaTable(soa),
 
-        { text: 'NOTE: To be paid on or before the due date otherwise subject to reassessment.', fontSize: 5.6, margin: [0, 2, 0, 1] },
-
-        // ✅ NOW TICKS WHEN TRUE
         {
-          columns: [
-            { columns: [this.cb(forAssessmentOnly), { text: 'For Assessment Only', fontSize: 5.6 }], columnGap: 2 },
-            { columns: [this.cb(endorsedForPayment), { text: 'Endorsed for Payment', fontSize: 5.6 }], columnGap: 2 },
+          stack: [
+            { text: 'NOTE: To be paid on or before the due date otherwise subject to reassessment.', fontSize: 5.6, margin: [0, 1.2, 0, 1] },
+            {
+              columns: [
+                { columns: [this.cb(forAssessmentOnly), { text: 'For Assessment Only', fontSize: 5.6 }], columnGap: 2 },
+                { columns: [this.cb(endorsedForPayment), { text: 'Endorsed for Payment', fontSize: 5.6 }], columnGap: 2 },
+              ],
+              columnGap: 12,
+            },
           ],
-          columnGap: 10,
-          margin: [0, 0, 0, 0.5],
-        },
-
-        {
-          columns: [
-            { text: 'Prepared By:', bold: true, width: 56, fontSize: 5.8 },
-            { text: preparedBy, width: '*', fontSize: 5.8 },
-          ],
-          margin: [0, 0.2, 0, 0],
-        },
-        {
-          columns: [
-            { text: 'Approved By:', bold: true, width: 56, fontSize: 5.8 },
-            { text: approvedBy, width: '*', fontSize: 5.8 },
-          ],
-          margin: [0, 0.2, 0, 0],
-        },
+          margin: [0, 2, 0, 0],
+        }
       ],
     };
   }

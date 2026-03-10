@@ -4,7 +4,6 @@ import { MatDialogRef } from '@angular/material/dialog';
 
 export type ShipMain =
   | 'SHIP_STATION_LICENSE'
-  | 'SHIP_EARTH_STATION_LICENSE'
   | 'COASTAL_STATION_LICENSE'
   | 'DELETION_CERTIFICATE';
 
@@ -22,7 +21,6 @@ export type ShipStationMainDialogResult = { value: ShipMain };
         <button
           type="button"
           class="tile"
-          [class.on]="selected==='SHIP_STATION_LICENSE'"
           (click)="pick('SHIP_STATION_LICENSE')"
         >
           <div class="tTitle">Ship Station License</div>
@@ -32,17 +30,6 @@ export type ShipStationMainDialogResult = { value: ShipMain };
         <button
           type="button"
           class="tile"
-          [class.on]="selected==='SHIP_EARTH_STATION_LICENSE'"
-          (click)="pick('SHIP_EARTH_STATION_LICENSE')"
-        >
-          <div class="tTitle">Ship Earth Station License</div>
-          <div class="tSub">Earth station license</div>
-        </button>
-
-        <button
-          type="button"
-          class="tile"
-          [class.on]="selected==='COASTAL_STATION_LICENSE'"
           (click)="pick('COASTAL_STATION_LICENSE')"
         >
           <div class="tTitle">Coastal Station License</div>
@@ -52,18 +39,10 @@ export type ShipStationMainDialogResult = { value: ShipMain };
         <button
           type="button"
           class="tile"
-          [class.on]="selected==='DELETION_CERTIFICATE'"
           (click)="pick('DELETION_CERTIFICATE')"
         >
           <div class="tTitle">Deletion Certificate</div>
           <div class="tSub">Deletion certificate</div>
-        </button>
-      </div>
-
-      <div class="dlgFoot">
-        <button type="button" class="btn" (click)="close()">Cancel</button>
-        <button type="button" class="btn primary" [disabled]="!selected" (click)="submit()">
-          Submit
         </button>
       </div>
     </div>
@@ -108,24 +87,15 @@ export type ShipStationMainDialogResult = { value: ShipMain };
     .tTitle { font-size: 14px; font-weight: 800; color: #111; }
     .tSub { margin-top: 2px; font-size: 12px; font-weight: 600; opacity: .75; }
 
-    .dlgFoot { margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px; }
-    .btn { height: 34px; padding: 0 12px; border: 1px solid #999; background: #fff; border-radius: 6px; cursor: pointer; }
-    .btn.primary { border-color: #2f74ff; background: #2f74ff; color: #fff; }
-    .btn:disabled { opacity: .55; cursor: not-allowed; }
-
     @media (max-width: 560px) {
       .grid { grid-template-columns: 1fr; }
     }
   `],
 })
 export class ShipStationMainDialogComponent {
-  selected: ShipMain | null = null;
-
   constructor(
     private ref: MatDialogRef<ShipStationMainDialogComponent, ShipStationMainDialogResult>
   ) {}
 
-  pick(v: ShipMain) { this.selected = v; }
-  submit() { if (this.selected) this.ref.close({ value: this.selected }); }
-  close() { this.ref.close(); }
+  pick(v: ShipMain) { this.ref.close({ value: v }); }
 }

@@ -101,20 +101,39 @@ export class AssessmentComponent implements OnDestroy {
     const approved = this.v('approvedBy') || '';
 
     footer.innerHTML = `
-      <div style="margin-top:6px; font-size:8pt; display:flex; gap:30px;">
-        <span>${this.chk('forAssessmentOnly')} For Assessment Only</span>
-        <span>${this.chk('endorsedForPayment')} Endorsed for Payment</span>
-      </div>
-
-      <div style="margin-top:6px; font-size:8pt;">
-        <b>Prepared By:</b> ${prepared}
-      </div>
-
-      <div style="margin-top:4px; font-size:8pt;">
-        <b>Approved By:</b> ${approved}
+      <div style="margin-top:8px; font-size:9pt; display:flex; align-items:flex-start; gap:16px;">
+        <div style="flex:1 1 auto;">
+          <div><b>NOTE:</b> To be paid on or before the due date otherwise subject to reassessment.</div>
+          <div style="margin-top:4px; display:flex; gap:18px; align-items:center;">
+            <span>${this.cbSvg(this.chk('forAssessmentOnly') === '☑')}</span>
+            <span style="margin-right:12px;">For Assessment Only</span>
+            <span>${this.cbSvg(this.chk('endorsedForPayment') === '☑')}</span>
+            <span>Endorsed for Payment</span>
+          </div>
+          <div style="margin-top:10px; display:flex; gap:30px; align-items:flex-end; font-size:9pt;">
+            <div style="flex:1 1 0; max-width:220px;">
+              <div style="font-weight:bold; margin-bottom:2px;">Prepared By:</div>
+              <div style="display:inline-block; border-bottom:1px solid #000; padding:0 0 2px 0;">${prepared}</div>
+            </div>
+            <div style="flex:1 1 0; max-width:220px;">
+              <div style="font-weight:bold; margin-bottom:2px;">Approved By:</div>
+              <div style="display:inline-block; border-bottom:1px solid #000; padding:0 0 2px 0;">${approved}</div>
+            </div>
+          </div>
+        </div>
       </div>
     `;
     return footer;
+  }
+
+  // simple SVG checkbox so html2canvas captures consistently
+  private cbSvg(checked: boolean): string {
+    return `
+      <svg width="10" height="10" style="margin-top:1px;">
+        <rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="black" stroke-width="1"/>
+        ${checked ? '<polyline points="2,5 4,7.5 8,2" fill="none" stroke="black" stroke-width="1.2"/>' : ''}
+      </svg>
+    `;
   }
 
   // ✅ remove existing duplicate checkbox row & prepared/approved in HTML (export only)
@@ -126,9 +145,10 @@ export class AssessmentComponent implements OnDestroy {
       const t = (el.textContent ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
       const hasFAO = t.includes('for assessment only');
       const hasEFP = t.includes('endorsed for payment');
+      const hasNote = t.startsWith('note: to be paid on or before the due date');
 
       // hide container that likely represents that checkbox row
-      if (hasFAO && hasEFP) {
+      if ((hasFAO && hasEFP) || hasNote) {
         if (!el.hasAttribute('data-hide-pdf')) {
           el.setAttribute('data-hide-pdf', '1');
           (el as any).__oldDisplay = el.style.display;
@@ -137,17 +157,6 @@ export class AssessmentComponent implements OnDestroy {
       }
     }
 
-    // hide Prepared/Approved lines if already printed in HTML
-    for (const el of candidates) {
-      const t = (el.textContent ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
-      if (t.startsWith('prepared by') || t.startsWith('approved by')) {
-        if (!el.hasAttribute('data-hide-pdf')) {
-          el.setAttribute('data-hide-pdf', '1');
-          (el as any).__oldDisplay = el.style.display;
-          el.style.display = 'none';
-        }
-      }
-    }
   }
 
   private restoreHiddenFooterBits(page: HTMLElement): void {
@@ -164,7 +173,7 @@ export class AssessmentComponent implements OnDestroy {
       // remove previously injected footer
       p.querySelectorAll('[data-pdf-footer="1"]').forEach((n) => n.remove());
 
-      // hide existing duplicates (export only)
+      // hide existing note/checkbox rows to avoid duplicates
       this.hideExistingFooterBits(p);
 
       // inject single footer

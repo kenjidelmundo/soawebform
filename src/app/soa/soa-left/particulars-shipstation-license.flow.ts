@@ -1,9 +1,6 @@
 import { MatDialog } from '@angular/material/dialog';
 
-import {
-  ShipStationLicenseScopeDialogComponent,
-  ShipLicenseScope,
-} from './ship-station-license-scope-dialog.component';
+import { ShipLicenseScope } from './ship-station-license-scope-dialog.component';
 
 // ONE dialog for both domestic/international choices
 import {
@@ -18,8 +15,11 @@ import {
 // =====================
 export type ShipStationLicensePicked = {
   scope: ShipLicenseScope;
-  txn: ShipTxn;
+  txns: ShipTxn[];
   power: ShipPower;
+  purchasePossessUnits?: number;
+  sellTransferUnits?: number;
+  possessStorageUnits?: number;
 };
 
 export function openShipStationLicenseFlow(
@@ -27,46 +27,28 @@ export function openShipStationLicenseFlow(
   cancel: () => void,
   done: (picked: ShipStationLicensePicked) => void
 ): void {
-  // 1) scope (DOMESTIC / INTERNATIONAL)
-  const ref1 = dialog.open(ShipStationLicenseScopeDialogComponent, {
-    width: '460px',
-    maxWidth: '92vw',
+  const ref = dialog.open(ShipStationLicenseOptionsDialogComponent, {
+    width: '840px',
+    maxWidth: '94vw',
     panelClass: 'soa-dlg',
     disableClose: true,
     autoFocus: false,
     restoreFocus: false,
   });
 
-  ref1.afterClosed().subscribe((r1: { value?: ShipLicenseScope } | undefined) => {
-    if (!r1?.value) {
+  ref.afterClosed().subscribe((r: ShipStationLicenseOptionsResult | undefined) => {
+    if (!r?.txns?.length || !r?.power || !r?.scope) {
       cancel();
       return;
     }
 
-    const scope = r1.value as ShipLicenseScope;
-
-    // 2) open ONE options dialog only
-    const ref2 = dialog.open(ShipStationLicenseOptionsDialogComponent, {
-      width: '720px',
-      maxWidth: '92vw',
-      panelClass: 'soa-dlg',
-      disableClose: true,
-      autoFocus: false,
-      restoreFocus: false,
-      data: { scope }, // optional if you want to show scope label in dialog
-    });
-
-    ref2.afterClosed().subscribe((r2: ShipStationLicenseOptionsResult | undefined) => {
-      if (!r2?.txn || !r2?.power) {
-        cancel();
-        return;
-      }
-
-      done({
-        scope,
-        txn: r2.txn as ShipTxn,
-        power: r2.power as ShipPower,
-      });
+    done({
+      scope: r.scope as ShipLicenseScope,
+      txns: r.txns as ShipTxn[],
+      power: r.power as ShipPower,
+      purchasePossessUnits: r.purchasePossessUnits,
+      sellTransferUnits: r.sellTransferUnits,
+      possessStorageUnits: r.possessStorageUnits,
     });
   });
 }

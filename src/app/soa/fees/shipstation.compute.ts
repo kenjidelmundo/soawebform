@@ -5,7 +5,9 @@ export type PickedTxn =
   | 'RENEW'
   | 'MOD'
   | 'DUPLICATE'
-  | 'PURCHASE_POSSESS';
+  | 'PURCHASE_POSSESS'
+  | 'SELL_TRANSFER'
+  | 'POSSESS_STORAGE';
 
 export type TxnFlags = {
   txnNew: boolean;
@@ -13,6 +15,8 @@ export type TxnFlags = {
   txnMod: boolean;
   txnDuplicate: boolean;
   txnPurchasePossess: boolean;
+  txnSellTransfer: boolean;
+  txnPossessStorage: boolean;
 };
 
 export type ShipStationRow = {
@@ -34,6 +38,9 @@ export type ShipParse = {
   withEquipment: boolean;
   units: number;
   sur100: boolean;
+  purchaseUnits?: number;
+  sellTransferUnits?: number;
+  possessStorageUnits?: number;
 };
 
 export type ShipResult = {
@@ -44,6 +51,7 @@ export type ShipResult = {
   LF: number;
   IF: number;
   MOD: number;
+  OTH: number;
   DST: number;
   SUR: number;
   CERT: number;
@@ -61,7 +69,10 @@ export type ParsedShipText = {
   scope?: 'DOMESTIC' | 'INTERNATIONAL';
   power?: 'HIGH' | 'MEDIUM' | 'LOW' | 'SESCL';
   band?: 'HF' | 'VHF';
-  txn?: PickedTxn;
+  txns: PickedTxn[];
+  purchaseUnits?: number;
+  sellTransferUnits?: number;
+  possessStorageUnits?: number;
 };
 
 const num = (v: any): number => {
@@ -86,6 +97,8 @@ export function txnFlagsFromTxn(txn: PickedTxn): TxnFlags {
     txnMod: txn === 'MOD',
     txnDuplicate: txn === 'DUPLICATE',
     txnPurchasePossess: txn === 'PURCHASE_POSSESS',
+    txnSellTransfer: txn === 'SELL_TRANSFER',
+    txnPossessStorage: txn === 'POSSESS_STORAGE',
   };
 }
 
@@ -93,13 +106,19 @@ export function buildShipParse(
   rowKey: string,
   withEquipment: boolean,
   units: number,
-  sur100: boolean
+  sur100: boolean,
+  purchaseUnits?: number,
+  sellTransferUnits?: number,
+  possessStorageUnits?: number
 ): ShipParse {
   return {
     rowKey,
     withEquipment: !!withEquipment,
     units: Math.max(1, Math.floor(num(units) || 1)),
     sur100: !!sur100,
+    purchaseUnits: purchaseUnits ? Math.max(1, Math.floor(num(purchaseUnits))) : undefined,
+    sellTransferUnits: sellTransferUnits ? Math.max(1, Math.floor(num(sellTransferUnits))) : undefined,
+    possessStorageUnits: possessStorageUnits ? Math.max(1, Math.floor(num(possessStorageUnits))) : undefined,
   };
 }
 
@@ -110,22 +129,40 @@ export function parseParticularsText(text: string): ParsedShipText | null {
   const t = norm(text);
   if (!t) return null;
 
+  const txns: PickedTxn[] = [];
+
+  const pushTxn = (v: PickedTxn) => {
+    if (!txns.includes(v)) txns.push(v);
+  };
+
+  const unitFrom = (pattern: RegExp): number | undefined => {
+    const m = t.match(pattern);
+    if (!m) return undefined;
+    const n = Number(m[1]);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined;
+  };
+
   if (t.includes('DELETION CERTIFICATE')) {
-    return { kind: 'DEL' };
+    return { kind: 'DEL', txns };
   }
 
-  const txn: PickedTxn | null =
-    t.includes('PURCHASE') && t.includes('POSSESS')
-      ? 'PURCHASE_POSSESS'
-      : t.includes('RENEW')
-      ? 'RENEW'
-      : t.includes('MODIFICATION') || t.includes('MOD')
-      ? 'MOD'
-      : t.includes('DUPLICATE')
-      ? 'DUPLICATE'
-      : t.includes('NEW')
-      ? 'NEW'
-      : null;
+  if (t.includes('PURCHASE') && t.includes('POSSESS')) pushTxn('PURCHASE_POSSESS');
+  if (t.includes('SELL/TRANSFER')) pushTxn('SELL_TRANSFER');
+  if (t.includes('POSSESS (STORAGE)')) pushTxn('POSSESS_STORAGE');
+  if (t.includes('DUPLICATE')) pushTxn('DUPLICATE');
+  if (t.includes('MODIFICATION') || t.includes(' MOD ')) pushTxn('MOD');
+  if (t.includes('RENEW')) pushTxn('RENEW');
+  if (t.includes('NEW')) pushTxn('NEW');
+
+  // enforce NEW vs RENEW exclusivity (keep RENEW if present)
+  if (txns.includes('RENEW') && txns.includes('NEW')) {
+    const idx = txns.indexOf('NEW');
+    if (idx >= 0) txns.splice(idx, 1);
+  }
+
+  const purchaseUnits = unitFrom(/PURCHASE\/POSSESS[^0-9]*UNIT\s+(\d+)/);
+  const sellTransferUnits = unitFrom(/SELL\/TRANSFER[^0-9]*UNIT\s+(\d+)/);
+  const possessStorageUnits = unitFrom(/POSSESS \(STORAGE\)[^0-9]*UNIT\s+(\d+)/);
 
   if (t.startsWith('SHIP STATION LICENSE')) {
     const scope: 'DOMESTIC' | 'INTERNATIONAL' =
@@ -142,12 +179,23 @@ export function parseParticularsText(text: string): ParsedShipText | null {
         ? 'LOW'
         : null;
 
-    if (!power || !txn) return null;
+    if (!power || !txns.length) return null;
 
-    return { kind: 'SSL', scope, power, txn };
+    return {
+      kind: 'SSL',
+      scope,
+      power,
+      txns,
+      purchaseUnits,
+      sellTransferUnits,
+      possessStorageUnits,
+    };
   }
 
   if (t.startsWith('COASTAL STATION LICENSE')) {
+    // if no txn from earlier, default to NEW so compute still proceeds
+    if (!txns.length) txns.push('NEW');
+
     if (t.includes('RADIO TELEGRAPHY')) {
       const power: 'HIGH' | 'MEDIUM' | 'LOW' | null =
         t.includes('HIGH POWERED')
@@ -158,18 +206,18 @@ export function parseParticularsText(text: string): ParsedShipText | null {
           ? 'LOW'
           : null;
 
-      if (!power || !txn) return null;
+      if (!power || !txns.length) return null;
 
-      return { kind: 'COASTAL_RT', power, txn };
+      return { kind: 'COASTAL_RT', power, txns };
     }
 
     if (t.includes('RADIO TELEPHONY')) {
       const band: 'HF' | 'VHF' | null =
         t.includes('VHF') ? 'VHF' : t.includes('HF') ? 'HF' : null;
 
-      if (!band || !txn) return null;
+      if (!band || !txns.length) return null;
 
-      return { kind: 'COASTAL_RP', band, txn };
+      return { kind: 'COASTAL_RP', band, txns };
     }
   }
 
@@ -250,7 +298,7 @@ export function getSurchargeFromDelay(lfTotal: number, delayMonths: number): num
 export function computeShipStation(
   ship: ShipParse,
   years: number,
-  txn: TxnFlags,
+  txns: TxnFlags | PickedTxn | PickedTxn[],
   SHIP_STATION: Record<string, ShipStationRow>,
   delayMonths: number = 0
 ): ShipResult {
@@ -260,9 +308,34 @@ export function computeShipStation(
       ? SHIP_STATION['SSL-INT-SESCL']
       : SHIP_STATION['SSL-DOM-HIGH']);
 
-  const units = Math.max(1, Math.floor(num(ship.units) || 1));
+  const unitsBase = Math.max(1, Math.floor(num(ship.units) || 1));
+  const purchaseUnits = Math.max(
+    1,
+    Math.floor(num(ship.purchaseUnits ?? unitsBase) || 1)
+  );
+  const sellUnits = Math.max(1, Math.floor(num(ship.sellTransferUnits ?? unitsBase) || 1));
+  const possessStorageUnits = Math.max(
+    1,
+    Math.floor(num(ship.possessStorageUnits ?? unitsBase) || 1)
+  );
   const validYears = Math.max(1, Math.floor(num(years) || 1));
   const withEquip = !!ship.withEquipment;
+
+  const txnList: PickedTxn[] = Array.isArray(txns)
+    ? txns
+    : (txns as any)?.txnNew !== undefined
+    ? ([
+        ['NEW', 'txnNew'],
+        ['RENEW', 'txnRenew'],
+        ['MOD', 'txnMod'],
+        ['DUPLICATE', 'txnDuplicate'],
+        ['PURCHASE_POSSESS', 'txnPurchasePossess'],
+        ['SELL_TRANSFER', 'txnSellTransfer'],
+        ['POSSESS_STORAGE', 'txnPossessStorage'],
+      ] as const)
+        .filter(([, key]) => (txns as TxnFlags)[key])
+        .map(([val]) => val as PickedTxn)
+    : [txns as PickedTxn];
 
   let FF = 0;
   let Purchase = 0;
@@ -271,44 +344,108 @@ export function computeShipStation(
   let LF = 0;
   let IF = 0;
   let MOD = 0;
-  let DST = num(row.DST);
+  let OTH = 0;
+  let DST = 0;
   let SUR = 0;
   let CERT = 0;
 
+  const isCoastal = ship.rowKey.startsWith('PCS-');
   const isDeletion = ship.rowKey === 'CERT-DEL';
 
   if (isDeletion) {
-    FF = num(row.FF);
-    CERT = num(row.CERT);
-  } else if (txn.txnPurchasePossess) {
-    FF = num(row.FF) * units;
-    Purchase = num(row.Purchase) * units;
-    Possess = num(row.Possess) * units;
-  } else if (txn.txnMod) {
-    FF = num(row.FF);
-    CPF = num(row.CPF);
-    MOD = num(row.MOD);
-  } else if (txn.txnRenew) {
-    LF = num(row.LF) * validYears;
-    IF = num(row.IF) * validYears;
-    SUR = getSurchargeFromDelay(LF, delayMonths);
-  } else if (txn.txnDuplicate) {
-    FF = num(row.FF);
-    MOD = num(row.MOD);
-  } else if (txn.txnNew) {
-    CPF = num(row.CPF);
-    LF = num(row.LF) * validYears;
-    IF = num(row.IF) * validYears;
+    FF += num(row.FF);
+    CERT += num(row.CERT);
+    DST += num(row.DST);
+    // Deletion is standalone; skip other txn processing
+    const total = round2(FF + CERT + DST);
+    return {
+      FF: round2(FF),
+      Purchase: 0,
+      Possess: 0,
+      CPF: 0,
+      LF: 0,
+      IF: 0,
+      MOD: 0,
+      OTH: 0,
+      DST: round2(DST),
+      SUR: 0,
+      CERT: round2(CERT),
+      total,
+      PUR: 0,
+      POS: 0,
+      LFIF: 0,
+      INS: 0,
+    };
+  }
 
-    if (withEquip) {
-      FF = num(row.FF) * units;
-      Purchase = num(row.Purchase) * units;
-      Possess = num(row.Possess) * units;
+  for (const t of txnList) {
+    switch (t) {
+      case 'PURCHASE_POSSESS': {
+        FF += num(row.FF) * purchaseUnits;
+        Purchase += num(row.Purchase) * purchaseUnits;
+        Possess += num(row.Possess) * purchaseUnits;
+        DST += num(row.DST);
+        break;
+      }
+      case 'SELL_TRANSFER': {
+        Purchase += num(row.Purchase) * sellUnits;
+        DST += num(row.DST);
+        break;
+      }
+      case 'POSSESS_STORAGE': {
+        Possess += num(row.Possess) * possessStorageUnits;
+        DST += num(row.DST);
+        break;
+      }
+      case 'MOD': {
+        FF += num(row.FF);
+        CPF += num(row.CPF);
+        MOD += num(row.MOD);
+        DST += num(row.DST);
+        break;
+      }
+      case 'RENEW': {
+        const lfVal = num(row.LF) * validYears;
+        const ifVal = num(row.IF) * validYears;
+        LF += lfVal;
+        IF += ifVal;
+        // Citizen Charter: 50% for first 0-6 months overdue, 100% for 6-12, +50% every 6 months thereafter
+        const sur = getSurchargeFromDelay(lfVal, delayMonths);
+        SUR += sur;
+        DST += num(row.DST);
+        break;
+      }
+      case 'DUPLICATE': {
+        // User request: duplicate posts 120 to Others and 120 to service (license fee); no filing fee
+        OTH += 120;
+        LF += 120;
+        DST += num(row.DST);
+        break;
+      }
+      case 'NEW': {
+        CPF += num(row.CPF);
+        LF += num(row.LF) * validYears;
+        IF += num(row.IF) * validYears;
+        DST += num(row.DST);
+
+        if (isCoastal) {
+          // Coastal charter: include Filing Fee even without equipment
+          FF += num(row.FF) * unitsBase;
+        } else if (withEquip) {
+          // A.3 with equipment: FF + Purchase + Possess
+          FF += num(row.FF) * unitsBase;
+          Purchase += num(row.Purchase) * unitsBase;
+          Possess += num(row.Possess) * unitsBase;
+        }
+        break;
+      }
+      default:
+        break;
     }
   }
 
   const total = round2(
-    FF + Purchase + Possess + CPF + LF + IF + MOD + DST + SUR + CERT
+    FF + Purchase + Possess + CPF + LF + IF + MOD + OTH + DST + SUR + CERT
   );
 
   return {
@@ -319,6 +456,7 @@ export function computeShipStation(
     LF: round2(LF),
     IF: round2(IF),
     MOD: round2(MOD),
+    OTH: round2(OTH),
     DST: round2(DST),
     SUR: round2(SUR),
     CERT: round2(CERT),

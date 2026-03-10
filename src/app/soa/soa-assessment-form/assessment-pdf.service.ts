@@ -96,12 +96,11 @@ export class AssessmentPdfService {
       margin: [0, 6, 0, 0],
       stack: [
         {
-          text:
-            'NOTE: To be paid on or before the due date otherwise subject to reassessment.',
+          text: 'NOTE: To be paid on or before the due date otherwise subject to reassessment.',
           fontSize: 6,
+          margin: [0, 0, 2, 0],
         },
         {
-          margin: [0, 4, 0, 0],
           columns: [
             {
               columns: [cb(forAssessmentOnly), { text: 'For Assessment Only', fontSize: 6, margin: [3, 0, 0, 0] }],
@@ -114,17 +113,7 @@ export class AssessmentPdfService {
               width: 'auto',
             },
           ],
-          columnGap: 20,
-        },
-        {
-          margin: [0, 4, 0, 0],
-          columns: [
-            { text: 'Prepared By:', bold: true, width: 60, fontSize: 6.5 },
-            { text: preparedBy, width: '*', fontSize: 6.5 },
-            { text: 'Approved By:', bold: true, width: 60, fontSize: 6.5 },
-            { text: approvedBy, width: '*', fontSize: 6.5 },
-          ],
-          columnGap: 8,
+          columnGap: 24,
         },
       ],
     };

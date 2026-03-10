@@ -22,7 +22,7 @@ export function openShipStationParticularsFlow(
     width: '640px',
     maxWidth: '92vw',
     panelClass: 'soa-dlg',
-    disableClose: true,
+    disableClose: false,
     autoFocus: false,
     restoreFocus: false,
   });
@@ -34,7 +34,31 @@ export function openShipStationParticularsFlow(
 
     if (main === 'SHIP_STATION_LICENSE') {
       openShipStationLicenseFlow(dialog, cancel, (picked: ShipStationLicensePicked) => {
-        const txnText = picked.txn === 'MOD' ? 'MODIFICATION' : picked.txn;
+        const labelMap: Record<string, string> = {
+          NEW: 'NEW',
+          RENEW: 'RENEW',
+          MOD: 'MODIFICATION',
+          DUPLICATE: 'DUPLICATE',
+          PURCHASE_POSSESS: 'PURCHASE/POSSESS',
+          SELL_TRANSFER: 'SELL/TRANSFER',
+          POSSESS_STORAGE: 'POSSESS (STORAGE)',
+        };
+
+        const txnParts = picked.txns.map((t) => {
+          const base = labelMap[t] ?? t;
+          if (t === 'PURCHASE_POSSESS' && picked.purchasePossessUnits) {
+            return `${base} - UNIT ${picked.purchasePossessUnits}`;
+          }
+          if (t === 'SELL_TRANSFER' && picked.sellTransferUnits) {
+            return `${base} - UNIT ${picked.sellTransferUnits}`;
+          }
+          if (t === 'POSSESS_STORAGE' && picked.possessStorageUnits) {
+            return `${base} - UNIT ${picked.possessStorageUnits}`;
+          }
+          return base;
+        });
+
+        const txnText = txnParts.join(' / ');
 
         const powerText =
           picked.power === 'HIGH_POWERED'
@@ -55,16 +79,22 @@ export function openShipStationParticularsFlow(
         const finalText = `SHIP STATION LICENSE - ${scopeText} - ${powerText}${codeText} - ${txnText}`;
 
         const txnForForm: TxnType =
-          picked.txn === 'RENEW' ? 'RENEW' : picked.txn === 'MOD' ? 'MOD' : 'NEW';
+          picked.txns.includes('RENEW')
+            ? 'RENEW'
+            : picked.txns.includes('MOD')
+            ? 'MOD'
+            : 'NEW';
 
         finalize(finalText, txnForForm);
       });
       return;
     }
 
-    if (main === 'SHIP_EARTH_STATION_LICENSE') { finalize('SHIP EARTH STATION LICENSE'); return; }
     if (main === 'DELETION_CERTIFICATE') { finalize('DELETION CERTIFICATE'); return; }
-    if (main === 'COASTAL_STATION_LICENSE') { openCoastalParticularsFlow(dialog, cancel, finalize); return; }
+    if (main === 'COASTAL_STATION_LICENSE') {
+      openCoastalParticularsFlow(dialog, cancel, finalize);
+      return;
+    }
 
     cancel();
   });

@@ -171,33 +171,27 @@ export function parseCoastalParticulars(particulars: string): CoastalParsed | nu
 
   if (!t.includes('COASTAL')) return null;
 
-  const isHF = t.includes('HIGH FREQUENCY') || /\bHF\b/.test(t);
+  const isTelephony = t.includes('RADIO TELEPHONY') || t.includes('TELEPHONY');
+  const isTelegraphy = t.includes('RADIO TELEGRAPHY') || t.includes('TELEGRAPHY');
+  const isHF = t.includes('HIGH FREQUENCY') || /\bHF\b/.test(t) || (isTelephony && t.includes('HF'));
   const subtype: CoastalSubtype = isHF ? 'HF' : 'CoastalStations';
 
-  // Option detection
-  // Note: we match by keywords in the label text you generate.
-  if (t.includes('VHF')) return { subtype, option: 'VHF' };
+  // Band first
+  if (t.includes('VHF')) return { subtype: 'HF', option: 'VHF' };
+  if (isTelephony && isHF && t.includes('HF')) return { subtype: 'HF', option: 'HFHighPowered100W' };
 
-  // Coastal Stations options
-  if (!isHF) {
-    if (t.includes('HIGH POWERED') && t.includes('100')) return { subtype, option: 'HighPoweredAbove100W' };
-    if (t.includes('MEDIUM POWERED') && t.includes('25') && t.includes('100')) return { subtype, option: 'MediumPowered25To100W' };
-    if (t.includes('LOW POWERED') && (t.includes('25W') || t.includes('25 W') || t.includes('BELOW'))) return { subtype, option: 'LowPowered25WBelow' };
+  // Telegraphy power detection (no wattage required)
+  if (isTelegraphy || !isTelephony) {
+    if (t.includes('HIGH')) return { subtype: 'CoastalStations', option: 'HighPoweredAbove100W' };
+    if (t.includes('MED')) return { subtype: 'CoastalStations', option: 'MediumPowered25To100W' };
+    if (t.includes('LOW')) return { subtype: 'CoastalStations', option: 'LowPowered25WBelow' };
   }
 
-  // HF options
-  if (isHF) {
-    if (t.includes('HF HIGH') && t.includes('100')) return { subtype, option: 'HFHighPowered100W' };
-    if (t.includes('HF MEDIUM') && t.includes('25') && t.includes('100')) return { subtype, option: 'HFMediumPowered25To100W' };
-    if (t.includes('HF LOW') && (t.includes('25W') || t.includes('25 W') || t.includes('BELOW'))) return { subtype, option: 'HFLowPowered25WBelow' };
+  // Telephony fallback: default HF if no VHF
+  if (isTelephony) return { subtype: 'HF', option: 'HFHighPowered100W' };
 
-    // fallback: if user picked HF but text doesn’t contain "HF HIGH/MED/LOW", try generic
-    if (t.includes('HIGH POWERED') && t.includes('100')) return { subtype, option: 'HFHighPowered100W' };
-    if (t.includes('MEDIUM POWERED') && t.includes('25') && t.includes('100')) return { subtype, option: 'HFMediumPowered25To100W' };
-    if (t.includes('LOW POWERED') && (t.includes('25W') || t.includes('25 W') || t.includes('BELOW'))) return { subtype, option: 'HFLowPowered25WBelow' };
-  }
-
-  return null;
+  // Ultimate fallback: medium coastal
+  return { subtype: 'CoastalStations', option: 'MediumPowered25To100W' };
 }
 
 // ======================================================

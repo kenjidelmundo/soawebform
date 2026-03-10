@@ -108,20 +108,6 @@ export class SoaPdfService {
             },
           ],
         },
-        {
-          margin: [0, 1, 0, 0],
-          columns: [
-            { text: 'Prepared By:', fontSize: 5.8, bold: true, width: 50 },
-            { text: String(soa.preparedBy ?? ''), fontSize: 5.8, width: '*' },
-          ],
-        },
-        {
-          margin: [0, 0.5, 0, 0],
-          columns: [
-            { text: 'Approved By:', fontSize: 5.8, bold: true, width: 50 },
-            { text: String(soa.approvedBy ?? ''), fontSize: 5.8, width: '*' },
-          ],
-        },
       ],
     };
   }

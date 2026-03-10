@@ -9,7 +9,6 @@ import {
   computeShipStation,
   parseParticularsText,
   rowKeyFromParsed,
-  txnFlagsFromTxn,
   buildShipParse,
   PickedTxn,
   ShipStationRow,
@@ -70,6 +69,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     const txnModCtrl = this.ctrl('txnModification');
 
     const delayMonthsCtrl = this.ctrl('delayMonths');
+    const periodFromCtrl = this.ctrl('periodFrom');
 
     if (!particulars || !yearsCtrl) return;
 
@@ -103,6 +103,9 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     const delayMonths$ = delayMonthsCtrl
       ? delayMonthsCtrl.valueChanges.pipe(startWith(delayMonthsCtrl.value))
       : of(0);
+    const periodFrom$ = periodFromCtrl
+      ? periodFromCtrl.valueChanges.pipe(startWith(periodFromCtrl.value))
+      : of(null);
 
     combineLatest([
       particulars$,
@@ -114,9 +117,10 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
       txnRenew$,
       txnMod$,
       delayMonths$,
+      periodFrom$,
     ])
       .pipe(debounceTime(30), takeUntil(this.destroy$))
-      .subscribe(([pText, y, shipU, wEq, s100, tNew, tRen, tMod, delayMonthsRaw]) => {
+      .subscribe(([pText, y, shipU, wEq, s100, tNew, tRen, tMod, delayMonthsRaw, periodFromRaw]) => {
         const text = String(pText || '').trim();
         const up = text.toUpperCase();
 
@@ -128,11 +132,26 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
 
         const YEARS = Math.max(1, Math.floor(this.num(y, 1)));
         const SHIP_UNITS = Math.max(1, Math.floor(this.num(shipU, 1)));
-        const DELAY_MONTHS = Math.max(0, Math.floor(this.num(delayMonthsRaw, 0)));
-
         const txnFromChecks = this.txnFromChecks(!!tNew, !!tRen, !!tMod);
         const txnForText = this.txnFromText(text);
         const txn = txnFromChecks ?? txnForText;
+
+        const parsedShipTop = parseParticularsText(text);
+        const hasRenewTxn =
+          !!tRen ||
+          txn === 'RENEW' ||
+          parsedShipTop?.txns?.includes('RENEW') ||
+          up.includes('RENEW');
+
+        const delayFromExpiry = this.computeDelayMonthsFromNow(periodFromRaw);
+        const delayFromCtrl = Math.max(0, Math.floor(this.num(delayMonthsRaw, 0)));
+        const DELAY_MONTHS = hasRenewTxn ? delayFromExpiry : delayFromCtrl;
+
+        // keep delayMonths control synced for visibility/debug
+        if (delayMonthsCtrl && delayMonthsCtrl.value !== DELAY_MONTHS) {
+          delayMonthsCtrl.patchValue(DELAY_MONTHS, { emitEvent: false });
+        }
+
 
         // =====================================================
         // 1) ROC
@@ -223,9 +242,9 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         }
 
         // =====================================================
-        // 4) COASTAL
+        // 4) COASTAL (handled separately only if not already parsed by ship parser)
         // =====================================================
-        if (up.includes('COASTAL')) {
+        if (up.includes('COASTAL') && !parsedShipTop) {
           this.clearAllComputedFields();
 
           const surMode: CoastalSurchargeMode =
@@ -300,21 +319,43 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         // =====================================================
         // 7) SHIP
         // =====================================================
-        const parsedShip = parseParticularsText(text);
+        const parsedShip = parsedShipTop;
         if (parsedShip) {
           this.clearAllComputedFields();
 
-          const pickedTxn: PickedTxn = txn;
           const rowKey = rowKeyFromParsed(parsedShip);
 
-          const ship = buildShipParse(rowKey, !!wEq, SHIP_UNITS, !!s100);
-          const flags = txnFlagsFromTxn(pickedTxn);
+          const txns = parsedShip.txns?.length
+            ? [...parsedShip.txns]
+            : txn
+            ? [txn]
+            : [];
+          if (hasRenewTxn && !txns.includes('RENEW')) txns.push('RENEW');
+
+          const isDeletion = parsedShip.kind === 'DEL';
+
+          if (!txns.length && !isDeletion) {
+            this.clearAllComputedFields();
+            this.patch(0, 'totalAmount');
+            return;
+          }
+
+          const ship = buildShipParse(
+            rowKey,
+            !!wEq,
+            SHIP_UNITS,
+            !!s100,
+            parsedShip.purchaseUnits,
+            parsedShip.sellTransferUnits,
+            parsedShip.possessStorageUnits
+          );
 
           const res = computeShipStation(
             ship,
             YEARS,
-            flags,
-            SHIP_STATION as Record<string, ShipStationRow>
+            txns,
+            SHIP_STATION as Record<string, ShipStationRow>,
+            DELAY_MONTHS
           );
 
           this.patch(res.Purchase, 'licPermitToPurchase');
@@ -333,10 +374,10 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
           this.patch(0, 'appSupervisionRegulationFee');
           this.patch(0, 'appVerificationAuthFee');
           this.patch(0, 'appExaminationFee');
-          this.patch(0, 'appClearanceCertificationFee');
+          this.patch(res.CERT, 'appClearanceCertificationFee');
           this.patch(res.MOD, 'appModificationFee');
           this.patch(0, 'appMiscIncome');
-          this.patch(0, 'appOthers');
+          this.patch(res.OTH, 'appOthers');
           this.patch(res.DST, 'dst');
 
           this.patch(this.computeTotalAmount(), 'totalAmount');
@@ -356,6 +397,54 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     const c = this.form?.get(name);
     if (!c) return;
     c.patchValue(this.round2(val), { emitEvent: false });
+  }
+
+  private computeDelayMonthsFromNow(expiryRaw: any): number {
+    const expiry = this.parseDate(expiryRaw);
+    if (!expiry) return 0;
+
+    const today = new Date();
+    const cleanToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    if (cleanToday <= expiry) return 0;
+
+    let months =
+      (cleanToday.getFullYear() - expiry.getFullYear()) * 12 +
+      (cleanToday.getMonth() - expiry.getMonth());
+
+    if (cleanToday.getDate() >= expiry.getDate()) {
+      months += 1;
+    }
+
+    return Math.max(0, months);
+  }
+
+  private parseDate(raw: any): Date | null {
+    if (!raw) return null;
+    if (raw instanceof Date && !isNaN(raw.getTime())) return raw;
+
+    if (typeof raw === 'string') {
+      // support dd/mm/yyyy, mm/dd/yyyy, and yyyy-mm-dd
+      const iso = raw.match(/^\d{4}-\d{2}-\d{2}$/)
+        ? raw
+        : raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+        ? `${RegExp.$3}-${RegExp.$2}-${RegExp.$1}`
+        : raw.match(/^(\d{2})-(\d{2})-(\d{4})$/)
+        ? `${RegExp.$3}-${RegExp.$1}-${RegExp.$2}`
+        : raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+        ? `${RegExp.$3}-${RegExp.$1}-${RegExp.$2}`
+        : null;
+      if (iso) {
+        const d = new Date(iso);
+        return isNaN(d.getTime()) ? null : d;
+      }
+
+      // final fallback: let Date parse it
+      const parsed = new Date(raw);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+
+    return null;
   }
 
   private num(v: any, fallback = 0): number {
