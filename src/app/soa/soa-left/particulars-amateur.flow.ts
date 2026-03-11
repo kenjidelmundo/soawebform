@@ -37,6 +37,7 @@ export function openAmateurParticularsFlow(
         showSellTransfer: isAtRslClass && !isTemporary,
         showPossessStorage: isAtRslClass && !isTemporary,
         showStandaloneUnits: isTemporary,
+        showDuplicate: true,
         contextTitle: choice,
       },
     });
@@ -56,6 +57,7 @@ export function openAmateurParticularsFlow(
       const sellTransferUnits = Math.max(1, Math.floor(Number(resTxn.sellTransferUnits || 1)));
       const possessStorageUnits = Math.max(1, Math.floor(Number(resTxn.possessStorageUnits || 1)));
       const modificationUnits = Math.max(1, Math.floor(Number(resTxn.modificationUnits || 1)));
+      const hasDuplicate = picked.includes('DUPLICATE');
 
       const txn: TxnType | undefined =
         (picked.includes('NEW') && 'NEW') ||
@@ -92,6 +94,10 @@ export function openAmateurParticularsFlow(
         if (txn === 'MOD') {
           finalText += ` - UNITS_${modificationUnits}`;
         }
+      }
+
+      if (hasDuplicate) {
+        finalText += ' - DUPLICATE';
       }
 
       finalize(finalText, txn);

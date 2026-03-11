@@ -254,6 +254,13 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private applyTxnFromTxnChoice(txn: TxnType): void {
+    if (txn === 'DUPLICATE') {
+      this.setTxnEverywhere({ txnNew: false, txnRenew: false, txnModification: false });
+      this.setStringDeep('txnType', txn);
+      this.setStringDeep('transactionType', txn);
+      return;
+    }
+
     this.setTxnEverywhere({
       txnNew: txn === 'NEW',
       txnRenew: txn === 'RENEW',

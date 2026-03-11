@@ -29,18 +29,30 @@ export function openRocParticularsFlow(
         disableClose: true,
         autoFocus: false,
         restoreFocus: false,
-        data: { contextTitle: base },
+        data: { contextTitle: base, showDuplicate: true },
       });
 
       refTxn.afterClosed().subscribe((resTxn) => {
-        if (!resTxn?.value) {
+        const selected: TxnType[] = Array.isArray(resTxn?.value)
+          ? (resTxn.value as TxnType[])
+          : resTxn?.value
+          ? [resTxn.value as TxnType]
+          : [];
+
+        if (!selected.length) {
           cancel();
           return;
         }
 
-        const txn = resTxn.value as TxnType;
-        const txnText = txn === 'MOD' ? 'MODIFICATION' : txn;
-        finalize(`${base} - ${txnText}`, txn);
+        // build display text with all selected txn types
+        const parts = selected.map((t: TxnType) => (t === 'MOD' ? 'MODIFICATION' : t));
+        const finalText = `${base} - ${parts.join(' - ')}`;
+
+        // pick a primary txn for form flags (priority: RENEW > NEW > DUPLICATE > MOD)
+        const priority: TxnType[] = ['RENEW', 'NEW', 'DUPLICATE', 'MOD'];
+        const primary = (priority.find((p) => selected.includes(p)) ?? selected[0]) as TxnType;
+
+        finalize(finalText, primary);
       });
     };
 

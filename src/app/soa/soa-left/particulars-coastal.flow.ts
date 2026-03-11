@@ -29,11 +29,24 @@ export function openCoastalParticularsFlow(
       return;
     }
 
-    const txn = ro.txn as ShipTxn;
+    const txnList = Array.isArray(ro.txn) ? ro.txn as ShipTxn[] : [ro.txn as ShipTxn];
     const power = ro.power as CoastalPower;
     const service = ro.service as CoastalService;
+    const purchasePossess = !!ro.purchasePossess;
+    const purchaseUnits = Math.max(1, Math.floor(Number(ro.purchaseUnits || 1)));
+    const sellTransfer = !!ro.sellTransfer;
+    const sellTransferUnits = Math.max(1, Math.floor(Number(ro.sellTransferUnits || 1)));
 
-    const txnText = txn === 'MOD' ? 'MODIFICATION' : txn;
+    const primary: ShipTxn =
+      (txnList.includes('RENEW') && 'RENEW') ||
+      (txnList.includes('NEW') && 'NEW') ||
+      txnList[0];
+    const hasMod = txnList.includes('MOD');
+
+    const txnText = [primary, hasMod ? 'MODIFICATION' : null]
+      .filter(Boolean)
+      .map(t => (t === 'MOD' ? 'MODIFICATION' : t))
+      .join(' - ');
 
     const powerText =
       service === 'RADIO_TELEGRAPHY'
@@ -46,9 +59,17 @@ export function openCoastalParticularsFlow(
 
     const serviceText = service === 'RADIO_TELEGRAPHY' ? 'RADIO TELEGRAPHY' : 'RADIO TELEPHONY';
 
-    const finalText = `COASTAL STATION LICENSE - ${serviceText} - ${powerText} - ${txnText}`;
+    let finalText = `COASTAL STATION LICENSE - ${serviceText} - ${powerText} - ${txnText}`;
 
-    const txnForForm: TxnType = txn === 'RENEW' ? 'RENEW' : txn === 'MOD' ? 'MOD' : 'NEW';
+    if (purchasePossess) {
+      finalText += ` - PERMIT TO PURCHASE/POSSESS - UNITS_${purchaseUnits}`;
+    }
+
+    if (sellTransfer) {
+      finalText += ` - PERMIT TO SELL/TRANSFER - UNITS_${sellTransferUnits}`;
+    }
+
+    const txnForForm: TxnType = primary === 'RENEW' ? 'RENEW' : primary === 'MOD' ? 'MOD' : 'NEW';
 
     finalize(finalText, txnForForm);
   });

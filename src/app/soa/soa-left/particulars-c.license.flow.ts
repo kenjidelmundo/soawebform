@@ -58,27 +58,67 @@ export function openCoastalLicenseParticularsFlow(
         return;
       }
 
+      const subtypeLabel = coastalOptionLabel(option, subtype);
+
       // 3) TXN last (NEW / RENEW / MOD)
       const refTxn = dialog.open(TxnTypeDialogComponent, {
         width: '460px',
         disableClose: true,
         autoFocus: false,
         restoreFocus: false,
+        data: {
+          contextTitle: subtypeLabel,
+          showPurchasePossess: true,
+          showSellTransfer: true,
+          showDuplicate: true,
+        },
       });
 
       refTxn.afterClosed().subscribe((rTxn) => {
-        const txn: TxnType | undefined = rTxn?.value;
-        if (!txn) {
+        const selected: TxnType[] = Array.isArray(rTxn?.value)
+          ? rTxn.value
+          : rTxn?.value
+          ? [rTxn.value]
+          : [];
+
+        const purchasePossess = !!rTxn?.purchasePossess;
+        const purchaseUnits = Math.max(1, Math.floor(Number(rTxn?.purchasePossessUnits || 1)));
+        const sellTransfer = !!rTxn?.sellTransfer;
+        const sellTransferUnits = Math.max(1, Math.floor(Number(rTxn?.sellTransferUnits || 1)));
+
+        if (!selected.length && !purchasePossess && !sellTransfer) {
           cancel();
           return;
         }
 
-        const picked: CoastalLicensePicked = { subtype, option, txn };
+        const primary: TxnType =
+          (selected.includes('RENEW') && 'RENEW') ||
+          (selected.includes('NEW') && 'NEW') ||
+          (selected.includes('MOD') && 'MOD') ||
+          'NEW';
+
+        const picked: CoastalLicensePicked = { subtype, option, txn: primary };
 
         // build your particulars text
-        const finalText = buildCoastalLicenseFinalText(picked);
+        let finalText = buildCoastalLicenseFinalText(picked);
 
-        finalize(finalText, txn, picked);
+        if (primary) {
+          finalText += ` - ${primary === 'MOD' ? 'MODIFICATION' : primary}`;
+        }
+
+        if (purchasePossess) {
+          finalText += ` - PERMIT TO PURCHASE/POSSESS - UNITS_${purchaseUnits}`;
+        }
+
+        if (sellTransfer) {
+          finalText += ` - PERMIT TO SELL/TRANSFER - UNITS_${sellTransferUnits}`;
+        }
+
+        if (selected.includes('DUPLICATE')) {
+          finalText += ' - DUPLICATE';
+        }
+
+        finalize(finalText, primary, picked);
       });
     });
   });
@@ -91,7 +131,7 @@ function buildCoastalLicenseFinalText(p: CoastalLicensePicked): string {
   const service = 'COASTAL STATION LICENSE';
   const subtypeLabel =
     p.subtype === 'CoastalStations' ? 'Coastal Stations' : 'HIGH FREQUENCY (HF)';
-  const optionLabel = coastalOptionLabel(p.option);
+  const optionLabel = coastalOptionLabel(p.option, p.subtype);
 
   // If you want txn included in particulars text, keep this:
   // return `${service} - ${subtypeLabel} - ${optionLabel} - ${p.txn}`;
@@ -100,27 +140,29 @@ function buildCoastalLicenseFinalText(p: CoastalLicensePicked): string {
   return `${service} - ${subtypeLabel} - ${optionLabel}`;
 }
 
-function coastalOptionLabel(opt: CoastalOption): string {
+function coastalOptionLabel(opt: CoastalOption, subtype?: CoastalSubtype): string {
   switch (opt) {
     // Coastal Stations
     case 'HighPoweredAbove100W':
-      return 'High Powered (above 100W)';
+      return 'Coastal Stations - High Powered (above 100W)';
     case 'MediumPowered25To100W':
-      return 'Medium Powered (above 25W up to 100W)';
+      return 'Coastal Stations - Medium Powered (above 25W up to 100W)';
     case 'LowPowered25WBelow':
-      return 'Low Powered (25W below)';
+      return 'Coastal Stations - Low Powered (25W below)';
 
     // HF
     case 'HFHighPowered100W':
-      return 'HF High Powered (100W)';
+      return 'High Frequency (HF) - High Powered (100W)';
     case 'HFMediumPowered25To100W':
-      return 'HF Medium Powered (25W up to 100W)';
+      return 'High Frequency (HF) - Medium Powered (25W up to 100W)';
     case 'HFLowPowered25WBelow':
-      return 'HF Low Powered (25W below)';
+      return 'High Frequency (HF) - Low Powered (25W below)';
     case 'VHF':
-      return 'VHF';
+      return 'High Frequency (HF) - VHF';
 
     default:
-      return String(opt);
+      return subtype
+        ? `${subtype === 'CoastalStations' ? 'Coastal Stations' : 'High Frequency (HF)'} - ${String(opt)}`
+        : String(opt);
   }
 }

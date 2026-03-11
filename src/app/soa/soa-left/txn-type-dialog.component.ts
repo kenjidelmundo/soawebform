@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
-export type TxnType = 'NEW' | 'RENEW' | 'MOD';
+export type TxnType = 'NEW' | 'RENEW' | 'MOD' | 'DUPLICATE';
 
 export type TxnTypeDialogResult = {
   value: TxnType[];
@@ -20,6 +20,7 @@ type TxnTypeDialogData = {
   showSellTransfer?: boolean;
   showPossessStorage?: boolean;
   showStandaloneUnits?: boolean;
+  showDuplicate?: boolean;
   contextTitle?: string;
 };
 
@@ -86,6 +87,22 @@ type TxnTypeDialogData = {
           />
           <span class="box" [class.on]="isChecked('RENEW')"></span>
           <span class="txt">Renew</span>
+        </label>
+
+        <label
+          class="row"
+          *ngIf="showDuplicate"
+          (click)="$event.preventDefault(); toggle('DUPLICATE')"
+        >
+          <input
+            type="checkbox"
+            class="cb"
+            [checked]="isChecked('DUPLICATE')"
+            tabindex="-1"
+            aria-hidden="true"
+          />
+          <span class="box" [class.on]="isChecked('DUPLICATE')"></span>
+          <span class="txt">Duplicate</span>
         </label>
 
         <div class="ppWrap" *ngIf="showSellTransfer">
@@ -341,6 +358,7 @@ export class TxnTypeDialogComponent {
   readonly showSellTransfer: boolean;
   readonly showPossessStorage: boolean;
   readonly showStandaloneUnits: boolean;
+  readonly showDuplicate: boolean;
   readonly contextTitle: string;
 
   constructor(
@@ -351,6 +369,7 @@ export class TxnTypeDialogComponent {
     this.showSellTransfer = !!this.data?.showSellTransfer;
     this.showPossessStorage = !!this.data?.showPossessStorage;
     this.showStandaloneUnits = !!this.data?.showStandaloneUnits;
+    this.showDuplicate = !!this.data?.showDuplicate;
     this.contextTitle = String(this.data?.contextTitle ?? '').trim();
   }
 

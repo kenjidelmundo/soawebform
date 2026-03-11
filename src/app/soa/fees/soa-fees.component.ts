@@ -159,6 +159,8 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         if (up.startsWith('ROC')) {
           this.clearAllComputedFields();
 
+          const isDuplicate = txn === 'DUPLICATE' || up.includes('DUPLICATE');
+
           const rocFlags: RocTxnFlags = {
             txnNew: !!tNew || (up.includes('NEW') && !up.includes('RENEW')),
             txnRenew: !!tRen || up.includes('RENEW') || up.includes('REN'),
@@ -176,6 +178,11 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
           this.patch(res.rocModificationFee, 'appModificationFee');
           this.patch(res.rocDST, 'dst');
 
+          if (isDuplicate) {
+            const currentOthers = this.num(this.form.get('appOthers')?.value, 0);
+            this.patch(currentOthers + 120, 'appOthers');
+          }
+
           this.patch(this.computeTotalAmount(), 'totalAmount');
           return;
         }
@@ -187,6 +194,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
           this.clearAllComputedFields();
 
           const cls = this.extractAmateurClass(text);
+          const isDuplicate = txn === 'DUPLICATE' || up.includes('DUPLICATE');
 
           const flags: AmateurTxnFlags = {
             txnNew: !!tNew || (up.includes('NEW') && !up.includes('RENEW')),
@@ -208,6 +216,11 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
           this.patch(res.maConstructionPermitFee, 'licConstructionPermitFee');
           this.patch(res.maModificationFee, 'appModificationFee');
           this.patch(res.maDST, 'dst');
+
+          if (isDuplicate) {
+            const currentOthers = this.num(this.form.get('appOthers')?.value, 0);
+            this.patch(currentOthers + 120, 'appOthers');
+          }
 
           this.patch(this.computeTotalAmount(), 'totalAmount');
           return;
@@ -247,21 +260,67 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         if (up.includes('COASTAL') && !parsedShipTop) {
           this.clearAllComputedFields();
 
+          const isRenew = !!tRen || up.includes('RENEW') || up.includes('REN');
+          const isNew = !!tNew || (up.includes('NEW') && !isRenew);
+          const hasMod = !!tMod || up.includes('MOD');
+
+          const baseTxn: any =
+            isRenew ? 'RENEW' :
+            isNew ? 'NEW' :
+            hasMod ? 'MOD' :
+            'NEW';
+
           const surMode: CoastalSurchargeMode =
-            txn === 'RENEW'
+            baseTxn === 'RENEW'
               ? (s100 ? 'SUR100' : 'SUR50')
               : 'NONE';
 
-          const res = computeCoastal(text, txn as any, YEARS, surMode);
+          const res = computeCoastal(text, baseTxn as any, YEARS, surMode);
 
-          this.patch(res.purchase, 'licPermitToPurchase');
-          this.patch(res.possess, 'licPermitToPossess');
-          this.patch(res.ff, 'licFilingFee');
-          this.patch(res.cp, 'licConstructionPermitFee');
-          this.patch(res.lf, 'licRadioStationLicense');
-          this.patch(res.ifee, 'licInspectionFee');
-          this.patch(res.surcharge, 'licSurcharges');
-          this.patch(res.dst, 'dst');
+          const purchaseUnits = this.num((text.match(/PURCHASE\/POSSESS[^0-9]*UNITS[_-]?(\d+)/i)?.[1]) ?? 1, 1);
+          const sellUnits = this.num((text.match(/SELL\/TRANSFER[^0-9]*UNITS[_-]?(\d+)/i)?.[1]) ?? 1, 1);
+          const hasPurchase = /PURCHASE\/POSSESS/i.test(up);
+          const hasSell = /SELL\/TRANSFER/i.test(up);
+          const hasDuplicate = /\bDUPLICATE\b/i.test(up);
+
+          const purchaseVal = hasPurchase ? res.purchase * purchaseUnits : res.purchase;
+          const possessVal = hasPurchase ? res.possess * purchaseUnits : res.possess;
+          const sellVal = hasSell ? res.purchase * sellUnits : 0; // reuse purchase rate for sell/transfer
+
+          if (baseTxn === 'MOD') {
+            // MOD only formula: FF + CP + MOD + DST
+            this.patch(res.ff, 'licFilingFee');
+            this.patch(res.cp, 'licConstructionPermitFee');
+            this.patch(res.mod, 'appModificationFee');
+            this.patch(res.dst, 'dst');
+          } else {
+            // NEW / RENEW base
+            this.patch(purchaseVal + sellVal, 'licPermitToPurchase');
+            this.patch(possessVal, 'licPermitToPossess');
+            this.patch(res.ff, 'licFilingFee');
+            this.patch(res.cp, 'licConstructionPermitFee');
+            this.patch(res.lf, 'licRadioStationLicense');
+            this.patch(res.ifee, 'licInspectionFee');
+            this.patch(res.surcharge, 'licSurcharges');
+            this.patch(res.dst, 'dst');
+
+            // MOD add-on on top of NEW/RENEW when selected
+            if (hasMod) {
+              const add = (name: string, val: number) => {
+                const curr = this.num(this.form.get(name)?.value, 0);
+                this.patch(curr + val, name);
+              };
+              add('licFilingFee', res.ff);
+              add('licConstructionPermitFee', res.cp);
+              add('appModificationFee', res.mod);
+              add('dst', res.dst);
+            }
+          }
+
+          if (hasDuplicate) {
+            const currOthers = this.num(this.form.get('appOthers')?.value, 0);
+            this.patch(currOthers + 120, 'appOthers');
+          }
 
           this.patch(this.computeTotalAmount(), 'totalAmount');
           return;
@@ -468,9 +527,9 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     const up = text.toUpperCase();
 
     if (up.includes('PURCHASE') && up.includes('POSSESS')) return 'PURCHASE_POSSESS';
-    if (up.includes('DUPLICATE')) return 'DUPLICATE';
     if (up.includes('RENEW') || up.includes('REN')) return 'RENEW';
     if (up.includes('MOD')) return 'MOD';
+    if (up.includes('DUPLICATE')) return 'DUPLICATE';
     return 'NEW';
   }
 
