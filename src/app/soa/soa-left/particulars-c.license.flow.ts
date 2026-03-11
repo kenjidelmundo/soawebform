@@ -15,7 +15,7 @@ import {
 export type CoastalLicensePicked = {
   subtype: CoastalSubtype; // CoastalStations | HF
   option: CoastalOption;   // selected option tile
-  txn: TxnType;            // NEW / RENEW / MOD  (LAST step)
+  txn?: TxnType;           // NEW / RENEW / MOD (optional)
 };
 
 export function openCoastalLicenseParticularsFlow(
@@ -91,20 +91,16 @@ export function openCoastalLicenseParticularsFlow(
           return;
         }
 
-        const primary: TxnType =
+        const primary: TxnType | undefined =
           (selected.includes('RENEW') && 'RENEW') ||
           (selected.includes('NEW') && 'NEW') ||
           (selected.includes('MOD') && 'MOD') ||
-          'NEW';
+          undefined;
 
         const picked: CoastalLicensePicked = { subtype, option, txn: primary };
 
         // build your particulars text
         let finalText = buildCoastalLicenseFinalText(picked);
-
-        if (primary) {
-          finalText += ` - ${primary === 'MOD' ? 'MODIFICATION' : primary}`;
-        }
 
         if (purchasePossess) {
           finalText += ` - PERMIT TO PURCHASE/POSSESS - UNITS_${purchaseUnits}`;

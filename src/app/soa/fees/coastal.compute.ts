@@ -3,20 +3,21 @@ export type TxnType = 'NEW' | 'RENEW' | 'MOD';
 export type CoastalSubtype = 'CoastalStations' | 'HF';
 
 export type CoastalOption =
-  // Coastal Stations
   | 'HighPoweredAbove100W'
   | 'MediumPowered25To100W'
   | 'LowPowered25WBelow'
-  // HF
   | 'HFHighPowered100W'
   | 'HFMediumPowered25To100W'
   | 'HFLowPowered25WBelow'
   | 'VHF';
 
+export type CoastalServiceType =
+  | 'PURCHASE_POSSESS'
+  | 'SELL_TRANSFER'
+  | 'LICENSE';
+
 export type CoastalRow = {
   key: CoastalOption;
-
-  // table columns
   ff: number;
   purchase: number;
   possess: number;
@@ -32,21 +33,19 @@ export type CoastalRow = {
 export type CoastalParsed = {
   subtype: CoastalSubtype;
   option: CoastalOption;
+  serviceType: CoastalServiceType;
 };
 
 export type CoastalSurchargeMode = 'NONE' | 'SUR50' | 'SUR100';
 
 export type CoastalComputed = {
-  // resolved
   parsed?: CoastalParsed;
   row?: CoastalRow;
-
-  // inputs
   txn: TxnType;
-  years: number; // can be decimal (your form uses 2 decimals)
+  years: number;
+  units: number;
   surchargeMode: CoastalSurchargeMode;
 
-  // computed breakdown
   ff: number;
   purchase: number;
   possess: number;
@@ -60,11 +59,7 @@ export type CoastalComputed = {
   total: number;
 };
 
-// ======================================================
-// ✅ TABLE VALUES (from your screenshot)
-// ======================================================
 export const COASTAL_TABLE: Record<CoastalOption, CoastalRow> = {
-  // COASTAL STATIONS
   HighPoweredAbove100W: {
     key: 'HighPoweredAbove100W',
     ff: 180,
@@ -105,7 +100,6 @@ export const COASTAL_TABLE: Record<CoastalOption, CoastalRow> = {
     sur100: 1200,
   },
 
-  // HIGH FREQUENCY (HF)
   HFHighPowered100W: {
     key: 'HFHighPowered100W',
     ff: 180,
@@ -160,92 +154,117 @@ export const COASTAL_TABLE: Record<CoastalOption, CoastalRow> = {
   },
 };
 
-// ======================================================
-// ✅ PARSER (reads your particulars string)
-// Works with text like:
-// "COASTAL STATION LICENSE - Coastal Stations - High Powered (above 100W)"
-// "COASTAL STATION LICENSE - HIGH FREQUENCY (HF) - VHF"
-// ======================================================
 export function parseCoastalParticulars(particulars: string): CoastalParsed | null {
   const t = String(particulars ?? '').toUpperCase();
 
   if (!t.includes('COASTAL')) return null;
 
-  const isTelephony = t.includes('RADIO TELEPHONY') || t.includes('TELEPHONY');
-  const isTelegraphy = t.includes('RADIO TELEGRAPHY') || t.includes('TELEGRAPHY');
-  const isHF = t.includes('HIGH FREQUENCY') || /\bHF\b/.test(t) || (isTelephony && t.includes('HF'));
+  const hasPurchasePossess =
+    t.includes('PURCHASE/POSSESS') ||
+    (t.includes('PURCHASE') && t.includes('POSSESS'));
+
+  const hasSellTransfer =
+    t.includes('SELL/TRANSFER') ||
+    (t.includes('SELL') && t.includes('TRANSFER'));
+
+  let serviceType: CoastalServiceType = 'LICENSE';
+  if (hasPurchasePossess) serviceType = 'PURCHASE_POSSESS';
+  else if (hasSellTransfer) serviceType = 'SELL_TRANSFER';
+
+  const isHF = t.includes('HIGH FREQUENCY') || /\bHF\b/.test(t);
   const subtype: CoastalSubtype = isHF ? 'HF' : 'CoastalStations';
 
-  // Band first
-  if (t.includes('VHF')) return { subtype: 'HF', option: 'VHF' };
-  if (isTelephony && isHF && t.includes('HF')) return { subtype: 'HF', option: 'HFHighPowered100W' };
-
-  // Telegraphy power detection (no wattage required)
-  if (isTelegraphy || !isTelephony) {
-    if (t.includes('HIGH')) return { subtype: 'CoastalStations', option: 'HighPoweredAbove100W' };
-    if (t.includes('MED')) return { subtype: 'CoastalStations', option: 'MediumPowered25To100W' };
-    if (t.includes('LOW')) return { subtype: 'CoastalStations', option: 'LowPowered25WBelow' };
+  if (t.includes('VHF')) {
+    return { subtype: 'HF', option: 'VHF', serviceType };
   }
 
-  // Telephony fallback: default HF if no VHF
-  if (isTelephony) return { subtype: 'HF', option: 'HFHighPowered100W' };
+  if (isHF) {
+    if (t.includes('HIGH')) {
+      return { subtype: 'HF', option: 'HFHighPowered100W', serviceType };
+    }
+    if (t.includes('MED')) {
+      return { subtype: 'HF', option: 'HFMediumPowered25To100W', serviceType };
+    }
+    if (t.includes('LOW')) {
+      return { subtype: 'HF', option: 'HFLowPowered25WBelow', serviceType };
+    }
+    return { subtype: 'HF', option: 'HFHighPowered100W', serviceType };
+  }
 
-  // Ultimate fallback: medium coastal
-  return { subtype: 'CoastalStations', option: 'MediumPowered25To100W' };
+  if (t.includes('HIGH')) {
+    return { subtype: 'CoastalStations', option: 'HighPoweredAbove100W', serviceType };
+  }
+  if (t.includes('MED')) {
+    return { subtype: 'CoastalStations', option: 'MediumPowered25To100W', serviceType };
+  }
+  if (t.includes('LOW')) {
+    return { subtype: 'CoastalStations', option: 'LowPowered25WBelow', serviceType };
+  }
+
+  return { subtype: 'CoastalStations', option: 'MediumPowered25To100W', serviceType };
 }
 
-// ======================================================
-// ✅ COMPUTE
-// TXN rules (based on your Citizen Charter column):
-// - NEW  : CP + (LF * years) + (IF * years) + DST
-// - RENEW: (LF * years) + (IF * years) + DST + SUR
-// - MOD  : FF + CP + MOD + DST
-//
-// NOTE: Years can be decimal. If you want strict integer years,
-// round it before calling this compute.
-// ======================================================
 export function computeCoastal(
   particulars: string,
   txn: TxnType,
   years: number,
-  surchargeMode: CoastalSurchargeMode = 'NONE'
+  surchargeMode: CoastalSurchargeMode = 'NONE',
+  units: number = 1
 ): CoastalComputed {
   const parsed = parseCoastalParticulars(particulars);
   const row = parsed ? COASTAL_TABLE[parsed.option] : undefined;
 
-  const y = safeNum(years);
+  const y = Math.max(1, safeNum(years));
+  const u = Math.max(1, Math.floor(safeNum(units)));
 
-  // defaults
-  let ff = 0, purchase = 0, possess = 0, cp = 0, lf = 0, ifee = 0, mod = 0, dst = 0, surcharge = 0;
-
-  if (row) {
-    // raw table values (per unit / per yr depending)
-    ff = row.ff;
-    purchase = row.purchase;
-    possess = row.possess;
-    cp = row.cp;
-    lf = row.lf;
-    ifee = row.ifee;
-    mod = row.mod;
-    dst = row.dst;
-
-    if (txn === 'RENEW') {
-      if (surchargeMode === 'SUR50') surcharge = row.sur50;
-      if (surchargeMode === 'SUR100') surcharge = row.sur100;
-    }
-  }
-
-  // computed totals per txn
+  let ff = 0;
+  let purchase = 0;
+  let possess = 0;
+  let cp = 0;
+  let lf = 0;
+  let ifee = 0;
+  let mod = 0;
+  let dst = 0;
+  let surcharge = 0;
   let total = 0;
 
-  if (txn === 'NEW') {
-    total = cp + (lf * y) + (ifee * y) + dst;
-  } else if (txn === 'RENEW') {
-    total = (lf * y) + (ifee * y) + dst + surcharge;
-  } else if (txn === 'MOD') {
-    total = ff + cp + mod + dst;
-  } else {
-    total = 0;
+  if (row && parsed) {
+    if (parsed.serviceType === 'PURCHASE_POSSESS') {
+      ff = row.ff;
+      purchase = row.purchase * u;
+      possess = row.possess * u;
+      dst = row.dst;
+      total = ff + purchase + possess + dst;
+    } else if (parsed.serviceType === 'SELL_TRANSFER') {
+      purchase = row.purchase * u; // STF placeholder
+      dst = row.dst;
+      total = purchase + dst;
+    } else {
+      if (txn === 'NEW') {
+        cp = row.cp;
+        lf = row.lf * y;
+        ifee = row.ifee * y;
+        dst = row.dst;
+        total = cp + lf + ifee + dst;
+      } else if (txn === 'RENEW') {
+        lf = row.lf * y;
+        ifee = row.ifee * y;
+        dst = row.dst;
+        surcharge =
+          surchargeMode === 'SUR100'
+            ? row.sur100
+            : surchargeMode === 'SUR50'
+            ? row.sur50
+            : 0;
+        total = lf + ifee + dst + surcharge;
+      } else {
+        ff = row.ff;
+        cp = row.cp;
+        mod = row.mod;
+        dst = row.dst;
+        total = ff + cp + mod + dst;
+      }
+    }
   }
 
   return {
@@ -253,25 +272,24 @@ export function computeCoastal(
     row,
     txn,
     years: y,
+    units: u,
     surchargeMode,
-
-    ff,
-    purchase,
-    possess,
-    cp,
-    lf,
-    ifee,
-    mod,
-    dst,
-    surcharge,
-
+    ff: round2(ff),
+    purchase: round2(purchase),
+    possess: round2(possess),
+    cp: round2(cp),
+    lf: round2(lf),
+    ifee: round2(ifee),
+    mod: round2(mod),
+    dst: round2(dst),
+    surcharge: round2(surcharge),
     total: round2(total),
   };
 }
 
 function safeNum(v: any): number {
   const n = Number(v ?? 0);
-  return isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? n : 0;
 }
 
 function round2(n: number): number {
