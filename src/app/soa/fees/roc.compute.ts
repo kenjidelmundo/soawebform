@@ -27,6 +27,8 @@ export type RocResult = {
   kind: string;
 };
 
+type RocTxn = 'NEW' | 'RENEW' | 'MOD';
+
 const num = (v: any): number => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -114,6 +116,33 @@ export function computeRocRenewalSurcharge(
   return round2(base * (1 + extraHalfYears * 0.5));
 }
 
+function getEffectiveRocTxn(txn: TxnFlags): RocTxn {
+  // ROC charter formulas are per transaction type.
+  // If multiple flags are true, keep one effective txn to avoid blended formulas.
+  if (txn.txnMod) return 'MOD';
+  if (txn.txnRenew) return 'RENEW';
+  return 'NEW';
+}
+
+function getRocCertCountFromParticulars(particulars: string): number {
+  const up = normalize(particulars);
+
+  const pats = [
+    /\bNO\._\s*([0-9]+)\b/,
+    /\bNO\.?\s*(?:OF\s*)?(?:CERT(?:IFICATE)?S?)?\s*[:=]?\s*([0-9]+)\b/,
+    /\bQTY\s*[:=]?\s*([0-9]+)\b/,
+  ];
+
+  for (const pat of pats) {
+    const m = up.match(pat);
+    if (!m?.[1]) continue;
+    const n = Math.floor(num(m[1]));
+    if (n >= 1) return n;
+  }
+
+  return 1;
+}
+
 export function computeROC(
   particulars: string,
   years: number,
@@ -122,6 +151,8 @@ export function computeROC(
 ): RocResult {
   const key = getRocOperatorKeyFromParticulars(particulars);
   const row = getRocOperatorRowFromParticulars(particulars);
+  const effectiveTxn = getEffectiveRocTxn(txn);
+  const certCount = getRocCertCountFromParticulars(particulars);
   const yr = Math.max(1, Math.floor(num(years) || 1));
 
   let rocFF = 0;
@@ -130,111 +161,48 @@ export function computeROC(
   let rocRadioOperatorsCert = 0;
   let rocSurcharges = 0;
   let rocModificationFee = 0;
-  const rocDST = num(row.DST);
+  let rocDST = num(row.DST);
 
-  // TEMPORARY ROC FOR FOREIGN PILOT = ROC + DST
-  if (key === 'TEMP-FOREIGN') {
-    rocRadioOperatorsCert = num(row.ROC);
-    if (txn.txnMod) rocModificationFee = num(row.MOD);
-
-    return {
-      rocFF: round2(rocFF),
-      rocAF: round2(rocAF),
-      rocSemFee: round2(rocSemFee),
-      rocRadioOperatorsCert: round2(rocRadioOperatorsCert),
-      rocSurcharges: round2(rocSurcharges),
-      rocDST: round2(rocDST),
-      rocModificationFee: round2(rocModificationFee),
-      total: round2(
-        rocFF + rocAF + rocSemFee + rocRadioOperatorsCert + rocSurcharges + rocModificationFee + rocDST
-      ),
-      kind: key,
-    };
-  }
-
-  // SROP
-  if (key === 'SROP') {
-    if (txn.txnNew) {
-      rocAF = num(row.AF);
-      rocSemFee = num(row.SEM);
-      rocRadioOperatorsCert = num(row.ROC) * yr;
-    }
-
-    if (txn.txnRenew) {
-      rocRadioOperatorsCert = num(row.ROC) * yr;
-      rocSurcharges = computeRocRenewalSurcharge(num(row.ROC), delayMonths);
-    }
-
-    if (txn.txnMod) {
-      rocModificationFee = num(row.MOD);
-    }
-
-    return {
-      rocFF: round2(rocFF),
-      rocAF: round2(rocAF),
-      rocSemFee: round2(rocSemFee),
-      rocRadioOperatorsCert: round2(rocRadioOperatorsCert),
-      rocSurcharges: round2(rocSurcharges),
-      rocDST: round2(rocDST),
-      rocModificationFee: round2(rocModificationFee),
-      total: round2(
-        rocFF + rocAF + rocSemFee + rocRadioOperatorsCert + rocSurcharges + rocModificationFee + rocDST
-      ),
-      kind: key,
-    };
-  }
-
-  // GROC / RROC-RLM
-  if (key === 'GROC' || key === 'RROC-RLM') {
-    if (txn.txnNew) {
-      rocFF = num(row.FF);
-      rocAF = num(row.AF);
-      rocRadioOperatorsCert = num(row.ROC) * yr;
-    }
-
-    if (txn.txnRenew) {
-      rocRadioOperatorsCert = num(row.ROC) * yr;
-      rocSurcharges = computeRocRenewalSurcharge(num(row.ROC), delayMonths);
-    }
-
-    if (txn.txnMod) {
-      rocModificationFee = num(row.MOD);
-    }
-
-    return {
-      rocFF: round2(rocFF),
-      rocAF: round2(rocAF),
-      rocSemFee: round2(rocSemFee),
-      rocRadioOperatorsCert: round2(rocRadioOperatorsCert),
-      rocSurcharges: round2(rocSurcharges),
-      rocDST: round2(rocDST),
-      rocModificationFee: round2(rocModificationFee),
-      total: round2(
-        rocFF + rocAF + rocSemFee + rocRadioOperatorsCert + rocSurcharges + rocModificationFee + rocDST
-      ),
-      kind: key,
-    };
-  }
-
-  // COMMERCIAL ROC / RROC-AIRCRAFT
-  if (txn.txnNew) {
-    rocRadioOperatorsCert = num(row.ROC) * yr;
-  }
-
-  if (txn.txnRenew) {
-    rocRadioOperatorsCert = num(row.ROC) * yr;
-    rocSurcharges = computeRocRenewalSurcharge(num(row.ROC), delayMonths);
-  }
-
-  if (txn.txnMod) {
+  if (effectiveTxn === 'MOD') {
+    // G. Modification of any certificate = MOD + DST
     rocModificationFee = num(row.MOD);
+  } else if (effectiveTxn === 'RENEW') {
+    // Renewal: ROC(YR) + DST + SUR
+    if (key === 'TEMP-FOREIGN') {
+      // Temporary ROC for Foreign Pilot is fixed as ROC + DST.
+      rocRadioOperatorsCert = num(row.ROC);
+      rocSurcharges = 0;
+    } else {
+      rocRadioOperatorsCert = num(row.ROC) * yr;
+      rocSurcharges = computeRocRenewalSurcharge(num(row.ROC), delayMonths);
+    }
+  } else if (key === 'TEMP-FOREIGN') {
+    // C. Temporary ROC for Foreign Pilot = ROC + DST
+    rocRadioOperatorsCert = num(row.ROC);
+  } else if (key === 'SROP') {
+    // D.1 SROP (NEW) = AF + SEM + ROC(YR) + DST
+    rocAF = num(row.AF);
+    rocSemFee = num(row.SEM);
+    rocRadioOperatorsCert = num(row.ROC) * yr;
+  } else if (key === 'GROC' || key === 'RROC-RLM') {
+    // E.1/F.1 (NEW) = FF + AF + ROC(YR) + DST
+    rocFF = num(row.FF);
+    rocAF = num(row.AF);
+    rocRadioOperatorsCert = num(row.ROC) * yr;
+  } else {
+    // A.1/B.1 Commercial/RROC-Aircraft (NEW) = ROC(YR) + DST
+    rocRadioOperatorsCert = num(row.ROC) * yr;
   }
 
-  // if only MOD selected and no NEW/RENEW
-  if (!txn.txnNew && !txn.txnRenew && txn.txnMod) {
-    rocRadioOperatorsCert = 0;
-    rocSurcharges = 0;
-  }
+  // Optional group multiplier: e.g. "NO. 5", "NO OF CERT 5", or "QTY 5"
+  // Multiplies all fee components, including DST and surcharge.
+  rocFF *= certCount;
+  rocAF *= certCount;
+  rocSemFee *= certCount;
+  rocRadioOperatorsCert *= certCount;
+  rocSurcharges *= certCount;
+  rocModificationFee *= certCount;
+  rocDST *= certCount;
 
   return {
     rocFF: round2(rocFF),
@@ -247,6 +215,6 @@ export function computeROC(
     total: round2(
       rocFF + rocAF + rocSemFee + rocRadioOperatorsCert + rocSurcharges + rocModificationFee + rocDST
     ),
-    kind: key,
+    kind: certCount > 1 ? `${key}_X${certCount}` : key,
   };
 }

@@ -289,11 +289,14 @@ export function getSurchargeFromDelay(lfTotal: number, delayMonths: number): num
 // A.5 / C.4 Mod
 //   = FF + CPF + MOD + DST
 //
+// B.2 (International, with equipment) Mod
+//   = FF(unit) + Purchase(unit) + Possess(unit) + CPF + MOD + DST
+//
 // F. Deletion
 //   = FF + CERT + DST
 //
 // DUPLICATE
-//   = FF + MOD + DST
+//   = handled outside this compute via applyDuplicateOthersCharge()
 // ----------------------------------------------------
 export function computeShipStation(
   ship: ShipParse,
@@ -398,7 +401,16 @@ export function computeShipStation(
         break;
       }
       case 'MOD': {
-        FF += num(row.FF);
+        // International MOD with originally-installed equipment follows
+        // FF/PUR/POS per unit + CPF + MOD + DST.
+        const intlWithEquipment = ship.rowKey.startsWith('SSL-INT-') && withEquip;
+        if (intlWithEquipment) {
+          FF += num(row.FF) * unitsBase;
+          Purchase += num(row.Purchase) * unitsBase;
+          Possess += num(row.Possess) * unitsBase;
+        } else {
+          FF += num(row.FF);
+        }
         CPF += num(row.CPF);
         MOD += num(row.MOD);
         DST += num(row.DST);
@@ -416,8 +428,8 @@ export function computeShipStation(
         break;
       }
       case 'DUPLICATE': {
-        // Duplicate adds fixed charge to Others while keeping the selected txn computation.
-        OTH += 120;
+        // Keep duplicate fee handling in soa-fees.component via applyDuplicateOthersCharge()
+        // so all services share one duplicate-charge path.
         break;
       }
       case 'NEW': {

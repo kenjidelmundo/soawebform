@@ -173,32 +173,46 @@ export function parseCoastalParticulars(particulars: string): CoastalParsed | nu
 
   const isHF = t.includes('HIGH FREQUENCY') || /\bHF\b/.test(t);
   const subtype: CoastalSubtype = isHF ? 'HF' : 'CoastalStations';
+  const hasHighPowered =
+    t.includes('HIGH POWERED') ||
+    t.includes('ABOVE 100W') ||
+    t.includes('(100W)');
+  const hasMediumPowered =
+    t.includes('MEDIUM POWERED') ||
+    t.includes('25W UP TO 100W') ||
+    t.includes('ABOVE 25W');
+  const hasLowPowered =
+    t.includes('LOW POWERED') ||
+    t.includes('25W BELOW') ||
+    t.includes('25W AND BELOW');
 
   if (t.includes('VHF')) {
     return { subtype: 'HF', option: 'VHF', serviceType };
   }
 
   if (isHF) {
-    if (t.includes('HIGH')) {
-      return { subtype: 'HF', option: 'HFHighPowered100W', serviceType };
-    }
-    if (t.includes('MED')) {
+    // Do not match generic "HIGH" here because "HIGH FREQUENCY" would
+    // incorrectly force HF high-powered for medium/low selections.
+    if (hasMediumPowered) {
       return { subtype: 'HF', option: 'HFMediumPowered25To100W', serviceType };
     }
-    if (t.includes('LOW')) {
+    if (hasLowPowered) {
       return { subtype: 'HF', option: 'HFLowPowered25WBelow', serviceType };
+    }
+    if (hasHighPowered) {
+      return { subtype: 'HF', option: 'HFHighPowered100W', serviceType };
     }
     return { subtype: 'HF', option: 'HFHighPowered100W', serviceType };
   }
 
-  if (t.includes('HIGH')) {
-    return { subtype: 'CoastalStations', option: 'HighPoweredAbove100W', serviceType };
-  }
-  if (t.includes('MED')) {
+  if (hasMediumPowered) {
     return { subtype: 'CoastalStations', option: 'MediumPowered25To100W', serviceType };
   }
-  if (t.includes('LOW')) {
+  if (hasLowPowered) {
     return { subtype: 'CoastalStations', option: 'LowPowered25WBelow', serviceType };
+  }
+  if (hasHighPowered) {
+    return { subtype: 'CoastalStations', option: 'HighPoweredAbove100W', serviceType };
   }
 
   return { subtype: 'CoastalStations', option: 'MediumPowered25To100W', serviceType };

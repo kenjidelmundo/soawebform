@@ -422,7 +422,25 @@ export function computeAmateur(
   // B.5
   if (isSellTransfer && key.startsWith('AT_RSL_')) {
     maStf = num(row.STF) * unit;
-    // Do not return early; allow other txn fees (e.g., MOD/RENEW) to apply.
+    maDST = num(row.DST);
+
+    const total = round2(maStf + maDST);
+
+    return {
+      maPermitPurchase: 0,
+      maPermitPossess: 0,
+      maStf: round2(maStf),
+      maRadioStationLicense: 0,
+      maRadioOperatorsCert: 0,
+      maApplicationFee: 0,
+      maFilingFee: 0,
+      maConstructionPermitFee: 0,
+      maSurcharges: 0,
+      maDST: round2(maDST),
+      maModificationFee: 0,
+      total,
+      kind: `${String(key)}_SELL_TRANSFER`,
+    };
   }
 
   // H
@@ -500,7 +518,7 @@ export function computeAmateur(
 
   // C.2 / C.3
   else if (key === 'AT_LIFETIME') {
-    if (txn.txnNew) {
+    if (txn.txnNew || txn.txnRenew) {
       maRadioStationLicense = num(row.LF);
     }
 

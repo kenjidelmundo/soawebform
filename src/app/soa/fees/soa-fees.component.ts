@@ -698,7 +698,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
       (cleanToday.getFullYear() - expiry.getFullYear()) * 12 +
       (cleanToday.getMonth() - expiry.getMonth());
 
-    if (cleanToday.getDate() >= expiry.getDate()) {
+    if (cleanToday.getDate() > expiry.getDate()) {
       months += 1;
     }
 

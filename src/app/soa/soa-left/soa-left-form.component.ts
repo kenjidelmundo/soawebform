@@ -197,7 +197,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       (today.getMonth() - expiry.getMonth());
 
     // count any started extra month as another late month
-    if (today.getDate() >= expiry.getDate()) {
+    if (today.getDate() > expiry.getDate()) {
       months += 1;
     }
 

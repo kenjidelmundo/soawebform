@@ -34,30 +34,32 @@ type TxnTypeDialogData = {
       <div class="contextTitle" *ngIf="contextTitle">{{ contextTitle }}</div>
 
       <div class="list" [class.twoCol]="showPurchasePossess">
-        <label class="row" (click)="$event.preventDefault(); toggle('NEW')">
-          <input
-            type="checkbox"
-            class="cb"
-            [checked]="isChecked('NEW')"
-            tabindex="-1"
-            aria-hidden="true"
-          />
-          <span class="box" [class.on]="isChecked('NEW')"></span>
-          <span class="txt">New</span>
-        </label>
+        <div class="ppWrap">
+          <label class="row" (click)="$event.preventDefault(); toggle('NEW')">
+            <input
+              type="checkbox"
+              class="cb"
+              [checked]="isChecked('NEW')"
+              tabindex="-1"
+              aria-hidden="true"
+            />
+            <span class="box" [class.on]="isChecked('NEW')"></span>
+            <span class="txt">New</span>
+          </label>
 
-        <div class="unitsRow" *ngIf="showStandaloneUnits && isChecked('NEW')">
-          <label class="unitsLabel" for="txnUnitsNew">Unit:</label>
-          <input
-            id="txnUnitsNew"
-            type="number"
-            class="unitsInput"
-            min="1"
-            step="1"
-            [value]="standaloneUnits"
-            (click)="$event.stopPropagation()"
-            (input)="onStandaloneUnitsInput($event)"
-          />
+          <div class="unitsRow" *ngIf="showStandaloneUnits && isChecked('NEW')">
+            <label class="unitsLabel" for="txnUnitsNew">Unit:</label>
+            <input
+              id="txnUnitsNew"
+              type="number"
+              class="unitsInput"
+              min="1"
+              step="1"
+              [value]="standaloneUnits"
+              (click)="$event.stopPropagation()"
+              (input)="onStandaloneUnitsInput($event)"
+            />
+          </div>
         </div>
 
         <div class="ppWrap" *ngIf="showPurchasePossess">
@@ -91,30 +93,32 @@ type TxnTypeDialogData = {
           </div>
         </div>
 
-        <label class="row" (click)="$event.preventDefault(); toggle('RENEW')">
-          <input
-            type="checkbox"
-            class="cb"
-            [checked]="isChecked('RENEW')"
-            tabindex="-1"
-            aria-hidden="true"
-          />
-          <span class="box" [class.on]="isChecked('RENEW')"></span>
-          <span class="txt">Renew</span>
-        </label>
+        <div class="ppWrap">
+          <label class="row" (click)="$event.preventDefault(); toggle('RENEW')">
+            <input
+              type="checkbox"
+              class="cb"
+              [checked]="isChecked('RENEW')"
+              tabindex="-1"
+              aria-hidden="true"
+            />
+            <span class="box" [class.on]="isChecked('RENEW')"></span>
+            <span class="txt">Renew</span>
+          </label>
 
-        <div class="unitsRow" *ngIf="showStandaloneUnits && isChecked('RENEW')">
-          <label class="unitsLabel" for="txnUnitsRenew">Unit:</label>
-          <input
-            id="txnUnitsRenew"
-            type="number"
-            class="unitsInput"
-            min="1"
-            step="1"
-            [value]="standaloneUnits"
-            (click)="$event.stopPropagation()"
-            (input)="onStandaloneUnitsInput($event)"
-          />
+          <div class="unitsRow" *ngIf="showStandaloneUnits && isChecked('RENEW')">
+            <label class="unitsLabel" for="txnUnitsRenew">Unit:</label>
+            <input
+              id="txnUnitsRenew"
+              type="number"
+              class="unitsInput"
+              min="1"
+              step="1"
+              [value]="standaloneUnits"
+              (click)="$event.stopPropagation()"
+              (input)="onStandaloneUnitsInput($event)"
+            />
+          </div>
         </div>
 
         <label
@@ -189,30 +193,32 @@ type TxnTypeDialogData = {
           </div>
         </div>
 
-        <label class="row" (click)="$event.preventDefault(); toggle('MOD')">
-          <input
-            type="checkbox"
-            class="cb"
-            [checked]="isChecked('MOD')"
-            tabindex="-1"
-            aria-hidden="true"
-          />
-          <span class="box" [class.on]="isChecked('MOD')"></span>
-          <span class="txt">Modification</span>
-        </label>
+        <div class="ppWrap">
+          <label class="row" (click)="$event.preventDefault(); toggle('MOD')">
+            <input
+              type="checkbox"
+              class="cb"
+              [checked]="isChecked('MOD')"
+              tabindex="-1"
+              aria-hidden="true"
+            />
+            <span class="box" [class.on]="isChecked('MOD')"></span>
+            <span class="txt">Modification</span>
+          </label>
 
-        <div class="unitsRow" *ngIf="showStandaloneUnits && isChecked('MOD')">
-          <label class="unitsLabel" for="txnUnitsMod">Unit:</label>
-          <input
-            id="txnUnitsMod"
-            type="number"
-            class="unitsInput"
-            min="1"
-            step="1"
-            [value]="standaloneUnits"
-            (click)="$event.stopPropagation()"
-            (input)="onStandaloneUnitsInput($event)"
-          />
+          <div class="unitsRow" *ngIf="showStandaloneUnits && isChecked('MOD')">
+            <label class="unitsLabel" for="txnUnitsMod">Unit:</label>
+            <input
+              id="txnUnitsMod"
+              type="number"
+              class="unitsInput"
+              min="1"
+              step="1"
+              [value]="standaloneUnits"
+              (click)="$event.stopPropagation()"
+              (input)="onStandaloneUnitsInput($event)"
+            />
+          </div>
         </div>
       </div>
 
