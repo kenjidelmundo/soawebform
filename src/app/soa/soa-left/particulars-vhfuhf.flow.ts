@@ -38,19 +38,50 @@ export function openVhfUhfParticularsFlow(
       autoFocus: false,
       restoreFocus: false,
       panelClass: 'soa-dlg',
+      data: {
+        contextTitle: baseText,
+        showPurchasePossess: true,
+        showStandaloneUnits: true,
+        showDuplicate: true,
+      },
     });
 
     refTxn.afterClosed().subscribe((r: any) => {
-      const txn: TxnType | undefined = r?.value ?? r?.txn ?? r;
-      if (!txn) {
+      const selected: TxnType[] = Array.isArray(r?.value)
+        ? (r.value as TxnType[])
+        : r?.value
+        ? [r.value as TxnType]
+        : [];
+
+      const primary: TxnType | undefined =
+        (selected.includes('MOD') && 'MOD') ||
+        (selected.includes('RENEW') && 'RENEW') ||
+        (selected.includes('NEW') && 'NEW') ||
+        undefined;
+
+      const purchasePossess = !!r?.purchasePossess;
+      const purchasePossessUnits = Math.max(1, Math.floor(Number(r?.purchasePossessUnits || 1)));
+      const primaryUnits = Math.max(1, Math.floor(Number(r?.standaloneUnits || 1)));
+      const hasDuplicate = selected.includes('DUPLICATE');
+
+      if (!primary && !purchasePossess && !hasDuplicate) {
         cancel();
         return;
       }
 
-      const txnText = txn === 'MOD' ? 'MODIFICATION' : txn; // match your other patterns
-      const finalText = `${baseText} - ${txnText}`;
+      const parts: string[] = [];
+      if (primary) {
+        const primaryText = primary === 'MOD' ? 'MODIFICATION' : primary;
+        parts.push(`${primaryText} - UNITS_${primaryUnits}`);
+      }
+      if (purchasePossess) {
+        parts.push(`PURCHASE/POSSESS - UNITS_${purchasePossessUnits}`);
+      }
+      if (hasDuplicate) parts.push('DUPLICATE');
 
-      finalize(finalText, txn);
+      const finalText = `${baseText} - ${parts.join(' - ')}`;
+
+      finalize(finalText, primary);
     });
   });
 }

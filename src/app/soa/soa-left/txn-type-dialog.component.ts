@@ -46,6 +46,20 @@ type TxnTypeDialogData = {
           <span class="txt">New</span>
         </label>
 
+        <div class="unitsRow" *ngIf="showStandaloneUnits && isChecked('NEW')">
+          <label class="unitsLabel" for="txnUnitsNew">Unit:</label>
+          <input
+            id="txnUnitsNew"
+            type="number"
+            class="unitsInput"
+            min="1"
+            step="1"
+            [value]="standaloneUnits"
+            (click)="$event.stopPropagation()"
+            (input)="onStandaloneUnitsInput($event)"
+          />
+        </div>
+
         <div class="ppWrap" *ngIf="showPurchasePossess">
           <label
             class="row"
@@ -88,6 +102,20 @@ type TxnTypeDialogData = {
           <span class="box" [class.on]="isChecked('RENEW')"></span>
           <span class="txt">Renew</span>
         </label>
+
+        <div class="unitsRow" *ngIf="showStandaloneUnits && isChecked('RENEW')">
+          <label class="unitsLabel" for="txnUnitsRenew">Unit:</label>
+          <input
+            id="txnUnitsRenew"
+            type="number"
+            class="unitsInput"
+            min="1"
+            step="1"
+            [value]="standaloneUnits"
+            (click)="$event.stopPropagation()"
+            (input)="onStandaloneUnitsInput($event)"
+          />
+        </div>
 
         <label
           class="row"
@@ -173,10 +201,10 @@ type TxnTypeDialogData = {
           <span class="txt">Modification</span>
         </label>
 
-        <div class="unitsRow" *ngIf="showStandaloneUnits">
-          <label class="unitsLabel" for="standaloneUnits">Unit:</label>
+        <div class="unitsRow" *ngIf="showStandaloneUnits && isChecked('MOD')">
+          <label class="unitsLabel" for="txnUnitsMod">Unit:</label>
           <input
-            id="standaloneUnits"
+            id="txnUnitsMod"
             type="number"
             class="unitsInput"
             min="1"
@@ -388,7 +416,11 @@ export class TxnTypeDialogComponent {
       return Number.isFinite(this.possessStorageUnits) && this.possessStorageUnits >= 1;
     }
     if (this.showStandaloneUnits) {
-      return Number.isFinite(this.standaloneUnits) && this.standaloneUnits >= 1;
+      return (
+        this.selected.length > 0 &&
+        Number.isFinite(this.standaloneUnits) &&
+        this.standaloneUnits >= 1
+      );
     }
     return this.selected.length > 0 || this.sellTransfer || this.possessStorage;
   }

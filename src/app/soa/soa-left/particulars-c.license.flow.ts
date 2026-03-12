@@ -91,10 +91,12 @@ export function openCoastalLicenseParticularsFlow(
           return;
         }
 
+        // Coastal charter flows are single-transaction paths; if MOD is checked,
+        // keep it as the primary txn so MOD fees are computed.
         const primary: TxnType | undefined =
+          (selected.includes('MOD') && 'MOD') ||
           (selected.includes('RENEW') && 'RENEW') ||
           (selected.includes('NEW') && 'NEW') ||
-          (selected.includes('MOD') && 'MOD') ||
           undefined;
 
         const picked: CoastalLicensePicked = { subtype, option, txn: primary };
@@ -128,12 +130,8 @@ function buildCoastalLicenseFinalText(p: CoastalLicensePicked): string {
   const subtypeLabel =
     p.subtype === 'CoastalStations' ? 'Coastal Stations' : 'HIGH FREQUENCY (HF)';
   const optionLabel = coastalOptionLabel(p.option, p.subtype);
-
-  // If you want txn included in particulars text, keep this:
-  // return `${service} - ${subtypeLabel} - ${optionLabel} - ${p.txn}`;
-
-  // If you do NOT want txn in particulars text, use this:
-  return `${service} - ${subtypeLabel} - ${optionLabel}`;
+  const txnLabel = p.txn ? ` - ${p.txn}` : '';
+  return `${service} - ${subtypeLabel} - ${optionLabel}${txnLabel}`;
 }
 
 function coastalOptionLabel(opt: CoastalOption, subtype?: CoastalSubtype): string {

@@ -236,17 +236,17 @@ export function parseVhfUhfFromParticulars(particulars: string): VhfUhfPicked | 
  *   FEE_PUR_POS = (FF)(UNIT) + (PUR)(UNIT) + (POS)(UNIT) + DST
  *
  * Radio Station License (NEW):
- *   FEE_RSL = (CPF)(UNIT) + (LF/CH_UNIT)(YR) + (IF/UNIT)(YR) + (SUF/CH_UNIT)(YR) + DST
+ *   FEE_RSL = (CPF)(UNIT) + (LF)(CH_UNIT)(YR) + (IF)(UNIT)(YR) + (SUF)(CH_UNIT)(YR) + DST
  *
  * Radio Station License (RENEWAL):
- *   FEE_RSL = (LF/CH_UNIT)(YR) + (IF/UNIT)(YR) + (SUF/CH_UNIT)(YR) + DST + SUR
+ *   FEE_RSL = (LF)(CH_UNIT)(YR) + (IF)(UNIT)(YR) + (SUF)(CH_UNIT)(YR) + DST + SUR
  *
  * Radio Station License (MODIFICATION):
  *   FEE_RSL = (FF)(UNIT) + (CPF)(UNIT) + (MOD)(UNIT) + DST
  *
  * Notes:
  * - UNIT, CH_UNIT, YR are inputs (default to 1 if missing)
- * - SUR is based on the LF portion (same basis as LF/CH_UNIT * YR)
+ * - SUR is based on LF base per channel (LF * CH_UNIT)
  */
 export function computeVhfUhfWithTxn(
   particularsText: string,
@@ -254,7 +254,8 @@ export function computeVhfUhfWithTxn(
   years: number,
   unit: number,
   chUnit: number,
-  surchargeMode: 'NONE' | 'SUR50' | 'SUR100'
+  surchargeMode: 'NONE' | 'SUR50' | 'SUR100',
+  delayMonths: number = 0
 ): VhfUhfComputed | null {
   const picked = parseVhfUhfFromParticulars(particularsText);
   if (!picked) return null;
@@ -276,16 +277,19 @@ export function computeVhfUhfWithTxn(
     out.possess = ov.possess;
   }
 
-  // compute surcharge based on LF portion (LF/CH_UNIT * YR)
-  const lfPortion = (out.licenseFee / CH_UNIT) * YEARS;
-  const sur =
-    surchargeMode === 'SUR100' ? lfPortion * 1.0 :
-    surchargeMode === 'SUR50' ? lfPortion * 0.5 :
+  const delayBlocks = Math.max(0, Math.ceil(Math.floor(Number(delayMonths || 0)) / 6));
+  const modeRate =
+    surchargeMode === 'SUR100' ? 1.0 :
+    surchargeMode === 'SUR50' ? 0.5 :
     0;
+  const surchargeRate = delayBlocks > 0 ? delayBlocks * 0.5 : modeRate;
+  // Citizen Charter table bases VHF/UHF surcharge on LF base (per channel, not per year).
+  const lfSurchargeBase = out.licenseFee * CH_UNIT;
+  const sur = lfSurchargeBase * surchargeRate;
 
   // keep also classic sur columns (per base LF only)
-  out.surLf50 = Math.round(out.licenseFee * 0.5);
-  out.surLf100 = Math.round(out.licenseFee * 1.0);
+  out.surLf50 = round2(out.licenseFee * CH_UNIT * 0.5);
+  out.surLf100 = round2(out.licenseFee * CH_UNIT * 1.0);
 
   // compute fee based on txn
   let total = 0;
@@ -293,15 +297,15 @@ export function computeVhfUhfWithTxn(
   if (txn === 'NEW') {
     total =
       (out.constructionPermit * UNIT) +
-      (out.licenseFee / CH_UNIT) * YEARS +
-      (out.inspectionFee / UNIT) * YEARS +
-      (out.supervisionFee / CH_UNIT) * YEARS +
+      (out.licenseFee * CH_UNIT) * YEARS +
+      (out.inspectionFee * UNIT) * YEARS +
+      (out.supervisionFee * CH_UNIT) * YEARS +
       out.dst;
   } else if (txn === 'RENEW') {
     total =
-      (out.licenseFee / CH_UNIT) * YEARS +
-      (out.inspectionFee / UNIT) * YEARS +
-      (out.supervisionFee / CH_UNIT) * YEARS +
+      (out.licenseFee * CH_UNIT) * YEARS +
+      (out.inspectionFee * UNIT) * YEARS +
+      (out.supervisionFee * CH_UNIT) * YEARS +
       out.dst +
       sur;
   } else {

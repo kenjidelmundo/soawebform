@@ -152,7 +152,17 @@ export class SoaRightPanelComponent implements OnInit, AfterViewInit, OnDestroy 
             this.findStringInFormTree(this.form, ['txn', 'type']) ??
             this.findStringInFormTree(this.form, ['transaction', 'type']);
 
-          return this.normalizeTxnState(particularsText) || this.normalizeTxnState(txnTypeAny);
+          const fromTxnType = this.normalizeTxnState(txnTypeAny);
+          const fromParticulars = this.normalizeTxnState(particularsText);
+
+          // Prefer explicit txn fields only when they clearly point to NEW/RENEW/MOD.
+          // For DUPLICATE-only, keep particulars as source so mixed cases like
+          // "MODIFICATION - DUPLICATE" still preserve MOD.
+          if (fromTxnType?.txnNew || fromTxnType?.txnRenew || fromTxnType?.txnModification) {
+            return fromTxnType;
+          }
+
+          return fromParticulars || fromTxnType;
         }),
         distinctUntilChanged((a, b) =>
           !!a &&
@@ -233,6 +243,15 @@ export class SoaRightPanelComponent implements OnInit, AfterViewInit, OnDestroy 
       s.includes('CORRECTION');
 
     const hasNew = s === 'NEW' || /\bNEW\b/.test(s) || s.includes('NEW APPLICATION');
+    const hasDuplicate = s === 'DUPLICATE' || /\bDUPLICATE\b/.test(s);
+
+    if (hasDuplicate && !hasNew && !hasRenew && !hasMod) {
+      return {
+        txnNew: false,
+        txnRenew: false,
+        txnModification: false,
+      };
+    }
 
     if (!hasNew && !hasRenew && !hasMod) return null;
 

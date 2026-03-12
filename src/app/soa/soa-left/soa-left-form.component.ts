@@ -233,11 +233,20 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       t.includes('RE-ISSUE');
 
     const hasNew = /\bNEW\b/.test(t) || t.includes('NEW APPLICATION');
+    const hasDuplicate = /\bDUPLICATE\b/.test(t);
+    const hasDuplicateOnly = hasDuplicate && !hasMod && !hasRenew && !hasNew;
 
     const curNew = this.getBoolDeep('txnNew');
     const curRenew = this.getBoolDeep('txnRenew');
     const curMod = this.getBoolDeep('txnModification');
     const anySelected = curNew || curRenew || curMod;
+
+    if (hasDuplicateOnly) {
+      this.setTxnEverywhere({ txnNew: false, txnRenew: false, txnModification: false });
+      this.setStringDeep('txnType', 'DUPLICATE');
+      this.setStringDeep('transactionType', 'DUPLICATE');
+      return;
+    }
 
     if (hasMod || hasRenew || hasNew) {
       this.setTxnEverywhere({
@@ -635,8 +644,8 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           return;
 
         case 'VHFUHF':
-          openVhfUhfParticularsFlow(this.dialog, () => {}, (finalText: string) => {
-            this.applyFinalParticulars(finalText, undefined);
+          openVhfUhfParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
+            this.applyFinalParticulars(finalText, txn);
           });
           return;
 
@@ -691,8 +700,8 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       if (kind.includes('VHF') || kind.includes('UHF')) {
-        openVhfUhfParticularsFlow(this.dialog, () => {}, (finalText: string) => {
-          this.applyFinalParticulars(finalText, undefined);
+        openVhfUhfParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
+          this.applyFinalParticulars(finalText, txn);
         });
         return;
       }

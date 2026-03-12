@@ -209,7 +209,8 @@ export function computeCoastal(
   txn: TxnType,
   years: number,
   surchargeMode: CoastalSurchargeMode = 'NONE',
-  units: number = 1
+  units: number = 1,
+  delayMonths: number = 0
 ): CoastalComputed {
   const parsed = parseCoastalParticulars(particulars);
   const row = parsed ? COASTAL_TABLE[parsed.option] : undefined;
@@ -250,12 +251,13 @@ export function computeCoastal(
         lf = row.lf * y;
         ifee = row.ifee * y;
         dst = row.dst;
-        surcharge =
-          surchargeMode === 'SUR100'
-            ? row.sur100
-            : surchargeMode === 'SUR50'
-            ? row.sur50
-            : 0;
+        surcharge = delayMonths > 0
+          ? computeCoastalRenewalSurcharge(lf, delayMonths)
+          : surchargeMode === 'SUR100'
+          ? row.sur100
+          : surchargeMode === 'SUR50'
+          ? row.sur50
+          : 0;
         total = lf + ifee + dst + surcharge;
       } else {
         ff = row.ff;
@@ -285,6 +287,19 @@ export function computeCoastal(
     surcharge: round2(surcharge),
     total: round2(total),
   };
+}
+
+export function computeCoastalRenewalSurcharge(
+  lfTotal: number,
+  delayMonths: number
+): number {
+  const lf = safeNum(lfTotal);
+  const months = Math.max(0, Math.floor(safeNum(delayMonths)));
+  if (months <= 0) return 0;
+
+  // 1-6 months: 50%, 7-12 months: 100%, then +50% for every started 6 months
+  const blocksOfSixMonths = Math.ceil(months / 6);
+  return round2(lf * (blocksOfSixMonths * 0.5));
 }
 
 function safeNum(v: any): number {

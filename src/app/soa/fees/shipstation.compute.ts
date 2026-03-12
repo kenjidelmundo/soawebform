@@ -416,10 +416,8 @@ export function computeShipStation(
         break;
       }
       case 'DUPLICATE': {
-        // User request: duplicate posts 120 to Others and 120 to service (license fee); no filing fee
+        // Duplicate adds fixed charge to Others while keeping the selected txn computation.
         OTH += 120;
-        LF += 120;
-        DST += num(row.DST);
         break;
       }
       case 'NEW': {
