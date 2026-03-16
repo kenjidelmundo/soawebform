@@ -9,7 +9,8 @@ import {
 // ✅ returned by finalize(...)
 export type MobilePhonePicked = {
   subtype: MobilePhoneSubtype;
-  txn: TxnType;
+  txns: TxnType[];
+  duplicate?: boolean;
 };
 
 // labels must match your screenshot text
@@ -38,15 +39,17 @@ function mobileSubtypeLabel(s: MobilePhoneSubtype): string {
 
 // ✅ you can adjust this text format anytime to match your exact particulars template
 function buildParticularsText(p: MobilePhonePicked): string {
-  // example output:
-  // "Mobile Phone Permits - MP Dealer(Main) - NEW"
-  return `Mobile Phone Permits - ${mobileSubtypeLabel(p.subtype)} - ${p.txn}`;
+  const parts = [
+    ...p.txns,
+    ...(p.duplicate ? ['DUPLICATE'] : []),
+  ];
+  return `Mobile Phone Permits - ${mobileSubtypeLabel(p.subtype)} - ${parts.join(' - ')}`;
 }
 
 /**
  * Mobile Phone permits flow:
  * 1) pick subtype (tile buttons)
- * 2) pick transaction type (NEW/RENEW/MOD)
+ * 2) pick transaction type (NEW/RENEW/MOD, with MOD combinable)
  * 3) finalize(finalText, txn)
  */
 export function openMobilePhoneParticularsFlow(
@@ -74,17 +77,39 @@ export function openMobilePhoneParticularsFlow(
       disableClose: true,
       autoFocus: false,
       restoreFocus: false,
+      data: {
+        contextTitle: mobileSubtypeLabel(subtype),
+        showDuplicate: true,
+      },
     });
 
     ref2.afterClosed().subscribe((r2) => {
-      if (!r2?.value) {
+      const selected: TxnType[] = Array.isArray(r2?.value)
+        ? (r2.value as TxnType[])
+        : r2?.value
+        ? [r2.value as TxnType]
+        : [];
+      const primarySelected = selected.filter((t) => t !== 'DUPLICATE');
+
+      if (!selected.length) {
         cancel();
         return;
       }
 
-      const txn: TxnType = r2.value;
+      const txn: TxnType | undefined =
+        primarySelected.length === 1 ? (primarySelected[0] as TxnType) : undefined;
 
-      const picked: MobilePhonePicked = { subtype, txn };
+      if (!primarySelected.length) {
+        cancel();
+        return;
+      }
+
+      const duplicate = selected.includes('DUPLICATE');
+      const orderedPrimary = ['NEW', 'RENEW', 'MOD'].filter((t) =>
+        primarySelected.includes(t as TxnType)
+      ) as TxnType[];
+
+      const picked: MobilePhonePicked = { subtype, txns: orderedPrimary, duplicate };
       const finalText = buildParticularsText(picked);
 
       finalize(finalText, txn);

@@ -73,18 +73,19 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         const tRen = !!txnRenewCtrl?.value;
         const tMod = !!txnModCtrl?.value;
 
-        const txnLabel =
-          tMod ? 'MOD' :
-          tRen ? 'RENEW' :
-          tNew ? 'NEW' :
-          /\bMOD(IFICATION)?\b/i.test(original) ? 'MOD' :
-          /\bRENEW(AL)?\b/i.test(original) ? 'RENEW' :
-          /\bNEW\b/i.test(original) ? 'NEW' :
-          '';
+        const hasCheckedTxn = tNew || tRen || tMod;
+        const hasNew = hasCheckedTxn ? tNew : /\bNEW\b/i.test(original) && !/\bRENEW(AL)?\b/i.test(original);
+        const hasRenew = hasCheckedTxn ? tRen : /\bRENEW(AL)?\b/i.test(original);
+        const hasMod = hasCheckedTxn ? tMod : /\bMOD(IFICATION)?\b/i.test(original);
+        const txnLabels = [
+          ...(hasNew ? ['NEW'] : []),
+          ...(hasRenew ? ['RENEW'] : []),
+          ...(hasMod ? ['MOD'] : []),
+        ];
 
-        if (!txnLabel) return;
+        if (!txnLabels.length) return;
 
-        const next = this.buildParticularsWithTxn(cleaned, txnLabel, duplicate);
+        const next = this.buildParticularsWithTxn(cleaned, txnLabels, duplicate);
 
         if (next !== original) {
           this.syncingParticulars = true;
@@ -192,6 +193,32 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
 
         if (delayMonthsCtrl && delayMonthsCtrl.value !== DELAY_MONTHS) {
           delayMonthsCtrl.patchValue(DELAY_MONTHS, { emitEvent: false });
+        }
+
+        const hasDuplicate = /\bDUPLICATE\b/.test(up);
+        const hasBaseTxnOrAction =
+          !!tNew ||
+          !!tRen ||
+          !!tMod ||
+          /\bNEW\b/.test(up) ||
+          /\bRENEW(AL)?\b/.test(up) ||
+          /\bMOD(IFICATION)?\b/.test(up) ||
+          up.includes('PURCHASE/POSSESS') ||
+          (up.includes('PURCHASE') && up.includes('POSSESS')) ||
+          up.includes('SELL/TRANSFER') ||
+          up.includes('POSSESS (STORAGE)') ||
+          up.includes('PERMIT TO PURCHASE') ||
+          up.includes('PERMIT TO SELL') ||
+          up.includes('PERMIT TO POSSESS') ||
+          up.includes('DELETION CERTIFICATE') ||
+          up.includes('SPECIAL EVENT') ||
+          up.includes('VANITY');
+
+        if (hasDuplicate && !hasBaseTxnOrAction) {
+          this.clearAllComputedFields();
+          this.applyDuplicateOthersCharge(true);
+          this.patch(this.computeTotalAmount(), 'totalAmount');
+          return;
         }
 
         // 1) ROC
@@ -334,7 +361,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
           } else if (isSellTransfer) {
             // A.4 Permit to Sell/Transfer
             // STF + DST
-            this.patch(res.purchase, 'licPermitToPurchase');
+            this.patch(0, 'licPermitToPurchase');
             this.patch(0, 'licPermitToPossess');
             this.patch(0, 'licFilingFee');
 
@@ -344,6 +371,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
             this.patch(0, 'licSUF');
             this.patch(0, 'licFinesPenalties');
             this.patch(0, 'licSurcharges');
+            this.patch(res.stf, 'appOthers');
             this.patch(0, 'appModificationFee');
             this.patch(res.dst, 'dst');
           } else {
@@ -510,9 +538,9 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
           this.clearAllComputedFields();
 
           const flags: MobileTxnFlags = {
-            isNew: txn === 'NEW',
-            isRenew: txn === 'RENEW',
-            isMod: txn === 'MOD',
+            isNew: !!tNew || (/\bNEW\b/.test(up) && !/\bRENEW(AL)?\b/.test(up)),
+            isRenew: !!tRen || /\bRENEW(AL)?\b/.test(up),
+            isMod: !!tMod || /\bMOD(IFICATION)?\b/.test(up),
           };
 
           const mp = computeMobilePhone(text, YEARS, flags);
@@ -536,9 +564,20 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         if (up.includes('TVRO/CATV') || up.includes('TVRO') || up.includes('CATV')) {
           this.clearAllComputedFields();
 
-          const tv = computeTvroCatv(text, YEARS, txn as any, !!s100);
+          const tv = computeTvroCatv(
+            text,
+            YEARS,
+            {
+              isNew: !!tNew || (/\bNEW\b/.test(up) && !/\bRENEW(AL)?\b/.test(up)),
+              isRenew: !!tRen || /\bRENEW(AL)?\b/.test(up),
+              isMod: !!tMod || /\bMOD(IFICATION)?\b/.test(up),
+            },
+            !!s100,
+            DELAY_MONTHS
+          );
 
           if (tv?.ok) {
+            this.patch(tv.reg, 'appRegistrationFee');
             this.patch(tv.ff, 'licFilingFee');
             this.patch(tv.cpf, 'licConstructionPermitFee');
             this.patch(tv.lf, 'licRadioStationLicense');
@@ -627,7 +666,9 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
   private cleanParticularsTxnText(text: string): string {
     return String(text ?? '')
       .replace(/\bNEW\b/gi, '')
+      .replace(/\bRENEWAL\b/gi, '')
       .replace(/\bRENEW\b/gi, '')
+      .replace(/\bMODIFICATION\b/gi, '')
       .replace(/\bMOD\b/gi, '')
       .replace(/\bDUPLICATE\b/gi, '')
       .replace(/\s+-\s+-/g, ' - ')
@@ -636,11 +677,13 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
       .trim();
   }
 
-  private buildParticularsWithTxn(baseText: string, txnLabel: string, duplicate: boolean): string {
+  private buildParticularsWithTxn(baseText: string, txnLabels: string[], duplicate: boolean): string {
     let result = baseText.trim();
 
-    if (!result.toUpperCase().includes(txnLabel)) {
-      result = `${result} - ${txnLabel}`;
+    for (const txnLabel of txnLabels) {
+      if (!result.toUpperCase().includes(txnLabel)) {
+        result = `${result} - ${txnLabel}`;
+      }
     }
 
     if (duplicate && !result.toUpperCase().includes('DUPLICATE')) {

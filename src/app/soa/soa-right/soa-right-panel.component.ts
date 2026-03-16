@@ -201,11 +201,17 @@ export class SoaRightPanelComponent implements OnInit, AfterViewInit, OnDestroy 
     if (!cRen) delete patch.txnRenew;
     if (!cMod) delete patch.txnModification;
 
+    const singleTxn =
+      state.txnNew && !state.txnRenew && !state.txnModification ? 'NEW' :
+      state.txnRenew && !state.txnNew && !state.txnModification ? 'RENEW' :
+      state.txnModification && !state.txnNew && !state.txnRenew ? 'MOD' :
+      '';
+
     if (this.form.get('txnType')) {
-      patch.txnType = state.txnRenew ? 'RENEW' : state.txnNew ? 'NEW' : state.txnModification ? 'MOD' : '';
+      patch.txnType = singleTxn;
     }
     if (this.form.get('transactionType')) {
-      patch.transactionType = state.txnRenew ? 'RENEW' : state.txnNew ? 'NEW' : state.txnModification ? 'MOD' : '';
+      patch.transactionType = singleTxn;
     }
 
     this.form.patchValue(patch, { emitEvent: false });

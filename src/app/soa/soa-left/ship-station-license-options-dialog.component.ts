@@ -185,7 +185,7 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
 
       <div class="foot">
         <button type="button" class="btn" (click)="close()">Cancel</button>
-        <button type="button" class="btn primary" [disabled]="!txns.length || !power || !scope || !unitsOk()" (click)="submit()">Submit</button>
+        <button type="button" class="btn primary" [disabled]="!hasPrimaryTxn() || !power || !scope || !unitsOk()" (click)="submit()">Submit</button>
       </div>
     </div>
   `,
@@ -440,6 +440,10 @@ export class ShipStationLicenseOptionsDialogComponent {
     return this.txns.includes(v);
   }
 
+  hasPrimaryTxn(): boolean {
+    return this.txns.some((t) => t !== 'DUPLICATE');
+  }
+
   onTxnClick(event: Event, v: ShipTxn): void {
     event.preventDefault();
     event.stopPropagation();
@@ -447,7 +451,7 @@ export class ShipStationLicenseOptionsDialogComponent {
   }
 
   submit(): void {
-    if (!this.txns.length || !this.power || !this.scope || !this.unitsOk()) return;
+    if (!this.hasPrimaryTxn() || !this.power || !this.scope || !this.unitsOk()) return;
     this.ref.close({
       txns: this.txns,
       power: this.power,

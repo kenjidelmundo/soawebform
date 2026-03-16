@@ -1,9 +1,14 @@
-export type TvroCatvTxn = 'NEW' | 'RENEW' | 'MOD';
 export type TvroCatvSubtype = 'TVRO' | 'CATV';
+export type TvroCatvTxnFlags = {
+  isNew: boolean;
+  isRenew: boolean;
+  isMod: boolean;
+};
 
 export type TvroCatvResult = {
   ok: boolean;
 
+  reg: number;    // Registration Fee
   ff: number;     // Filing Fee
   cpf: number;    // Construction Permit Fee
   lf: number;     // License Fee (total for years)
@@ -20,32 +25,41 @@ const num = (v: any, fb = 0) => {
 
 const round2 = (n: any) => Math.round((num(n) + Number.EPSILON) * 100) / 100;
 
-// surcharge based on ANNUAL LF only (not multiplied by years)
-const surchargeFromAnnualLF = (annualLF: number, sur100: boolean): number => {
+// 1 day to 6 months = 50%; 6 months + 1 day to 12 months = 100%;
+// thereafter +50% for every started 6 months.
+const surchargeFromDelayMonths = (annualLF: number, delayMonths: number): number => {
   const lf = num(annualLF, 0);
-  if (!lf) return 0;
-  return round2(sur100 ? lf * 1.0 : lf * 0.5);
+  const months = Math.max(0, Math.floor(num(delayMonths, 0)));
+  if (!lf || months <= 0) return 0;
+
+  const blocksOfSixMonths = Math.ceil(months / 6);
+  return round2(lf * (blocksOfSixMonths * 0.5));
 };
 
 export function computeTvroCatv(
   particularsText: string,
   years: number,
-  txn: TvroCatvTxn,
-  sur100: boolean
+  txn: TvroCatvTxnFlags,
+  _sur100: boolean,
+  delayMonths: number = 0
 ): TvroCatvResult {
   const text = String(particularsText ?? '').toUpperCase();
 
   const isTVRO = text.includes('TVRO STATION LICENSE');
   const isCATV = text.includes('CATV STATION LICENSE');
+  const hasRenew = !!txn.isRenew || /\bRENEW(AL)?\b/.test(text);
+  const hasNew = (!!txn.isNew || /\bNEW\b/.test(text)) && !hasRenew;
+  const hasMod = !!txn.isMod || /\bMOD(IFICATION)?\b/.test(text);
 
   if (!isTVRO && !isCATV) {
-    return { ok: false, ff: 0, cpf: 0, lf: 0, ifee: 0, mod: 0, dst: 0, sur: 0 };
+    return { ok: false, reg: 0, ff: 0, cpf: 0, lf: 0, ifee: 0, mod: 0, dst: 0, sur: 0 };
   }
 
   const YEARS = Math.max(1, Math.floor(num(years, 1)));
 
   // ===== RATES (from your sheet)
   // TVRO
+  const TVRO_REG = 6500;
   const TVRO_LF = 2600;
   const TVRO_MOD = 180;
   const DST = 30;
@@ -58,6 +72,7 @@ export function computeTvroCatv(
   const CATV_MOD = 180;
 
   // defaults
+  let reg = 0;
   let ff = 0;
   let cpf = 0;
   let lf = 0;
@@ -66,59 +81,71 @@ export function computeTvroCatv(
   let sur = 0;
 
   if (isTVRO) {
-    if (txn === 'MOD') {
+    if (!hasNew && !hasRenew && !hasMod) {
+      return { ok: false, reg: 0, ff: 0, cpf: 0, lf: 0, ifee: 0, mod: 0, dst: 0, sur: 0 };
+    }
+
+    if (hasNew) {
+      reg = TVRO_REG;
+    }
+
+    if (hasRenew) {
+      lf += TVRO_LF * YEARS;
+      sur += surchargeFromDelayMonths(TVRO_LF, delayMonths);
+    }
+
+    if (hasMod) {
       mod = TVRO_MOD;
-      // MOD + DST
-      return { ok: true, ff: 0, cpf: 0, lf: 0, ifee: 0, mod: round2(mod), dst: DST, sur: 0 };
     }
 
-    // LF/YR * years + DST
-    lf = TVRO_LF * YEARS;
+    const dst = hasNew || hasRenew || hasMod ? DST : 0;
 
-    // renew adds surcharge (based on annual LF only)
-    if (txn === 'RENEW') {
-      sur = surchargeFromAnnualLF(TVRO_LF, sur100);
-    }
-
-    return { ok: true, ff: 0, cpf: 0, lf: round2(lf), ifee: 0, mod: 0, dst: DST, sur: round2(sur) };
-  }
-
-  // CATV
-  if (txn === 'MOD') {
-    mod = CATV_MOD;
-    return { ok: true, ff: 0, cpf: 0, lf: 0, ifee: 0, mod: round2(mod), dst: DST, sur: 0 };
-  }
-
-  lf = CATV_LF * YEARS;
-  ifee = CATV_IF * YEARS;
-
-  if (txn === 'NEW') {
-    ff = CATV_FF;
-    cpf = CATV_CPF;
-    // FF + CPF + LF/YR*years + IF/YR*years + DST
     return {
       ok: true,
-      ff: round2(ff),
-      cpf: round2(cpf),
+      reg: round2(reg),
+      ff: 0,
+      cpf: 0,
       lf: round2(lf),
-      ifee: round2(ifee),
-      mod: 0,
-      dst: DST,
-      sur: 0,
+      ifee: 0,
+      mod: round2(mod),
+      dst: round2(dst),
+      sur: round2(sur),
     };
   }
 
-  // RENEW: (LF/YR*years) + (IF/YR*years) + DST + SUR
-  sur = surchargeFromAnnualLF(CATV_LF, sur100);
+  // CATV
+  if (!hasNew && !hasRenew && !hasMod) {
+    return { ok: false, reg: 0, ff: 0, cpf: 0, lf: 0, ifee: 0, mod: 0, dst: 0, sur: 0 };
+  }
+
+  if (hasNew) {
+    ff = CATV_FF;
+    cpf = CATV_CPF;
+    lf += CATV_LF * YEARS;
+    ifee += CATV_IF * YEARS;
+  }
+
+  if (hasRenew) {
+    lf += CATV_LF * YEARS;
+    ifee += CATV_IF * YEARS;
+    sur += surchargeFromDelayMonths(CATV_LF, delayMonths);
+  }
+
+  if (hasMod) {
+    mod = CATV_MOD;
+  }
+
+  const dst = hasNew || hasRenew || hasMod ? DST : 0;
 
   return {
     ok: true,
-    ff: 0,
-    cpf: 0,
+    reg: 0,
+    ff: round2(ff),
+    cpf: round2(cpf),
     lf: round2(lf),
     ifee: round2(ifee),
-    mod: 0,
-    dst: DST,
+    mod: round2(mod),
+    dst: round2(dst),
     sur: round2(sur),
   };
 }

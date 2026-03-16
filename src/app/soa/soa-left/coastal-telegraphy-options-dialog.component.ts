@@ -14,6 +14,7 @@ export type CoastalPower =
 export type CoastalTelegraphyOptionsResult = {
   txn: ShipTxn[];
   txnMod?: boolean;
+  duplicate?: boolean;
   purchasePossess?: boolean;
   purchaseUnits?: number;
   sellTransfer?: boolean;
@@ -50,6 +51,11 @@ export type CoastalTelegraphyOptionsResult = {
           <label class="row">
             <input class="cb" type="checkbox" [checked]="isCheckedTxn('MOD')" (change)="onTxnChange('MOD', $event)" />
             <span class="txt">Mod</span>
+          </label>
+
+          <label class="row">
+            <input class="cb" type="checkbox" [checked]="duplicate" (change)="toggleDuplicate()" />
+            <span class="txt">Duplicate</span>
           </label>
 
           <label class="row">
@@ -203,6 +209,7 @@ export class CoastalTelegraphyOptionsDialogComponent {
   txnNew = false;
   txnRenew = false;
   txnMod = false;
+  duplicate = false;
   purchasePossess = false;
   purchaseUnits = 1;
   sellTransfer = false;
@@ -247,6 +254,9 @@ export class CoastalTelegraphyOptionsDialogComponent {
     this.sellTransfer = !this.sellTransfer;
     if (!this.sellTransfer) this.sellTransferUnits = 1;
   }
+  toggleDuplicate() {
+    this.duplicate = !this.duplicate;
+  }
   onPurchaseUnits(ev: Event) {
     const n = Math.max(1, Math.floor(Number((ev.target as HTMLInputElement).value) || 1));
     this.purchaseUnits = n;
@@ -272,6 +282,7 @@ export class CoastalTelegraphyOptionsDialogComponent {
     this.ref.close({
       txn: txnArray,
       txnMod: this.txnMod,
+      duplicate: this.duplicate,
       purchasePossess: this.purchasePossess,
       purchaseUnits: this.purchasePossess ? this.purchaseUnits : undefined,
       sellTransfer: this.sellTransfer,

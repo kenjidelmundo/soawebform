@@ -21,6 +21,7 @@ type TxnTypeDialogData = {
   showPossessStorage?: boolean;
   showStandaloneUnits?: boolean;
   showDuplicate?: boolean;
+  allowDuplicateOnly?: boolean;
   contextTitle?: string;
 };
 
@@ -393,6 +394,7 @@ export class TxnTypeDialogComponent {
   readonly showPossessStorage: boolean;
   readonly showStandaloneUnits: boolean;
   readonly showDuplicate: boolean;
+  readonly allowDuplicateOnly: boolean;
   readonly contextTitle: string;
 
   constructor(
@@ -404,11 +406,16 @@ export class TxnTypeDialogComponent {
     this.showPossessStorage = !!this.data?.showPossessStorage;
     this.showStandaloneUnits = !!this.data?.showStandaloneUnits;
     this.showDuplicate = !!this.data?.showDuplicate;
+    this.allowDuplicateOnly = !!this.data?.allowDuplicateOnly;
     this.contextTitle = String(this.data?.contextTitle ?? '').trim();
   }
 
   isChecked(v: TxnType): boolean {
     return this.selected.includes(v);
+  }
+
+  private hasPrimaryTxnSelected(): boolean {
+    return this.selected.some((t) => t !== 'DUPLICATE');
   }
 
   canSubmit(): boolean {
@@ -423,12 +430,18 @@ export class TxnTypeDialogComponent {
     }
     if (this.showStandaloneUnits) {
       return (
-        this.selected.length > 0 &&
+        (this.hasPrimaryTxnSelected() || (this.allowDuplicateOnly && this.isChecked('DUPLICATE'))) &&
         Number.isFinite(this.standaloneUnits) &&
         this.standaloneUnits >= 1
       );
     }
-    return this.selected.length > 0 || this.sellTransfer || this.possessStorage;
+    return (
+      this.hasPrimaryTxnSelected() ||
+      (this.allowDuplicateOnly && this.isChecked('DUPLICATE')) ||
+      this.sellTransfer ||
+      this.possessStorage ||
+      this.purchasePossess
+    );
   }
 
   toggle(v: TxnType): void {

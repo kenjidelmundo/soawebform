@@ -47,6 +47,7 @@ export type CoastalComputed = {
   surchargeMode: CoastalSurchargeMode;
 
   ff: number;
+  stf: number;
   purchase: number;
   possess: number;
   cp: number;
@@ -233,6 +234,7 @@ export function computeCoastal(
   const u = Math.max(1, Math.floor(safeNum(units)));
 
   let ff = 0;
+  let stf = 0;
   let purchase = 0;
   let possess = 0;
   let cp = 0;
@@ -251,9 +253,10 @@ export function computeCoastal(
       dst = row.dst;
       total = ff + purchase + possess + dst;
     } else if (parsed.serviceType === 'SELL_TRANSFER') {
-      purchase = row.purchase * u; // STF placeholder
+      // Citizen Charter A.4: STF(UNIT) + DST
+      stf = 50 * u;
       dst = row.dst;
-      total = purchase + dst;
+      total = stf + dst;
     } else {
       if (txn === 'NEW') {
         cp = row.cp;
@@ -291,6 +294,7 @@ export function computeCoastal(
     units: u,
     surchargeMode,
     ff: round2(ff),
+    stf: round2(stf),
     purchase: round2(purchase),
     possess: round2(possess),
     cp: round2(cp),

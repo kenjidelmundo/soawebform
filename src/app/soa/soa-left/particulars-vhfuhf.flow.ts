@@ -64,7 +64,7 @@ export function openVhfUhfParticularsFlow(
       const primaryUnits = Math.max(1, Math.floor(Number(r?.standaloneUnits || 1)));
       const hasDuplicate = selected.includes('DUPLICATE');
 
-      if (!primary && !purchasePossess && !hasDuplicate) {
+      if (!primary && !purchasePossess) {
         cancel();
         return;
       }

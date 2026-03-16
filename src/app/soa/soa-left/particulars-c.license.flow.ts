@@ -86,11 +86,6 @@ export function openCoastalLicenseParticularsFlow(
         const sellTransfer = !!rTxn?.sellTransfer;
         const sellTransferUnits = Math.max(1, Math.floor(Number(rTxn?.sellTransferUnits || 1)));
 
-        if (!selected.length && !purchasePossess && !sellTransfer) {
-          cancel();
-          return;
-        }
-
         // Coastal charter flows are single-transaction paths; if MOD is checked,
         // keep it as the primary txn so MOD fees are computed.
         const primary: TxnType | undefined =
@@ -98,6 +93,11 @@ export function openCoastalLicenseParticularsFlow(
           (selected.includes('RENEW') && 'RENEW') ||
           (selected.includes('NEW') && 'NEW') ||
           undefined;
+
+        if (!primary && !purchasePossess && !sellTransfer) {
+          cancel();
+          return;
+        }
 
         const picked: CoastalLicensePicked = { subtype, option, txn: primary };
 

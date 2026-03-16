@@ -254,6 +254,13 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
         txnRenew: hasRenew,
         txnModification: hasMod,
       });
+      const singleTxn =
+        hasNew && !hasRenew && !hasMod ? 'NEW' :
+        hasRenew && !hasNew && !hasMod ? 'RENEW' :
+        hasMod && !hasNew && !hasRenew ? 'MOD' :
+        '';
+      this.setStringDeep('txnType', singleTxn);
+      this.setStringDeep('transactionType', singleTxn);
       return;
     }
 
@@ -751,6 +758,9 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.form.get('txnType')) patch.txnType = txn;
       if (this.form.get('transactionType')) patch.transactionType = txn;
       this.applyTxnFromTxnChoice(txn);
+    } else {
+      if (this.form.get('txnType')) patch.txnType = '';
+      if (this.form.get('transactionType')) patch.transactionType = '';
     }
 
     this.form.patchValue(patch, { emitEvent: true });

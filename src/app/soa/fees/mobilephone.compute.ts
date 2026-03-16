@@ -65,7 +65,7 @@ export const MOBILE_PHONE_ROWS: MobilePhoneRow[] = [
 
   { key: 'RETAILER_RESELLER', label: 'Retailer/Reseller',        ff: 500, pf: 1500, ifee: 1500, mod: 120, dst: 30, sur50: 750,  sur100: 1500 },
 
-  { key: 'SERVICE_CENTER',    label: 'Service Center',           ff: 180, pf: 1200, ifee: 720,  mod: 120, dst: 30, sur50: 600,  sur100: 1200 },
+  { key: 'SERVICE_CENTER',    label: 'Service Center',           ff: 500, pf: 1500, ifee: 1500, mod: 120, dst: 30, sur50: 750,  sur100: 1500 },
 ];
 
 const ROW_BY_KEY = new Map<MobilePhoneSubtypeKey, MobilePhoneRow>(
@@ -116,8 +116,8 @@ export function detectMobilePhoneSubtype(particularsText: string): MobilePhoneSu
 
 /**
  * Citizen Charter formulas implemented:
- * NEW:   TOTAL = FF + (PF/YR) + (IF/YR) + DST
- * RENEW: TOTAL = (PF/YR) + (IF/YR) + DST + SUR
+ * NEW:   TOTAL = FF + (PF * YR) + (IF * YR) + DST
+ * RENEW: TOTAL = (PF * YR) + (IF * YR) + DST + SUR
  * MOD:   TOTAL = MOD + DST
  */
 export function computeMobilePhone(
@@ -126,6 +126,7 @@ export function computeMobilePhone(
   flags: TxnFlags
 ): MobilePhoneComputed {
   const years = Math.max(0, Number(yearsRaw ?? 0) || 0);
+  const text = toUpperText(particularsText);
   const key = detectMobilePhoneSubtype(particularsText);
 
   if (!key) {
@@ -139,8 +140,12 @@ export function computeMobilePhone(
       ff: 0, pf: 0, ifee: 0, mod: 0, dst: 0, sur: 0, total: 0 };
   }
 
+  const hasRenew = !!flags.isRenew || /\bRENEW(AL)?\b/.test(text);
+  const hasNew = (!!flags.isNew || /\bNEW\b/.test(text)) && !hasRenew;
+  const hasMod = !!flags.isMod || /\bMOD(IFICATION)?\b/.test(text);
+
   const txn: 'NEW' | 'RENEW' | 'MOD' =
-    flags.isMod ? 'MOD' : flags.isRenew ? 'RENEW' : 'NEW';
+    hasMod ? 'MOD' : hasRenew ? 'RENEW' : 'NEW';
 
   const surchargeMode = detectSurchargeMode(particularsText);
 
@@ -151,41 +156,37 @@ export function computeMobilePhone(
       ? row.sur50
       : 0;
 
-  const safeYears = years > 0 ? years : 1; // avoid division by 0; Excel sheet typically assumes at least 1
+  const safeYears = years > 0 ? years : 1;
 
-  const pfPerYr = row.pf / safeYears;
-  const ifPerYr = row.ifee / safeYears;
+  const pfTotal = row.pf * safeYears;
+  const ifTotal = row.ifee * safeYears;
 
-  let ff = 0,
-    pf = 0,
-    ifee = 0,
-    mod = 0,
-    dst = 0,
-    total = 0;
+  let ff = 0;
+  let pf = 0;
+  let ifee = 0;
+  let mod = 0;
+  let dst = 0;
 
-  if (txn === 'NEW') {
-    ff = row.ff;
-    pf = pfPerYr;
-    ifee = ifPerYr;
-    mod = 0;
-    dst = row.dst;
-    total = ff + pf + ifee + dst;
-  } else if (txn === 'RENEW') {
-    ff = 0;
-    pf = pfPerYr;
-    ifee = ifPerYr;
-    mod = 0;
-    dst = row.dst;
-    total = pf + ifee + dst + sur;
-  } else {
-    // MOD
-    ff = 0;
-    pf = 0;
-    ifee = 0;
-    mod = row.mod;
-    dst = row.dst;
-    total = mod + dst;
+  if (hasNew) {
+    ff += row.ff;
+    pf += pfTotal;
+    ifee += ifTotal;
   }
+
+  if (hasRenew) {
+    pf += pfTotal;
+    ifee += ifTotal;
+  }
+
+  if (hasMod) {
+    mod += row.mod;
+  }
+
+  if (hasNew || hasRenew || hasMod) {
+    dst = row.dst;
+  }
+
+  const total = ff + pf + ifee + mod + dst + (hasRenew ? sur : 0);
 
   // keep 2 decimals like your periodYears precision
   const round2 = (n: number) => Number((Number(n || 0)).toFixed(2));
@@ -202,7 +203,7 @@ export function computeMobilePhone(
     ifee: round2(ifee),
     mod: round2(mod),
     dst: round2(dst),
-    sur: round2(sur),
+    sur: round2(hasRenew ? sur : 0),
     total: round2(total),
   };
 }

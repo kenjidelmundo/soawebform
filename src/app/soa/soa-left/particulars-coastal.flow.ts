@@ -36,6 +36,7 @@ export function openCoastalParticularsFlow(
     const purchaseUnits = Math.max(1, Math.floor(Number(ro.purchaseUnits || 1)));
     const sellTransfer = !!ro.sellTransfer;
     const sellTransferUnits = Math.max(1, Math.floor(Number(ro.sellTransferUnits || 1)));
+    const hasDuplicate = !!ro.duplicate;
 
     const primary: ShipTxn =
       (txnList.includes('RENEW') && 'RENEW') ||
@@ -67,6 +68,10 @@ export function openCoastalParticularsFlow(
 
     if (sellTransfer) {
       finalText += ` - PERMIT TO SELL/TRANSFER - UNITS_${sellTransferUnits}`;
+    }
+
+    if (hasDuplicate) {
+      finalText += ' - DUPLICATE';
     }
 
     const txnForForm: TxnType = primary === 'RENEW' ? 'RENEW' : primary === 'MOD' ? 'MOD' : 'NEW';

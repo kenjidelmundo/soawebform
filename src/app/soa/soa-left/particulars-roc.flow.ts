@@ -48,9 +48,14 @@ export function openRocParticularsFlow(
         const parts = selected.map((t: TxnType) => (t === 'MOD' ? 'MODIFICATION' : t));
         const finalText = `${base} - ${parts.join(' - ')}`;
 
-        // pick a primary txn for form flags (priority: RENEW > NEW > MOD > DUPLICATE)
-        const priority: TxnType[] = ['RENEW', 'NEW', 'MOD', 'DUPLICATE'];
+        // DUPLICATE is additive only (+120 in Others). Keep base txn as NEW/RENEW/MOD.
+        const priority: TxnType[] = ['RENEW', 'NEW', 'MOD'];
         const primary = (priority.find((p) => selected.includes(p)) ?? selected[0]) as TxnType;
+
+        if (!priority.includes(primary)) {
+          cancel();
+          return;
+        }
 
         finalize(finalText, primary);
       });
