@@ -145,6 +145,35 @@ export class SoaPdfService {
       width: 'auto',
     });
 
+    const signBlock = (label: string, value: string) => ({
+      width: '48%',
+      stack: [
+        { text: label, bold: true, fontSize: 5.8, margin: [0, 0, 0, 1] },
+        {
+          table: {
+            widths: ['*'],
+            body: [[
+              {
+                text: value || ' ',
+                fontSize: 5.8,
+                margin: [0, 0, 0, 1],
+                border: [false, false, false, true],
+              },
+            ]],
+          },
+          layout: {
+            hLineWidth: (i: number) => (i === 1 ? 0.8 : 0),
+            vLineWidth: () => 0,
+            hLineColor: () => '#000',
+            paddingLeft: () => 0,
+            paddingRight: () => 0,
+            paddingTop: () => 0,
+            paddingBottom: () => 0,
+          },
+        },
+      ],
+    });
+
     const particularsText = String((soa as any)?.particulars ?? '');
 
     return {
@@ -198,6 +227,14 @@ export class SoaPdfService {
                 { columns: [this.cb(endorsedForPayment), { text: 'Endorsed for Payment', fontSize: 5.6 }], columnGap: 2 },
               ],
               columnGap: 12,
+            },
+            {
+              columns: [
+                signBlock('Prepared By:', preparedBy),
+                signBlock('Approved By:', approvedBy),
+              ],
+              columnGap: 10,
+              margin: [0, 3, 0, 0],
             },
           ],
           margin: [0, 2, 0, 0],
