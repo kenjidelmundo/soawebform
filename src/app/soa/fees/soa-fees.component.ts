@@ -173,7 +173,8 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
           return;
         }
 
-        const YEARS = Math.max(1, Math.floor(this.num(y, 1)));
+        const YEARS_RAW = Math.max(0, this.num(y, 0));
+        const YEARS = Math.max(1, Math.floor(YEARS_RAW || 1));
         const SHIP_UNITS = Math.max(1, Math.floor(this.num(shipU, 1)));
         const txnFromChecks = this.txnFromChecks(!!tNew, !!tRen, !!tMod);
         const txnForText = this.txnFromText(text);
@@ -543,7 +544,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
             isMod: !!tMod || /\bMOD(IFICATION)?\b/.test(up),
           };
 
-          const mp = computeMobilePhone(text, YEARS, flags);
+          const mp = computeMobilePhone(text, YEARS_RAW || 1, flags, DELAY_MONTHS);
 
           if (mp?.ok) {
             this.patch(mp.ff, 'licFilingFee');

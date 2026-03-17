@@ -65,7 +65,7 @@ export const MOBILE_PHONE_ROWS: MobilePhoneRow[] = [
 
   { key: 'RETAILER_RESELLER', label: 'Retailer/Reseller',        ff: 500, pf: 1500, ifee: 1500, mod: 120, dst: 30, sur50: 750,  sur100: 1500 },
 
-  { key: 'SERVICE_CENTER',    label: 'Service Center',           ff: 500, pf: 1500, ifee: 1500, mod: 120, dst: 30, sur50: 750,  sur100: 1500 },
+  { key: 'SERVICE_CENTER',    label: 'Service Center',           ff: 180, pf: 1200, ifee: 720,  mod: 120, dst: 30, sur50: 600,  sur100: 1200 },
 ];
 
 const ROW_BY_KEY = new Map<MobilePhoneSubtypeKey, MobilePhoneRow>(
@@ -74,6 +74,15 @@ const ROW_BY_KEY = new Map<MobilePhoneSubtypeKey, MobilePhoneRow>(
 
 function toUpperText(v: any): string {
   return String(v ?? '').toUpperCase().trim();
+}
+
+function num(v: any, fallback = 0): number {
+  const n = Number(v ?? fallback);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function round2(n: number): number {
+  return Number((Number(n || 0)).toFixed(2));
 }
 
 export function detectSurchargeMode(particularsText: string): 'NONE' | 'SUR50' | 'SUR100' {
@@ -114,6 +123,19 @@ export function detectMobilePhoneSubtype(particularsText: string): MobilePhoneSu
   return null;
 }
 
+export function computeMobilePhoneRenewalSurcharge(
+  permitFeeBase: number,
+  delayMonthsRaw: any
+): number {
+  const base = Math.max(0, num(permitFeeBase, 0));
+  const months = Math.max(0, Math.floor(num(delayMonthsRaw, 0)));
+
+  if (months <= 0) return 0;
+
+  const blocksOfSixMonths = Math.ceil(months / 6);
+  return round2(base * (blocksOfSixMonths * 0.5));
+}
+
 /**
  * Citizen Charter formulas implemented:
  * NEW:   TOTAL = FF + (PF * YR) + (IF * YR) + DST
@@ -123,9 +145,11 @@ export function detectMobilePhoneSubtype(particularsText: string): MobilePhoneSu
 export function computeMobilePhone(
   particularsText: string,
   yearsRaw: any,
-  flags: TxnFlags
+  flags: TxnFlags,
+  delayMonthsRaw: any = 0
 ): MobilePhoneComputed {
-  const years = Math.max(0, Number(yearsRaw ?? 0) || 0);
+  const years = Math.max(0, num(yearsRaw, 0));
+  const delayMonths = Math.max(0, Math.floor(num(delayMonthsRaw, 0)));
   const text = toUpperText(particularsText);
   const key = detectMobilePhoneSubtype(particularsText);
 
@@ -147,14 +171,19 @@ export function computeMobilePhone(
   const txn: 'NEW' | 'RENEW' | 'MOD' =
     hasMod ? 'MOD' : hasRenew ? 'RENEW' : 'NEW';
 
-  const surchargeMode = detectSurchargeMode(particularsText);
+  const explicitSurchargeMode = detectSurchargeMode(particularsText);
+  const surchargeMode: 'NONE' | 'SUR50' | 'SUR100' =
+    delayMonths > 0
+      ? (delayMonths <= 6 ? 'SUR50' : 'SUR100')
+      : explicitSurchargeMode;
 
-  const sur =
-    surchargeMode === 'SUR100'
-      ? row.sur100
-      : surchargeMode === 'SUR50'
-      ? row.sur50
-      : 0;
+  const sur = delayMonths > 0
+    ? computeMobilePhoneRenewalSurcharge(row.pf, delayMonths)
+    : surchargeMode === 'SUR100'
+    ? row.sur100
+    : surchargeMode === 'SUR50'
+    ? row.sur50
+    : 0;
 
   const safeYears = years > 0 ? years : 1;
 
@@ -187,9 +216,6 @@ export function computeMobilePhone(
   }
 
   const total = ff + pf + ifee + mod + dst + (hasRenew ? sur : 0);
-
-  // keep 2 decimals like your periodYears precision
-  const round2 = (n: number) => Number((Number(n || 0)).toFixed(2));
 
   return {
     ok: true,
