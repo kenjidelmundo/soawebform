@@ -81,8 +81,41 @@ export class SoaPdfService {
       { text: this.money(grandTotal), bold: true, fontSize: 6.0, alignment: 'right' },
     ]);
 
+    const headerRowIndex = 0;
+    const totalRowIndex = body.length - 1;
+    const sectionRowIndexes = new Set<number>();
+    const targetTableHeight = 392;
+    const dataRowWeight = 1;
+    const sectionRowWeight = 1.1;
+    const headerRowWeight = 1.18;
+
+    let nextSectionIndex = 1;
+    sections.forEach((section) => {
+      sectionRowIndexes.add(nextSectionIndex);
+      nextSectionIndex += 1 + (Array.isArray(section.rows) ? section.rows.length : 0);
+    });
+
+    const dataRowCount = body.length - sectionRowIndexes.size - 2;
+    const totalWeight =
+      (dataRowCount * dataRowWeight) +
+      (sectionRowIndexes.size * sectionRowWeight) +
+      (2 * headerRowWeight);
+    const baseRowHeight = targetTableHeight / Math.max(totalWeight, 1);
+
     return {
-      table: { widths: [22, '*', 46], body },
+      table: {
+        widths: [22, '*', 46],
+        body,
+        heights: (rowIndex: number) => {
+          if (rowIndex === headerRowIndex || rowIndex === totalRowIndex) {
+            return Number((baseRowHeight * headerRowWeight).toFixed(2));
+          }
+          if (sectionRowIndexes.has(rowIndex)) {
+            return Number((baseRowHeight * sectionRowWeight).toFixed(2));
+          }
+          return Number(baseRowHeight.toFixed(2));
+        },
+      },
       layout: {
         hLineWidth: () => 0.8,
         vLineWidth: () => 0.8,
@@ -90,10 +123,10 @@ export class SoaPdfService {
         vLineColor: () => '#000',
         paddingLeft: () => 2,
         paddingRight: () => 2,
-        paddingTop: () => 1,
-        paddingBottom: () => 1,
+        paddingTop: () => 0.5,
+        paddingBottom: () => 0.5,
       },
-      margin: [0, 2, 0, 0],
+      margin: [0, 0.5, 0, 0],
     };
   }
 
@@ -181,7 +214,7 @@ export class SoaPdfService {
       stack: [
         { text: 'NATIONAL TELECOMMUNICATIONS COMMISSION', bold: true, fontSize: 6.8, alignment: 'center' },
         { text: 'Statement of Account', fontSize: 6.0, alignment: 'center' },
-        { text: copyLabel, fontSize: 5.8, alignment: 'center', margin: [0, 0, 0, 0.8] },
+        { text: copyLabel, fontSize: 5.8, alignment: 'center', margin: [0, 0, 0, 0.4] },
 
         infoLine('Date', (soa as any)?.date),
         infoLine('SOA No.', (soa as any)?.soaNo),
@@ -198,7 +231,7 @@ export class SoaPdfService {
             cbItem('ROC', types.ROC),
           ],
           columnGap: 6,
-          margin: [0, 0.4, 0, 0.4],
+          margin: [0, 0.25, 0, 0.25],
         },
 
         {
@@ -213,14 +246,14 @@ export class SoaPdfService {
             },
           ],
           columnGap: 4,
-          margin: [0, 0, 0, 2],
+          margin: [0, 0, 0, 0.8],
         },
 
         this.createSoaTable(soa),
 
         {
           stack: [
-            { text: 'NOTE: To be paid on or before the due date otherwise subject to reassessment.', fontSize: 5.6, margin: [0, 1.2, 0, 1] },
+            { text: 'NOTE: To be paid on or before the due date otherwise subject to reassessment.', fontSize: 5.6, margin: [0, 0.4, 0, 0.2] },
             {
               columns: [
                 { columns: [this.cb(forAssessmentOnly), { text: 'For Assessment Only', fontSize: 5.6 }], columnGap: 2 },
@@ -234,10 +267,10 @@ export class SoaPdfService {
                 signBlock('Approved By:', approvedBy),
               ],
               columnGap: 10,
-              margin: [0, 3, 0, 0],
+              margin: [0, 1, 0, 0],
             },
           ],
-          margin: [0, 2, 0, 0],
+          margin: [0, 0.4, 0, 0],
         }
       ],
     };
