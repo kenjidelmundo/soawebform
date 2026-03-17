@@ -548,7 +548,8 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
 
           if (mp?.ok) {
             this.patch(mp.ff, 'licFilingFee');
-            this.patch(mp.pf, 'licRadioStationLicense');
+            this.patch(mp.pf, 'licConstructionPermitFee');
+            this.patch(0, 'licRadioStationLicense');
             this.patch(mp.ifee, 'licInspectionFee');
             this.patch(mp.mod, 'appModificationFee');
             this.patch(mp.dst, 'dst');
