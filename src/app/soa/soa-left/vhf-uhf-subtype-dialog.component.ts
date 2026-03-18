@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
-import { MatDialogRef } from '@angular/material/dialog';
+import { Component, Inject } from '@angular/core';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 export type VhfUhfBaseRadio =
   | 'Fixed'
@@ -20,6 +20,31 @@ export type VhfUhfSubtypeResult = {
   baseRadio: VhfUhfBaseRadio;
   power: VhfUhfPower;
 };
+
+type VhfUhfSubtypeDialogData = {
+  baseRadio?: VhfUhfBaseRadio | null;
+  power?: VhfUhfPower | null;
+};
+
+let rememberedVhfUhfSubtype: VhfUhfSubtypeDialogData | null = null;
+
+export function rememberVhfUhfSubtypeSelection(data: VhfUhfSubtypeDialogData | null): void {
+  rememberedVhfUhfSubtype = data
+    ? {
+        baseRadio: data.baseRadio ?? null,
+        power: data.power ?? null,
+      }
+    : null;
+}
+
+function getRememberedVhfUhfSubtypeSelection(): VhfUhfSubtypeDialogData | null {
+  return rememberedVhfUhfSubtype
+    ? {
+        baseRadio: rememberedVhfUhfSubtype.baseRadio ?? null,
+        power: rememberedVhfUhfSubtype.power ?? null,
+      }
+    : null;
+}
 
 @Component({
   selector: 'app-vhf-uhf-subtype-dialog',
@@ -122,18 +147,31 @@ export class VhfUhfSubtypeDialogComponent {
   power: VhfUhfPower | null = null;
 
   constructor(
-    private ref: MatDialogRef<VhfUhfSubtypeDialogComponent, VhfUhfSubtypeResult>
-  ) {}
+    private ref: MatDialogRef<VhfUhfSubtypeDialogComponent, VhfUhfSubtypeResult>,
+    @Inject(MAT_DIALOG_DATA) data: VhfUhfSubtypeDialogData | null
+  ) {
+    const seed = data ?? getRememberedVhfUhfSubtypeSelection();
+    this.baseRadio = seed?.baseRadio ?? null;
+    this.power = seed?.power ?? null;
+  }
 
   get canOk(): boolean {
     return !!this.baseRadio && !!this.power;
   }
 
-  setBase(v: VhfUhfBaseRadio) { this.baseRadio = v; }
-  setPower(v: VhfUhfPower) { this.power = v; }
+  setBase(v: VhfUhfBaseRadio) {
+    this.baseRadio = v;
+    rememberVhfUhfSubtypeSelection({ baseRadio: this.baseRadio, power: this.power });
+  }
+
+  setPower(v: VhfUhfPower) {
+    this.power = v;
+    rememberVhfUhfSubtypeSelection({ baseRadio: this.baseRadio, power: this.power });
+  }
 
   ok() {
     if (!this.baseRadio || !this.power) return;
+    rememberVhfUhfSubtypeSelection({ baseRadio: this.baseRadio, power: this.power });
     this.ref.close({ baseRadio: this.baseRadio, power: this.power });
   }
 

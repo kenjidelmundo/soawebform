@@ -5,7 +5,7 @@ export type MobilePhoneSubtypeKey =
   | 'RCE_MANUFACTURER'
   | 'RCE_SERVICE_CENTER'
   | 'CPE_NON_MOBILE'
-  | 'CPE_MOBILE'
+  | 'CPE_MOBILE'  
   | 'MP_DEALER_MAIN'
   | 'MP_DEALER_BRANCH'
   | 'RETAILER_RESELLER'

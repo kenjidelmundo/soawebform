@@ -435,99 +435,102 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
 
         // 4) VHF/UHF
         {
-          const isVhfPurchasePossess =
-            up.includes('PURCHASE/POSSESS') ||
-            (up.includes('PURCHASE') && up.includes('POSSESS'));
+          const vhfEntries = this.splitStackedVhfEntries(text);
+          const vhfResults = vhfEntries
+            .map((entryText) => {
+              const entryUp = entryText.toUpperCase();
+              const isVhfPurchasePossess =
+                entryUp.includes('PURCHASE/POSSESS') ||
+                (entryUp.includes('PURCHASE') && entryUp.includes('POSSESS'));
 
-          const vhfTxn =
-            txn === 'RENEW' ? 'RENEW' :
-            txn === 'MOD' ? 'MOD' :
-            'NEW';
+              const entryTxn =
+                /\bRENEW(AL)?\b/.test(entryUp) ? 'RENEW' :
+                /\bMODIFICATION\b|\bMOD\b/.test(entryUp) ? 'MOD' :
+                'NEW';
 
-          const vhfTxnUnitMarker =
-            vhfTxn === 'MOD'
-              ? /MODIFICATION|\bMOD\b/
-              : vhfTxn === 'RENEW'
-              ? /\bRENEW(AL)?\b/
-              : /\bNEW\b/;
+              const vhfTxnUnitMarker =
+                entryTxn === 'MOD'
+                  ? /MODIFICATION|\bMOD\b/
+                  : entryTxn === 'RENEW'
+                  ? /\bRENEW(AL)?\b/
+                  : /\bNEW\b/;
 
-          const vhfTxnUnits = this.extractUnitsAfterKeyword(
-            text,
-            vhfTxnUnitMarker,
-            SHIP_UNITS
-          );
-
-          const vhfUnits = isVhfPurchasePossess
-            ? this.extractUnitsAfterKeyword(
-                text,
-                /PURCHASE\/POSSESS|PURCHASE AND POSSESS/,
+              const vhfTxnUnits = this.extractUnitsAfterKeyword(
+                entryText,
+                vhfTxnUnitMarker,
                 SHIP_UNITS
-              )
-            : vhfTxnUnits;
+              );
 
-          const vhf = computeVhfUhfWithTxn(
-            text,
-            vhfTxn,
-            YEARS,
-            vhfUnits,
-            1,
-            txn === 'RENEW'
-              ? (s100 ? 'SUR100' : 'SUR50')
-              : 'NONE',
-            vhfTxn === 'RENEW' ? DELAY_MONTHS : 0
-          );
+              const vhfUnits = isVhfPurchasePossess
+                ? this.extractUnitsAfterKeyword(
+                    entryText,
+                    /PURCHASE\/POSSESS|PURCHASE AND POSSESS/,
+                    SHIP_UNITS
+                  )
+                : vhfTxnUnits;
 
-          if (vhf?.ok) {
+              const vhf = computeVhfUhfWithTxn(
+                entryText,
+                entryTxn,
+                YEARS,
+                vhfUnits,
+                1,
+                entryTxn === 'RENEW'
+                  ? (s100 ? 'SUR100' : 'SUR50')
+                  : 'NONE',
+                entryTxn === 'RENEW' ? DELAY_MONTHS : 0
+              );
+
+              return vhf?.ok
+                ? {
+                    entryText,
+                    entryTxn,
+                    isVhfPurchasePossess,
+                    vhf,
+                  }
+                : null;
+            })
+            .filter((value): value is {
+              entryText: string;
+              entryTxn: 'NEW' | 'RENEW' | 'MOD';
+              isVhfPurchasePossess: boolean;
+              vhf: NonNullable<ReturnType<typeof computeVhfUhfWithTxn>>;
+            } => !!value);
+
+          if (vhfResults.length) {
             this.clearAllComputedFields();
 
-            if (isVhfPurchasePossess) {
-              // Purchase/Possess path: FF(unit) + PUR(unit) + POS(unit) + DST
-              this.patch(vhf.purchase * vhf.unit, 'licPermitToPurchase');
-              this.patch(vhf.possess * vhf.unit, 'licPermitToPossess');
-              this.patch(vhf.filingFee * vhf.unit, 'licFilingFee');
-              this.patch(0, 'licConstructionPermitFee');
-              this.patch(0, 'licRadioStationLicense');
-              this.patch(0, 'licInspectionFee');
-              this.patch(0, 'licSUF');
-              this.patch(0, 'licSurcharges');
-              this.patch(0, 'appModificationFee');
-              this.patch(vhf.dst, 'dst');
-            } else if (vhfTxn === 'NEW') {
-              this.patch(0, 'licPermitToPurchase');
-              this.patch(0, 'licPermitToPossess');
-              this.patch(0, 'licFilingFee');
-              this.patch(vhf.constructionPermit * vhf.unit, 'licConstructionPermitFee');
-              this.patch((vhf.licenseFee * vhf.chUnit) * vhf.years, 'licRadioStationLicense');
-              this.patch((vhf.inspectionFee * vhf.unit) * vhf.years, 'licInspectionFee');
-              this.patch((vhf.supervisionFee * vhf.chUnit) * vhf.years, 'licSUF');
-              this.patch(0, 'licSurcharges');
-              this.patch(0, 'appModificationFee');
-              this.patch(vhf.dst, 'dst');
-            } else if (vhfTxn === 'RENEW') {
-              this.patch(0, 'licPermitToPurchase');
-              this.patch(0, 'licPermitToPossess');
-              this.patch(0, 'licFilingFee');
-              this.patch(0, 'licConstructionPermitFee');
-              this.patch((vhf.licenseFee * vhf.chUnit) * vhf.years, 'licRadioStationLicense');
-              this.patch((vhf.inspectionFee * vhf.unit) * vhf.years, 'licInspectionFee');
-              this.patch((vhf.supervisionFee * vhf.chUnit) * vhf.years, 'licSUF');
-              this.patch(vhf.surchargeApplied, 'licSurcharges');
-              this.patch(0, 'appModificationFee');
-              this.patch(vhf.dst, 'dst');
-            } else {
-              this.patch(0, 'licPermitToPurchase');
-              this.patch(0, 'licPermitToPossess');
-              this.patch(vhf.filingFee * vhf.unit, 'licFilingFee');
-              this.patch(vhf.constructionPermit * vhf.unit, 'licConstructionPermitFee');
-              this.patch(0, 'licRadioStationLicense');
-              this.patch(0, 'licInspectionFee');
-              this.patch(0, 'licSUF');
-              this.patch(0, 'licSurcharges');
-              this.patch(vhf.modificationFee * vhf.unit, 'appModificationFee');
-              this.patch(vhf.dst, 'dst');
-            }
+            for (const result of vhfResults) {
+              const { entryText, entryTxn, isVhfPurchasePossess, vhf } = result;
 
-            this.applyDuplicateOthersCharge(up.includes('DUPLICATE'));
+              if (isVhfPurchasePossess) {
+                this.addToField('licPermitToPurchase', vhf.purchase * vhf.unit);
+                this.addToField('licPermitToPossess', vhf.possess * vhf.unit);
+                this.addToField('licFilingFee', vhf.filingFee * vhf.unit);
+                this.addToField('dst', vhf.dst);
+              } else if (entryTxn === 'NEW') {
+                this.addToField('licConstructionPermitFee', vhf.constructionPermit * vhf.unit);
+                this.addToField('licRadioStationLicense', (vhf.licenseFee * vhf.chUnit) * vhf.years);
+                this.addToField('licInspectionFee', (vhf.inspectionFee * vhf.unit) * vhf.years);
+                this.addToField('licSUF', (vhf.supervisionFee * vhf.chUnit) * vhf.years);
+                this.addToField('dst', vhf.dst);
+              } else if (entryTxn === 'RENEW') {
+                this.addToField('licRadioStationLicense', (vhf.licenseFee * vhf.chUnit) * vhf.years);
+                this.addToField('licInspectionFee', (vhf.inspectionFee * vhf.unit) * vhf.years);
+                this.addToField('licSUF', (vhf.supervisionFee * vhf.chUnit) * vhf.years);
+                this.addToField('licSurcharges', vhf.surchargeApplied);
+                this.addToField('dst', vhf.dst);
+              } else {
+                this.addToField('licFilingFee', vhf.filingFee * vhf.unit);
+                this.addToField('licConstructionPermitFee', vhf.constructionPermit * vhf.unit);
+                this.addToField('appModificationFee', vhf.modificationFee * vhf.unit);
+                this.addToField('dst', vhf.dst);
+              }
+
+              if (entryText.toUpperCase().includes('DUPLICATE')) {
+                this.addToField('appOthers', 120);
+              }
+            }
 
             this.patch(this.computeTotalAmount(), 'totalAmount');
             return;
@@ -693,6 +696,13 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     }
 
     return result.replace(/\s+-\s+-/g, ' - ').trim();
+  }
+
+  private splitStackedVhfEntries(text: string): string[] {
+    return String(text ?? '')
+      .split('||')
+      .map((part) => part.trim())
+      .filter(Boolean);
   }
 
   private ctrl(name: string): AbstractControl | null {

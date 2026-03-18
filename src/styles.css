@@ -34,3 +34,13 @@ textarea{ resize:none; }
 
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+.soa-hover-dlg .mat-mdc-dialog-container{
+  padding: 0;
+}
+
+.soa-hover-dlg .mat-mdc-dialog-surface{
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}

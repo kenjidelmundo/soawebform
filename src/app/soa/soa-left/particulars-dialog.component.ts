@@ -22,33 +22,13 @@ export type ParticularsDialogResult = {
       <div class="dlgHead">Select Service</div>
 
       <div class="btnGrid">
-        <button type="button" class="pickBtn" (click)="pick('ROC')">
-          <span class="txt">ROC</span>
-        </button>
-
-        <button type="button" class="pickBtn" (click)="pick('Amateur')">
-          <span class="txt">Amateur</span>
-        </button>
-
-        <button type="button" class="pickBtn" (click)="pick('ShipStation')">
-          <span class="txt">Ship Station</span>
-        </button>
-
-        <button type="button" class="pickBtn" (click)="pick('Coastal')">
-          <span class="txt">Coastal Station License</span>
-        </button>
-
-        <button type="button" class="pickBtn" (click)="pick('VHFUHF')">
-          <span class="txt">VHF/UHF Radio Stations</span>
-        </button>
-
-        <button type="button" class="pickBtn" (click)="pick('MobilePhone')">
-          <span class="txt">Mobile Phone Permits</span>
-        </button>
-
-        <!-- ✅ NEW -->
-        <button type="button" class="pickBtn" (click)="pick('TVROCATV')">
-          <span class="txt">TVRO / CATV</span>
+        <button
+          type="button"
+          class="pickBtn"
+          *ngFor="let option of options"
+          (click)="pick(option.value)"
+        >
+          <span class="txt">{{ option.label }}</span>
         </button>
       </div>
 
@@ -71,6 +51,43 @@ export type ParticularsDialogResult = {
   `],
 })
 export class ParticularsDialogComponent {
+  readonly options: ReadonlyArray<{
+    value:
+      | 'ROC'
+      | 'Amateur'
+      | 'ShipStation'
+      | 'Coastal'
+      | 'VHFUHF'
+      | 'MobilePhone'
+      | 'TVROCATV';
+    label: string;
+    keywords: string[];
+  }> = [
+    { value: 'ROC', label: 'ROC', keywords: ['roc', 'radio operator'] },
+    { value: 'Amateur', label: 'Amateur', keywords: ['amateur', 'ham'] },
+    { value: 'ShipStation', label: 'Ship Station', keywords: ['ship', 'station', 'vessel'] },
+    {
+      value: 'Coastal',
+      label: 'Coastal Station License',
+      keywords: ['coastal', 'coast', 'station', 'license'],
+    },
+    {
+      value: 'VHFUHF',
+      label: 'VHF/UHF Radio Stations',
+      keywords: ['vhf', 'uhf', 'radio', 'stations'],
+    },
+    {
+      value: 'MobilePhone',
+      label: 'Mobile Phone Permits',
+      keywords: ['mobile', 'phone', 'permit', 'permits'],
+    },
+    {
+      value: 'TVROCATV',
+      label: 'TVRO / CATV',
+      keywords: ['tvro', 'catv', 'cable', 'tv'],
+    },
+  ];
+
   constructor(
     private ref: MatDialogRef<ParticularsDialogComponent, ParticularsDialogResult>
   ) {}

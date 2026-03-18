@@ -13,6 +13,7 @@ export type TxnTypeDialogResult = {
   possessStorage?: boolean;
   possessStorageUnits?: number;
   standaloneUnits?: number;
+  action?: 'submit' | 'back';
 };
 
 type TxnTypeDialogData = {
@@ -23,6 +24,8 @@ type TxnTypeDialogData = {
   showDuplicate?: boolean;
   allowDuplicateOnly?: boolean;
   contextTitle?: string;
+  showBack?: boolean;
+  onBack?: (result: TxnTypeDialogResult) => void;
 };
 
 @Component({
@@ -224,6 +227,7 @@ type TxnTypeDialogData = {
       </div>
 
       <div class="dlgFoot">
+        <button type="button" class="btn" *ngIf="showBack" (click)="back()">Back</button>
         <button type="button" class="btn" (click)="close()">Cancel</button>
         <button
           type="button"
@@ -396,6 +400,7 @@ export class TxnTypeDialogComponent {
   readonly showDuplicate: boolean;
   readonly allowDuplicateOnly: boolean;
   readonly contextTitle: string;
+  readonly showBack: boolean;
 
   constructor(
     private ref: MatDialogRef<TxnTypeDialogComponent, TxnTypeDialogResult>,
@@ -408,6 +413,9 @@ export class TxnTypeDialogComponent {
     this.showDuplicate = !!this.data?.showDuplicate;
     this.allowDuplicateOnly = !!this.data?.allowDuplicateOnly;
     this.contextTitle = String(this.data?.contextTitle ?? '').trim();
+    this.showBack =
+      !!this.data?.showBack ||
+      this.contextTitle.toUpperCase().includes('VHF/UHF RADIO STATIONS');
   }
 
   isChecked(v: TxnType): boolean {
@@ -515,10 +523,8 @@ export class TxnTypeDialogComponent {
     this.sellTransferUnits = Number.isFinite(n) && n >= 1 ? n : 1;
   }
 
-  submit(): void {
-    if (!this.canSubmit()) return;
-
-    this.ref.close({
+  private buildResult(action: 'submit' | 'back'): TxnTypeDialogResult {
+    return {
       value: this.selected,
       purchasePossess: this.purchasePossess,
       purchasePossessUnits: this.purchasePossess ? this.purchasePossessUnits : undefined,
@@ -527,7 +533,20 @@ export class TxnTypeDialogComponent {
       possessStorage: this.possessStorage,
       possessStorageUnits: this.possessStorage ? this.possessStorageUnits : undefined,
       standaloneUnits: this.showStandaloneUnits ? this.standaloneUnits : undefined,
-    });
+      action,
+    };
+  }
+
+  submit(): void {
+    if (!this.canSubmit()) return;
+
+    this.ref.close(this.buildResult('submit'));
+  }
+
+  back(): void {
+    const result = this.buildResult('back');
+    this.data?.onBack?.(result);
+    this.ref.close(result);
   }
 
   close(): void {
