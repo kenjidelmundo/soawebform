@@ -4,14 +4,20 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 type ParticularsHoverDialogData = {
   particulars?: string;
+  years?: string | number | null;
+  licensePermitNo?: string | null;
 };
 
-type HoverRow = {
-  deviceName: string;
-  units: number;
+type HoverEntry = {
+  status: string;
+  type: string;
+  years: string;
+  units: string;
+  licensePermitNo: string;
 };
 
 const GENERIC_SERVICE_LABELS = [
+  'ROC',
   'VHF/UHF RADIO STATIONS',
   'MOBILE PHONE PERMITS',
   'TVRO/CATV',
@@ -19,18 +25,6 @@ const GENERIC_SERVICE_LABELS = [
   'COASTAL STATION LICENSE',
   'SHIP STATION LICENSE',
   'DELETION CERTIFICATE',
-] as const;
-
-const NON_DEVICE_SEGMENTS = [
-  'DOMESTIC',
-  'INTERNATIONAL',
-  'HIGH POWERED',
-  'MEDIUM POWERED',
-  'LOW POWERED',
-  'RADIO TELEGRAPHY',
-  'RADIO TELEPHONY',
-  'COASTAL STATIONS',
-  'HIGH FREQUENCY (HF)',
 ] as const;
 
 const TXN_LABELS = [
@@ -71,19 +65,16 @@ function isUnitsSegment(value: string): boolean {
   return /^UNITS?[_\s:=-]*\d+$/.test(text) || /^UNIT\s+\d+$/.test(text);
 }
 
+function splitSlashSeparated(value: string): string[] {
+  return String(value ?? '')
+    .split(/\s+\/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function isGenericServiceLabel(value: string): boolean {
   const text = String(value ?? '').trim().toUpperCase();
   return GENERIC_SERVICE_LABELS.some((label) => text === label);
-}
-
-function looksLikeNonDeviceSegment(value: string): boolean {
-  const text = String(value ?? '').trim().toUpperCase();
-
-  if (NON_DEVICE_SEGMENTS.some((label) => text === label)) return true;
-  if (text.includes('POWERED')) return true;
-  if (text === 'SESCL/LRIT/SSAS/SESFB') return true;
-
-  return false;
 }
 
 function humanizeTxnLabel(value: string): string {
@@ -115,136 +106,152 @@ function humanizeTxnLabel(value: string): string {
   }
 }
 
-function txnSuffix(value: string): string {
-  const text = normalizeTxnLabel(value);
-
-  switch (text) {
-    case 'NEW':
-      return 'NEW';
-    case 'RENEW':
-      return 'REN';
-    case 'MODIFICATION':
-      return 'MOD';
-    case 'PURCHASE/POSSESS':
-    case 'PERMIT TO PURCHASE/POSSESS':
-      return 'POSSESS';
-    case 'PERMIT TO POSSESS FOR STORAGE OF AMATEUR RADIO STATIONS':
-    case 'POSSESS (STORAGE)':
-      return 'STORAGE';
-    case 'PERMIT TO SELL/TRANSFER':
-    case 'SELL/TRANSFER':
-      return 'SELL';
-    case 'DUPLICATE':
-      return 'DUP';
-    default:
-      return '';
-  }
-}
-
-function decorateDeviceName(deviceName: string, txn: string): string {
-  const base = String(deviceName ?? '').trim();
-  const suffix = txnSuffix(txn);
-
-  if (!base) return base;
-  if (!suffix) return base;
-
-  return `${base} (${suffix})`;
-}
-
-function buildBaseLabel(segments: string[]): string {
-  const baseParts: string[] = [];
-
-  for (const segment of segments) {
-    if (isTxnSegment(segment) || isUnitsSegment(segment)) break;
-    baseParts.push(segment);
-  }
-
-  return baseParts.join(' - ').trim();
-}
-
-function extractDeviceName(segments: string[], baseLabel: string): string {
-  const baseSegments = segments.filter((segment) => !isTxnSegment(segment) && !isUnitsSegment(segment));
-  const preferred = baseSegments.find((segment, index) =>
-    index > 0 && !isGenericServiceLabel(segment) && !looksLikeNonDeviceSegment(segment)
-  );
-
-  if (preferred) return preferred;
-
-  const fallback = baseSegments.find((segment) => !isGenericServiceLabel(segment));
-  return fallback || baseLabel || '';
-}
-
-function extractPrimaryTxn(segments: string[]): string {
-  for (const segment of segments) {
-    const txn = normalizeTxnLabel(segment);
-    if (txn === 'NEW' || txn === 'RENEW' || txn === 'MODIFICATION') {
-      return txn;
-    }
-  }
-
-  return '';
-}
-
 function parseUnitsValue(value: string): number {
   const match = String(value ?? '').trim().toUpperCase().match(/(?:UNITS?[_\s:=-]*|UNIT\s+)(\d+)/);
   return Math.max(1, Number(match?.[1] || 1));
 }
 
-function buildTxnRows(segments: string[], deviceName: string): HoverRow[] {
-  const rows: HoverRow[] = [];
-  let pendingTxn = '';
-  let pendingUnits: number | null = null;
+function formatYearsValue(value: string | number | null | undefined): string {
+  const text = String(value ?? '').trim();
+  if (!text || text === '0') return '';
+  return text;
+}
 
-  const pushRow = (txn: string, units: number | null) => {
-    const normalizedTxn = normalizeTxnLabel(txn);
-    const nextUnits = Math.max(1, Number(units ?? 1));
+function displayStatusLabel(value: string): string {
+  const text = normalizeTxnLabel(value);
 
-    rows.push({
-      deviceName: decorateDeviceName(deviceName || humanizeTxnLabel(normalizedTxn), normalizedTxn),
-      units: nextUnits,
-    });
-  };
+  switch (text) {
+    case 'NEW':
+      return 'New';
+    case 'RENEW':
+      return 'Ren';
+    case 'MODIFICATION':
+      return 'Mod';
+    case 'DUPLICATE':
+      return 'Dup';
+    case 'PURCHASE/POSSESS':
+      return 'Purchase/Possess';
+    case 'PERMIT TO PURCHASE/POSSESS':
+      return 'Permit to Purchase/Possess';
+    case 'SELL/TRANSFER':
+      return 'Sell/Transfer';
+    case 'PERMIT TO SELL/TRANSFER':
+      return 'Permit to Sell/Transfer';
+    case 'PERMIT TO POSSESS FOR STORAGE OF AMATEUR RADIO STATIONS':
+    case 'POSSESS (STORAGE)':
+      return 'Possess (Storage)';
+    default:
+      return humanizeTxnLabel(text);
+  }
+}
 
-  for (const segment of segments) {
-    if (isUnitsSegment(segment)) {
-      const units = parseUnitsValue(segment);
+function shouldCombineStatuses(current: string, next: string): boolean {
+  const combinable = new Set(['New', 'Ren', 'Mod']);
+  return combinable.has(current) && combinable.has(next);
+}
 
-      if (pendingTxn) {
-        pushRow(pendingTxn, units);
-        pendingTxn = '';
-        pendingUnits = null;
+function combineStatus(current: string, next: string): string {
+  if (!current) return next;
+  if (!next || current === next) return current;
+
+  const parts = current.split('/').map((part) => part.trim()).filter(Boolean);
+  if (parts.includes(next)) return current;
+
+  return `${current}/${next}`;
+}
+
+function segmentHasTxnOrUnits(value: string): boolean {
+  return splitSlashSeparated(value).some((piece) => isTxnSegment(piece) || isUnitsSegment(piece));
+}
+
+function buildTypeLabel(baseSegments: string[], fallback: string): string {
+  if (!baseSegments.length) return fallback.trim();
+
+  const detailSegments = baseSegments.filter((segment) => !isGenericServiceLabel(segment));
+  const cleanedDetail =
+    detailSegments.length >= 2 &&
+    detailSegments[1].toUpperCase().startsWith(detailSegments[0].toUpperCase())
+      ? detailSegments.slice(1)
+      : detailSegments;
+
+  return cleanedDetail.join(' - ').trim() || baseSegments.join(' - ').trim() || fallback.trim();
+}
+
+function buildEntriesForChunk(
+  chunk: string,
+  years: string,
+  licensePermitNo: string
+): HoverEntry[] {
+  const segments = chunk.split(' - ').map((segment) => segment.trim()).filter(Boolean);
+  if (!segments.length) return [];
+
+  const firstTxnIndex = segments.findIndex((segment) => segmentHasTxnOrUnits(segment));
+  const baseSegments = firstTxnIndex >= 0 ? segments.slice(0, firstTxnIndex) : segments.slice();
+  const type = buildTypeLabel(baseSegments, chunk);
+  const tailSegments = firstTxnIndex >= 0 ? segments.slice(firstTxnIndex) : [];
+  const pieces = tailSegments.flatMap((segment) => splitSlashSeparated(segment));
+
+  const entries: HoverEntry[] = [];
+  let pendingUnits = '';
+
+  for (const piece of pieces) {
+    if (isUnitsSegment(piece)) {
+      const units = String(parseUnitsValue(piece));
+      const lastEntry = entries[entries.length - 1];
+
+      if (lastEntry && !lastEntry.units) {
+        lastEntry.units = units;
       } else {
         pendingUnits = units;
       }
       continue;
     }
 
-    if (!isTxnSegment(segment)) continue;
+    if (!isTxnSegment(piece)) continue;
 
-    const txn = normalizeTxnLabel(segment);
+    const status = displayStatusLabel(piece);
+    const lastEntry = entries[entries.length - 1];
 
-    if (pendingUnits !== null) {
-      pushRow(txn, pendingUnits);
-      pendingUnits = null;
-      pendingTxn = '';
+    if (status === 'Dup' && lastEntry) {
+      lastEntry.status = combineStatus(lastEntry.status, status);
       continue;
     }
 
-    if (pendingTxn) {
-      pushRow(pendingTxn, 1);
+    if (lastEntry && !lastEntry.units && !pendingUnits && shouldCombineStatuses(lastEntry.status, status)) {
+      lastEntry.status = combineStatus(lastEntry.status, status);
+      continue;
     }
 
-    pendingTxn = txn;
+    entries.push({
+      status,
+      type,
+      years,
+      units: pendingUnits,
+      licensePermitNo,
+    });
+    pendingUnits = '';
   }
 
-  if (pendingTxn) {
-    pushRow(pendingTxn, pendingUnits);
+  if (!entries.length) {
+    return [
+      {
+        status: '',
+        type,
+        years,
+        units: pendingUnits,
+        licensePermitNo,
+      },
+    ];
   }
 
-  return rows;
+  return entries;
 }
 
-function parseHoverRows(raw: string): HoverRow[] {
+function parseHoverEntries(
+  raw: string,
+  yearsValue: string | number | null | undefined,
+  licensePermitNoValue: string | null | undefined
+): HoverEntry[] {
   const particulars = String(raw ?? '').trim();
   if (!particulars) return [];
 
@@ -253,32 +260,15 @@ function parseHoverRows(raw: string): HoverRow[] {
     .map((chunk) => chunk.trim())
     .filter(Boolean);
 
-  const allRows: HoverRow[] = [];
+  const years = formatYearsValue(yearsValue);
+  const licensePermitNo = String(licensePermitNoValue ?? '').trim();
+  const allEntries: HoverEntry[] = [];
 
   for (const chunk of chunks) {
-    const segments = chunk.split(' - ').map((segment) => segment.trim()).filter(Boolean);
-    const baseLabel = buildBaseLabel(segments);
-    const deviceName = extractDeviceName(segments, baseLabel);
-    const firstTxnIndex = segments.findIndex((segment) => isTxnSegment(segment) || isUnitsSegment(segment));
-    const txnSegments = firstTxnIndex >= 0 ? segments.slice(firstTxnIndex) : [];
-    const txnRows = buildTxnRows(txnSegments, deviceName);
-
-    if (txnRows.length) {
-      allRows.push(...txnRows);
-      continue;
-    }
-
-    const primaryTxn = extractPrimaryTxn(segments);
-    const unitsMatch = chunk.match(/UNITS?_?(\d+)|UNIT\s+(\d+)/i);
-    const units = Math.max(1, Number(unitsMatch?.[1] || unitsMatch?.[2] || 1));
-    const baseRowName = decorateDeviceName(deviceName || baseLabel || chunk, primaryTxn);
-
-    if (baseRowName) {
-      allRows.push({ deviceName: baseRowName, units });
-    }
+    allEntries.push(...buildEntriesForChunk(chunk, years, licensePermitNo));
   }
 
-  return allRows;
+  return allEntries;
 }
 
 @Component({
@@ -287,20 +277,18 @@ function parseHoverRows(raw: string): HoverRow[] {
   imports: [CommonModule],
   template: `
     <div class="hoverDlg">
-      <table class="tbl" *ngIf="rows.length">
-        <thead>
-          <tr>
-            <th>Device Name</th>
-            <th>Units</th>
-          </tr>
-        </thead>
-        <tbody>
+      <div class="tblWrap" *ngIf="entries.length; else emptyState">
+        <table class="tbl">
           <tr *ngFor="let row of rows">
-            <td>{{ row.deviceName }}</td>
-            <td class="units">{{ row.units }}</td>
+            <th class="rowLabel">{{ row.label }}</th>
+            <td *ngFor="let entry of entries">{{ entry[row.key] || '' }}</td>
           </tr>
-        </tbody>
-      </table>
+        </table>
+      </div>
+
+      <ng-template #emptyState>
+        <div class="empty">No particulars to preview.</div>
+      </ng-template>
     </div>
   `,
   styles: [`
@@ -313,11 +301,15 @@ function parseHoverRows(raw: string): HoverRow[] {
       background:#fffef7;
       box-shadow:0 10px 24px rgba(0,0,0,.16);
       box-sizing:border-box;
+      overflow:hidden;
+    }
+    .tblWrap{
+      overflow:auto;
     }
     .tbl{
       width:100%;
       border-collapse:collapse;
-      table-layout:fixed;
+      table-layout:auto;
       font-family:Arial,sans-serif;
       font-size:12px;
       color:#1f2937;
@@ -333,24 +325,42 @@ function parseHoverRows(raw: string): HoverRow[] {
       background:#eef4fb;
       font-weight:700;
     }
-    tbody tr:last-child td{
-      border-bottom:none;
-    }
-    .units{
-      width:72px;
-      text-align:center;
+    .rowLabel{
+      width:320px;
+      min-width:320px;
+      background:#eef4fb;
       white-space:nowrap;
+    }
+    td{
+      min-width:148px;
+      background:#fff;
+    }
+    .empty{
+      padding:12px 14px;
+      font:600 12px Arial,sans-serif;
+      color:#475569;
     }
   `],
 })
 export class ParticularsHoverDialogComponent {
-  readonly rows: HoverRow[];
+  readonly entries: HoverEntry[];
+  readonly rows: Array<{ label: string; key: keyof HoverEntry }> = [
+    { label: 'Status', key: 'status' },
+    { label: 'Type', key: 'type' },
+    { label: 'Years', key: 'years' },
+    { label: 'Units (optional)', key: 'units' },
+    { label: 'License No / Permit No.', key: 'licensePermitNo' },
+  ];
 
   constructor(
     private ref: MatDialogRef<ParticularsHoverDialogComponent>,
     @Inject(MAT_DIALOG_DATA) data: ParticularsHoverDialogData
   ) {
-    this.rows = parseHoverRows(data?.particulars ?? '');
+    this.entries = parseHoverEntries(
+      data?.particulars ?? '',
+      data?.years,
+      data?.licensePermitNo
+    );
   }
 
   close(): void {

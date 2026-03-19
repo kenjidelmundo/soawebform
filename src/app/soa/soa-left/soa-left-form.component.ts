@@ -772,18 +772,19 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.particularsDialogOpen || this.particularsHoverRef) return;
 
     const particularsText = String(this.form?.get('particulars')?.value ?? '').trim();
-    if (!this.isVhfUhfParticulars(particularsText)) return;
+    if (!particularsText) return;
 
     const rect = anchor.getBoundingClientRect();
-    const dialogWidth = 280;
+    const dialogWidth = Math.min(760, Math.max(420, Math.floor(window.innerWidth * 0.72)));
     const gap = 8;
     const maxLeft = Math.max(12, window.innerWidth - dialogWidth - 12);
     const left = Math.min(Math.max(12, rect.left), maxLeft);
     const top = Math.min(rect.bottom + gap, Math.max(12, window.innerHeight - 100));
+    const yearsValue = this.form?.get('periodYears')?.value;
 
     this.particularsHoverRef = this.dialog.open(ParticularsHoverDialogComponent, {
       width: `${dialogWidth}px`,
-      maxWidth: '92vw',
+      maxWidth: '96vw',
       panelClass: ['soa-dlg', 'soa-hover-dlg'],
       hasBackdrop: false,
       disableClose: false,
@@ -792,6 +793,8 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       scrollStrategy: this.overlay.scrollStrategies.noop(),
       data: {
         particulars: particularsText,
+        years: yearsValue,
+        licensePermitNo: '',
       },
       position: {
         left: `${left}px`,
@@ -807,11 +810,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private closeParticularsHoverDialog(): void {
     this.particularsHoverRef?.close();
     this.particularsHoverRef = null;
-  }
-
-  private isVhfUhfParticulars(text: string): boolean {
-    const upper = String(text ?? '').toUpperCase();
-    return upper.includes('VHF/UHF RADIO STATIONS') || (upper.includes('VHF') && upper.includes('UHF'));
   }
 
   private applyFinalParticulars(finalText: string, txn?: TxnType): void {
