@@ -14,6 +14,14 @@ export class SoaPdfService {
     this.form = form;
   }
 
+  private formatParticulars(value: any): string {
+    return String(value ?? '')
+      .split('||')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join('\n');
+  }
+
   generatePDF(soaData: any): void {
     const live = this.form?.getRawValue?.() ?? this.form?.value ?? {};
     const v = { ...(soaData ?? {}), ...(live ?? {}) };
@@ -22,7 +30,7 @@ export class SoaPdfService {
     const soaNo = this.pick(v, ['soaSeries', 'SOASeries', 'soaNo', 'seriesNumber'], '');
     const name = this.pick(v, ['licensee', 'Licensee', 'name'], '');
     const address = this.pick(v, ['address', 'Address'], '');
-    const particulars = this.pick(v, ['particulars', 'Particulars'], '');
+    const particulars = this.formatParticulars(this.pick(v, ['particulars', 'Particulars'], ''));
     const periodCovered = this.pick(v, ['periodCovered', 'PeriodCovered'], '');
     const years = this.pick(v, ['periodYears', 'years', 'Years'], 0);
 

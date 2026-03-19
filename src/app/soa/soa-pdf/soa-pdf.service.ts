@@ -8,6 +8,14 @@ import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 
 @Injectable({ providedIn: 'root' })
 export class SoaPdfService {
+  private formatParticulars(value: any): string {
+    return String(value ?? '')
+      .split('||')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join('\n');
+  }
+
   generatePDF(soa: Soa): void {
     const docDefinition: any = {
       pageSize: 'A4',
@@ -207,7 +215,7 @@ export class SoaPdfService {
       ],
     });
 
-    const particularsText = String((soa as any)?.particulars ?? '');
+    const particularsText = this.formatParticulars((soa as any)?.particulars ?? '');
 
     return {
       width: '25%',

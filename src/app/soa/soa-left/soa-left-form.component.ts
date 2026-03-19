@@ -378,15 +378,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private applyCategoryFromParticulars(particularsText: string): void {
-    const t = particularsText.toUpperCase();
-
-    const isShip = t.includes('SHIPSTATION') || t.includes('SHIP STATION');
-    if (isShip) {
-      if (this.form.get('catROC') || this.form.get('catMA')) {
-        this.form.patchValue({ catROC: false, catMA: false }, { emitEvent: true });
-      }
-      return;
-    }
+    const t = this.splitParticularsEntries(particularsText).join(' ').toUpperCase();
 
     const isROC = t.includes('ROC');
     const isMA =
@@ -407,6 +399,19 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     if (Object.keys(patch).length) {
       this.form.patchValue(patch, { emitEvent: true });
     }
+  }
+
+  private splitParticularsEntries(text: string): string[] {
+    return String(text ?? '')
+      .split('||')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  private appendParticulars(existingText: string, nextText: string): string {
+    const existingEntries = this.splitParticularsEntries(existingText);
+    const nextEntries = this.splitParticularsEntries(nextText);
+    return [...existingEntries, ...nextEntries].join(' || ').trim();
   }
 
   private loadPayees(): void {
@@ -813,8 +818,13 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private applyFinalParticulars(finalText: string, txn?: TxnType): void {
+    const mergedText = this.appendParticulars(
+      String(this.form?.get('particulars')?.value ?? ''),
+      finalText
+    );
+
     const patch: any = {
-      particulars: finalText,
+      particulars: mergedText,
     };
 
     if (txn) {
@@ -829,7 +839,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.form.patchValue(patch, { emitEvent: true });
     this.form.get('particulars')?.updateValueAndValidity({ emitEvent: true });
 
-    this.applyCategoryFromParticulars(finalText);
+    this.applyCategoryFromParticulars(mergedText);
   }
 
   private periodCoveredToDates(periodCovered: any): { periodFrom?: string; periodTo?: string } {

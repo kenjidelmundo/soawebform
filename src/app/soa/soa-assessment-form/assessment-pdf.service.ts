@@ -10,6 +10,14 @@ import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 export class AssessmentPdfService {
   private form: FormGroup | null = null;
 
+  private formatParticulars(value: any): string {
+    return String(value ?? '')
+      .split('||')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join('\n');
+  }
+
   setForm(form: FormGroup) {
     this.form = form;
   }
@@ -71,7 +79,7 @@ export class AssessmentPdfService {
     const soaNo = pick(['soaSeries', 'soaNo'], '');
     const licensee = pick(['licensee', 'payeeName', 'name'], '');
     const address = pick(['address'], '');
-    const particulars = pick(['particulars'], '');
+    const particulars = this.formatParticulars(pick(['particulars'], ''));
     const years = pick(['periodYears', 'years'], 0);
 
     const totalAmount = money(pick(['totalAmount'], 0));

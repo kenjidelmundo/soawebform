@@ -87,6 +87,14 @@ export class AssessmentComponent implements OnDestroy {
     return `${dd}/${mm}/${yyyy}`;
   }
 
+  formatParticulars(val: any): string {
+    return String(val ?? '')
+      .split('||')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join('\n');
+  }
+
   // ==========================================
   // ✅ EXPORT-ONLY FOOTER (exact flow)
   // checkbox row

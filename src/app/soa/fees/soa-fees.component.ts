@@ -67,16 +67,22 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         const original = String(p ?? '').trim();
         if (!original) return;
 
-        const duplicate = /\bDUPLICATE\b/i.test(original);
-        const cleaned = this.cleanParticularsTxnText(original);
+        const entries = this.splitParticularsEntries(original);
+        if (entries.length !== 1) return;
+
+        const currentEntry = entries[0];
+
+        const duplicate = /\bDUPLICATE\b/i.test(currentEntry);
+        const cleaned = this.cleanParticularsTxnText(currentEntry);
         const tNew = !!txnNewCtrl?.value;
         const tRen = !!txnRenewCtrl?.value;
         const tMod = !!txnModCtrl?.value;
 
         const hasCheckedTxn = tNew || tRen || tMod;
-        const hasNew = hasCheckedTxn ? tNew : /\bNEW\b/i.test(original) && !/\bRENEW(AL)?\b/i.test(original);
-        const hasRenew = hasCheckedTxn ? tRen : /\bRENEW(AL)?\b/i.test(original);
-        const hasMod = hasCheckedTxn ? tMod : /\bMOD(IFICATION)?\b/i.test(original);
+        const hasNew =
+          hasCheckedTxn ? tNew : /\bNEW\b/i.test(currentEntry) && !/\bRENEW(AL)?\b/i.test(currentEntry);
+        const hasRenew = hasCheckedTxn ? tRen : /\bRENEW(AL)?\b/i.test(currentEntry);
+        const hasMod = hasCheckedTxn ? tMod : /\bMOD(IFICATION)?\b/i.test(currentEntry);
         const txnLabels = [
           ...(hasNew ? ['NEW'] : []),
           ...(hasRenew ? ['RENEW'] : []),
@@ -87,7 +93,7 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
 
         const next = this.buildParticularsWithTxn(cleaned, txnLabels, duplicate);
 
-        if (next !== original) {
+        if (next !== currentEntry) {
           this.syncingParticulars = true;
           particularsCtrl.patchValue(next, { emitEvent: false });
           this.syncingParticulars = false;
@@ -162,7 +168,6 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
       .pipe(debounceTime(30), takeUntil(this.destroy$))
       .subscribe(([pText, y, shipU, wEq, s100, _tNew, _tRen, _tMod, delayMonthsRaw, periodFromRaw]) => {
         const text = String(pText || '').trim();
-        const up = text.toUpperCase();
         const tNew = !!txnNewCtrl?.value;
         const tRen = !!txnRenewCtrl?.value;
         const tMod = !!txnModCtrl?.value;
@@ -176,496 +181,393 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
         const YEARS_RAW = Math.max(0, this.num(y, 0));
         const YEARS = Math.max(1, Math.floor(YEARS_RAW || 1));
         const SHIP_UNITS = Math.max(1, Math.floor(this.num(shipU, 1)));
-        const txnFromChecks = this.txnFromChecks(!!tNew, !!tRen, !!tMod);
-        const txnForText = this.txnFromText(text);
-        const txn = txnFromChecks ?? txnForText;
-
-        const parsedShipTop = parseParticularsText(text);
-
-        const hasRenewTxn =
-          !!tRen ||
-          txn === 'RENEW' ||
-          parsedShipTop?.txns?.includes('RENEW') ||
-          up.includes('RENEW');
-
-        const delayFromExpiry = this.computeDelayMonthsFromNow(periodFromRaw);
         const delayFromCtrl = Math.max(0, Math.floor(this.num(delayMonthsRaw, 0)));
-        const DELAY_MONTHS = hasRenewTxn ? delayFromExpiry : delayFromCtrl;
-
-        if (delayMonthsCtrl && delayMonthsCtrl.value !== DELAY_MONTHS) {
-          delayMonthsCtrl.patchValue(DELAY_MONTHS, { emitEvent: false });
-        }
-
-        const hasDuplicate = /\bDUPLICATE\b/.test(up);
-        const hasBaseTxnOrAction =
-          !!tNew ||
-          !!tRen ||
-          !!tMod ||
-          /\bNEW\b/.test(up) ||
-          /\bRENEW(AL)?\b/.test(up) ||
-          /\bMOD(IFICATION)?\b/.test(up) ||
-          up.includes('PURCHASE/POSSESS') ||
-          (up.includes('PURCHASE') && up.includes('POSSESS')) ||
-          up.includes('SELL/TRANSFER') ||
-          up.includes('POSSESS (STORAGE)') ||
-          up.includes('PERMIT TO PURCHASE') ||
-          up.includes('PERMIT TO SELL') ||
-          up.includes('PERMIT TO POSSESS') ||
-          up.includes('DELETION CERTIFICATE') ||
-          up.includes('SPECIAL EVENT') ||
-          up.includes('VANITY');
-
-        if (hasDuplicate && !hasBaseTxnOrAction) {
-          this.clearAllComputedFields();
-          this.applyDuplicateOthersCharge(true);
-          this.patch(this.computeTotalAmount(), 'totalAmount');
-          return;
-        }
-
-        // 1) ROC
-        if (up.startsWith('ROC')) {
-          this.clearAllComputedFields();
-
-          const isDuplicate = up.includes('DUPLICATE');
-
-          const rocFlags: RocTxnFlags = {
-            txnNew: !!tNew || (up.includes('NEW') && !up.includes('RENEW')),
-            txnRenew: !!tRen || up.includes('RENEW') || up.includes('REN'),
-            txnMod: !!tMod || up.includes('MOD'),
-          };
-
-          const res = computeROC(text, YEARS, rocFlags, DELAY_MONTHS);
-
-          this.patch(0, 'amRadioStationLicense');
-          this.patch(res.rocRadioOperatorsCert, 'amRadioOperatorsCert');
-          this.patch(res.rocAF, 'amApplicationFee');
-          this.patch(res.rocFF, 'amFilingFee');
-          this.patch(res.rocSemFee, 'amSeminarFee');
-          this.patch(res.rocSurcharges, 'amSurcharges');
-          this.patch(res.rocModificationFee, 'appModificationFee');
-          this.patch(res.rocDST, 'dst');
-
-          this.applyDuplicateOthersCharge(isDuplicate);
-
-          this.patch(this.computeTotalAmount(), 'totalAmount');
-          return;
-        }
-
-        // 2) AMATEUR
-        if (up.startsWith('AMATEUR')) {
-          this.clearAllComputedFields();
-
-          const cls = this.extractAmateurClass(text);
-          const isDuplicate = up.includes('DUPLICATE');
-
-          const flags: AmateurTxnFlags = {
-            txnNew: !!tNew || (up.includes('NEW') && !up.includes('RENEW')),
-            txnRenew: !!tRen || up.includes('RENEW') || up.includes('REN'),
-            txnMod: !!tMod || up.includes('MOD'),
-          };
-
-          const res = computeAmateur(text, cls, YEARS, flags, DELAY_MONTHS);
-
-          this.patch(res.maPermitPurchase, 'licPermitToPurchase');
-          this.patch(res.maPermitPossess, 'licPermitToPossess');
-          this.patch(res.maStf, 'appOthers');
-          this.patch(res.maRadioStationLicense, 'amRadioStationLicense');
-          this.patch(res.maRadioOperatorsCert, 'amRadioOperatorsCert');
-          this.patch(res.maApplicationFee, 'amApplicationFee');
-          this.patch(res.maFilingFee, 'amFilingFee');
-          this.patch(0, 'amSeminarFee');
-          this.patch(res.maSurcharges, 'amSurcharges');
-          this.patch(res.maConstructionPermitFee, 'licConstructionPermitFee');
-          this.patch(res.maModificationFee, 'appModificationFee');
-          this.patch(res.maDST, 'dst');
-
-          this.applyDuplicateOthersCharge(isDuplicate);
-
-          this.patch(this.computeTotalAmount(), 'totalAmount');
-          return;
-        }
-
-        // 3) COASTAL
-        if (up.includes('COASTAL STATION LICENSE') || up.includes('COASTAL')) {
-          this.clearAllComputedFields();
-
-          const hasDuplicate = /\bDUPLICATE\b/i.test(up);
-          const baseText = this.cleanParticularsTxnText(text);
-
-          const isPurchasePossess =
-            up.includes('PURCHASE/POSSESS') ||
-            (up.includes('PURCHASE') && up.includes('POSSESS'));
-
-          const isSellTransfer =
-            up.includes('SELL/TRANSFER') ||
-            (up.includes('SELL') && up.includes('TRANSFER'));
-
-          const defaultCoastalUnits = Math.max(1, Math.floor(this.num(shipU, 1)));
-          const purchasePossessUnits = this.extractUnitsAfterKeyword(
-            text,
-            /PURCHASE\/POSSESS|PURCHASE AND POSSESS/,
-            defaultCoastalUnits
-          );
-          const sellTransferUnits = this.extractUnitsAfterKeyword(
-            text,
-            /SELL\/TRANSFER/,
-            defaultCoastalUnits
-          );
-
-          let coastalTxn: 'NEW' | 'RENEW' | 'MOD' = 'NEW';
-          if (!!tMod) coastalTxn = 'MOD';
-          else if (!!tRen) coastalTxn = 'RENEW';
-          else coastalTxn = 'NEW';
-
-          const surMode: CoastalSurchargeMode =
-            coastalTxn === 'RENEW'
-              ? (s100 ? 'SUR100' : 'SUR50')
-              : 'NONE';
-
-          const coastalUnits = isPurchasePossess
-            ? purchasePossessUnits
-            : isSellTransfer
-            ? sellTransferUnits
-            : defaultCoastalUnits;
-
-          const res = computeCoastal(
-            baseText,
-            coastalTxn,
-            YEARS,
-            surMode,
-            coastalUnits,
-            coastalTxn === 'RENEW' ? DELAY_MONTHS : 0
-          );
-
-          if (!res || !res.row) {
-            this.clearAllComputedFields();
-            this.applyDuplicateOthersCharge(hasDuplicate);
-            this.patch(this.computeTotalAmount(), 'totalAmount');
-            return;
-          }
-
-          if (isPurchasePossess) {
-            // A.1 Permit to Purchase/Possess
-            // FF + Purchase + Possess + DST
-            this.patch(res.purchase, 'licPermitToPurchase');
-            this.patch(res.possess, 'licPermitToPossess');
-            this.patch(res.ff, 'licFilingFee');
-
-            this.patch(0, 'licConstructionPermitFee');
-            this.patch(0, 'licRadioStationLicense');
-            this.patch(0, 'licInspectionFee');
-            this.patch(0, 'licSUF');
-            this.patch(0, 'licFinesPenalties');
-            this.patch(0, 'licSurcharges');
-            this.patch(0, 'appModificationFee');
-            this.patch(res.dst, 'dst');
-          } else if (isSellTransfer) {
-            // A.4 Permit to Sell/Transfer
-            // STF + DST
-            this.patch(0, 'licPermitToPurchase');
-            this.patch(0, 'licPermitToPossess');
-            this.patch(0, 'licFilingFee');
-
-            this.patch(0, 'licConstructionPermitFee');
-            this.patch(0, 'licRadioStationLicense');
-            this.patch(0, 'licInspectionFee');
-            this.patch(0, 'licSUF');
-            this.patch(0, 'licFinesPenalties');
-            this.patch(0, 'licSurcharges');
-            this.patch(res.stf, 'appOthers');
-            this.patch(0, 'appModificationFee');
-            this.patch(res.dst, 'dst');
-          } else {
-            if (coastalTxn === 'NEW') {
-              // A.2 Public Coastal Station License (NEW)
-              // CP + LF + IF + DST
-              this.patch(0, 'licPermitToPurchase');
-              this.patch(0, 'licPermitToPossess');
-              this.patch(0, 'licFilingFee');
-
-              this.patch(res.cp, 'licConstructionPermitFee');
-              this.patch(res.lf, 'licRadioStationLicense');
-              this.patch(res.ifee, 'licInspectionFee');
-
-              this.patch(0, 'licSUF');
-              this.patch(0, 'licFinesPenalties');
-              this.patch(0, 'licSurcharges');
-              this.patch(0, 'appModificationFee');
-              this.patch(res.dst, 'dst');
-            } else if (coastalTxn === 'RENEW') {
-              // Public Coastal Station License (REN)
-              // LF + IF + DST + SUR
-              this.patch(0, 'licPermitToPurchase');
-              this.patch(0, 'licPermitToPossess');
-              this.patch(0, 'licFilingFee');
-              this.patch(0, 'licConstructionPermitFee');
-
-              this.patch(res.lf, 'licRadioStationLicense');
-              this.patch(res.ifee, 'licInspectionFee');
-
-              this.patch(0, 'licSUF');
-              this.patch(0, 'licFinesPenalties');
-              this.patch(res.surcharge, 'licSurcharges');
-              this.patch(0, 'appModificationFee');
-              this.patch(res.dst, 'dst');
-            } else {
-              // A.3 Public Coastal Station License (MOD)
-              // FF + CP + MOD + DST
-              this.patch(0, 'licPermitToPurchase');
-              this.patch(0, 'licPermitToPossess');
-
-              this.patch(res.ff, 'licFilingFee');
-              this.patch(res.cp, 'licConstructionPermitFee');
-              this.patch(0, 'licRadioStationLicense');
-              this.patch(0, 'licInspectionFee');
-
-              this.patch(0, 'licSUF');
-              this.patch(0, 'licFinesPenalties');
-              this.patch(0, 'licSurcharges');
-              this.patch(res.mod, 'appModificationFee');
-              this.patch(res.dst, 'dst');
-            }
-          }
-
-          this.applyDuplicateOthersCharge(hasDuplicate);
-
-          this.patch(this.computeTotalAmount(), 'totalAmount');
-          return;
-        }
-
-        // 4) VHF/UHF
-        {
-          const vhfEntries = this.splitStackedVhfEntries(text);
-          const vhfResults = vhfEntries
-            .map((entryText) => {
-              const entryUp = entryText.toUpperCase();
-              const isVhfPurchasePossess =
-                entryUp.includes('PURCHASE/POSSESS') ||
-                (entryUp.includes('PURCHASE') && entryUp.includes('POSSESS'));
-
-              const entryTxn =
-                /\bRENEW(AL)?\b/.test(entryUp) ? 'RENEW' :
-                /\bMODIFICATION\b|\bMOD\b/.test(entryUp) ? 'MOD' :
-                'NEW';
-
-              const vhfTxnUnitMarker =
-                entryTxn === 'MOD'
-                  ? /MODIFICATION|\bMOD\b/
-                  : entryTxn === 'RENEW'
-                  ? /\bRENEW(AL)?\b/
-                  : /\bNEW\b/;
-
-              const vhfTxnUnits = this.extractUnitsAfterKeyword(
-                entryText,
-                vhfTxnUnitMarker,
-                SHIP_UNITS
-              );
-
-              const vhfUnits = isVhfPurchasePossess
-                ? this.extractUnitsAfterKeyword(
-                    entryText,
-                    /PURCHASE\/POSSESS|PURCHASE AND POSSESS/,
-                    SHIP_UNITS
-                  )
-                : vhfTxnUnits;
-
-              const vhf = computeVhfUhfWithTxn(
-                entryText,
-                entryTxn,
-                YEARS,
-                vhfUnits,
-                1,
-                entryTxn === 'RENEW'
-                  ? (s100 ? 'SUR100' : 'SUR50')
-                  : 'NONE',
-                entryTxn === 'RENEW' ? DELAY_MONTHS : 0
-              );
-
-              return vhf?.ok
-                ? {
-                    entryText,
-                    entryTxn,
-                    isVhfPurchasePossess,
-                    vhf,
-                  }
-                : null;
-            })
-            .filter((value): value is {
-              entryText: string;
-              entryTxn: 'NEW' | 'RENEW' | 'MOD';
-              isVhfPurchasePossess: boolean;
-              vhf: NonNullable<ReturnType<typeof computeVhfUhfWithTxn>>;
-            } => !!value);
-
-          if (vhfResults.length) {
-            this.clearAllComputedFields();
-
-            for (const result of vhfResults) {
-              const { entryText, entryTxn, isVhfPurchasePossess, vhf } = result;
-
-              if (isVhfPurchasePossess) {
-                this.addToField('licPermitToPurchase', vhf.purchase * vhf.unit);
-                this.addToField('licPermitToPossess', vhf.possess * vhf.unit);
-                this.addToField('licFilingFee', vhf.filingFee * vhf.unit);
-                this.addToField('dst', vhf.dst);
-              } else if (entryTxn === 'NEW') {
-                this.addToField('licConstructionPermitFee', vhf.constructionPermit * vhf.unit);
-                this.addToField('licRadioStationLicense', (vhf.licenseFee * vhf.chUnit) * vhf.years);
-                this.addToField('licInspectionFee', (vhf.inspectionFee * vhf.unit) * vhf.years);
-                this.addToField('licSUF', (vhf.supervisionFee * vhf.chUnit) * vhf.years);
-                this.addToField('dst', vhf.dst);
-              } else if (entryTxn === 'RENEW') {
-                this.addToField('licRadioStationLicense', (vhf.licenseFee * vhf.chUnit) * vhf.years);
-                this.addToField('licInspectionFee', (vhf.inspectionFee * vhf.unit) * vhf.years);
-                this.addToField('licSUF', (vhf.supervisionFee * vhf.chUnit) * vhf.years);
-                this.addToField('licSurcharges', vhf.surchargeApplied);
-                this.addToField('dst', vhf.dst);
-              } else {
-                this.addToField('licFilingFee', vhf.filingFee * vhf.unit);
-                this.addToField('licConstructionPermitFee', vhf.constructionPermit * vhf.unit);
-                this.addToField('appModificationFee', vhf.modificationFee * vhf.unit);
-                this.addToField('dst', vhf.dst);
-              }
-
-              if (entryText.toUpperCase().includes('DUPLICATE')) {
-                this.addToField('appOthers', 120);
-              }
-            }
-
-            this.patch(this.computeTotalAmount(), 'totalAmount');
-            return;
-          }
-        }
-
-        // 5) MOBILE PHONE
-        if (up.includes('MOBILE PHONE') || up.includes('MOBILEPHONE')) {
-          this.clearAllComputedFields();
-
-          const flags: MobileTxnFlags = {
-            isNew: !!tNew || (/\bNEW\b/.test(up) && !/\bRENEW(AL)?\b/.test(up)),
-            isRenew: !!tRen || /\bRENEW(AL)?\b/.test(up),
-            isMod: !!tMod || /\bMOD(IFICATION)?\b/.test(up),
-          };
-
-          const mp = computeMobilePhone(text, YEARS_RAW || 1, flags, DELAY_MONTHS);
-
-          if (mp?.ok) {
-            this.patch(mp.ff, 'licFilingFee');
-            this.patch(mp.pf, 'licConstructionPermitFee');
-            this.patch(0, 'licRadioStationLicense');
-            this.patch(mp.ifee, 'licInspectionFee');
-            this.patch(mp.mod, 'appModificationFee');
-            this.patch(mp.dst, 'dst');
-            this.patch(mp.sur, 'licSurcharges');
-
-            this.applyDuplicateOthersCharge(up.includes('DUPLICATE'));
-
-            this.patch(this.computeTotalAmount(), 'totalAmount');
-            return;
-          }
-        }
-
-        // 6) TVRO / CATV
-        if (up.includes('TVRO/CATV') || up.includes('TVRO') || up.includes('CATV')) {
-          this.clearAllComputedFields();
-
-          const tv = computeTvroCatv(
-            text,
-            YEARS,
-            {
-              isNew: !!tNew || (/\bNEW\b/.test(up) && !/\bRENEW(AL)?\b/.test(up)),
-              isRenew: !!tRen || /\bRENEW(AL)?\b/.test(up),
-              isMod: !!tMod || /\bMOD(IFICATION)?\b/.test(up),
-            },
-            !!s100,
-            DELAY_MONTHS
-          );
-
-          if (tv?.ok) {
-            this.patch(tv.reg, 'appRegistrationFee');
-            this.patch(tv.ff, 'licFilingFee');
-            this.patch(tv.cpf, 'licConstructionPermitFee');
-            this.patch(tv.lf, 'licRadioStationLicense');
-            this.patch(tv.ifee, 'licInspectionFee');
-            this.patch(tv.sur, 'licSurcharges');
-            this.patch(tv.dst, 'dst');
-            this.patch(tv.mod, 'appModificationFee');
-
-            this.applyDuplicateOthersCharge(up.includes('DUPLICATE'));
-
-            this.patch(this.computeTotalAmount(), 'totalAmount');
-            return;
-          }
-        }
-
-        // 7) SHIP
-        const parsedShip = parsedShipTop;
-        if (parsedShip && !up.includes('COASTAL')) {
-          this.clearAllComputedFields();
-
-          const rowKey = rowKeyFromParsed(parsedShip);
-
-          const txns = parsedShip.txns?.length ? [...parsedShip.txns] : txn ? [txn] : [];
-
-          if (hasRenewTxn && !txns.includes('RENEW')) txns.push('RENEW');
-
-          const isDeletion = parsedShip.kind === 'DEL';
-
-          if (!txns.length && !isDeletion) {
-            this.clearAllComputedFields();
-            this.patch(0, 'totalAmount');
-            return;
-          }
-
-          const ship = buildShipParse(
-            rowKey,
-            !!wEq,
-            SHIP_UNITS,
-            !!s100,
-            parsedShip.purchaseUnits,
-            parsedShip.sellTransferUnits,
-            parsedShip.possessStorageUnits
-          );
-
-          const res = computeShipStation(
-            ship,
-            YEARS,
-            txns,
-            SHIP_STATION as Record<string, ShipStationRow>,
-            DELAY_MONTHS
-          );
-
-          this.patch(res.Purchase, 'licPermitToPurchase');
-          this.patch(res.FF, 'licFilingFee');
-          this.patch(res.Possess, 'licPermitToPossess');
-          this.patch(res.CPF, 'licConstructionPermitFee');
-          this.patch(res.LF, 'licRadioStationLicense');
-          this.patch(res.IF, 'licInspectionFee');
-          this.patch(0, 'licSUF');
-          this.patch(0, 'licFinesPenalties');
-          this.patch(res.SUR, 'licSurcharges');
-          this.patch(0, 'appRegistrationFee');
-          this.patch(0, 'appSupervisionRegulationFee');
-          this.patch(0, 'appVerificationAuthFee');
-          this.patch(0, 'appExaminationFee');
-          this.patch(res.CERT, 'appClearanceCertificationFee');
-          this.patch(res.MOD, 'appModificationFee');
-          this.patch(0, 'appMiscIncome');
-          this.patch(res.OTH, 'appOthers');
-          this.patch(res.DST, 'dst');
-
-          this.applyDuplicateOthersCharge(up.includes('DUPLICATE'));
-
-          this.patch(this.computeTotalAmount(), 'totalAmount');
-          return;
-        }
-
         this.clearAllComputedFields();
+        const entries = this.splitParticularsEntries(text);
+        const useTxnChecks = entries.length === 1;
+        const delayFromExpiry = this.computeDelayMonthsFromNow(periodFromRaw);
 
-        this.applyDuplicateOthersCharge(up.includes('DUPLICATE'));
+        if (delayMonthsCtrl) {
+          const nextDelayMonths =
+            entries.some((entry) => /\bRENEW(AL)?\b/i.test(entry)) ? delayFromExpiry : delayFromCtrl;
+          if (delayMonthsCtrl.value !== nextDelayMonths) {
+            delayMonthsCtrl.patchValue(nextDelayMonths, { emitEvent: false });
+          }
+        }
+
+        for (const entryText of entries) {
+          this.computeEntry(entryText, {
+            YEARS,
+            YEARS_RAW,
+            SHIP_UNITS,
+            delayFromCtrl,
+            delayFromExpiry,
+            useTxnChecks,
+            tNew,
+            tRen,
+            tMod,
+            wEq: !!wEq,
+            s100: !!s100,
+          });
+        }
 
         this.patch(this.computeTotalAmount(), 'totalAmount');
       });
+  }
+
+  private computeEntry(
+    entryText: string,
+    options: {
+      YEARS: number;
+      YEARS_RAW: number;
+      SHIP_UNITS: number;
+      delayFromCtrl: number;
+      delayFromExpiry: number;
+      useTxnChecks: boolean;
+      tNew: boolean;
+      tRen: boolean;
+      tMod: boolean;
+      wEq: boolean;
+      s100: boolean;
+    }
+  ): void {
+    const text = String(entryText ?? '').trim();
+    if (!text) return;
+
+    const up = text.toUpperCase();
+    const txnFromChecks = options.useTxnChecks
+      ? this.txnFromChecks(options.tNew, options.tRen, options.tMod)
+      : null;
+    const txnForText = this.txnFromText(text);
+    const txn = txnFromChecks ?? txnForText;
+    const parsedShipTop = parseParticularsText(text);
+
+    const hasRenewTxn =
+      (options.useTxnChecks && options.tRen) ||
+      txn === 'RENEW' ||
+      parsedShipTop?.txns?.includes('RENEW') ||
+      up.includes('RENEW');
+
+    const DELAY_MONTHS = hasRenewTxn ? options.delayFromExpiry : options.delayFromCtrl;
+    const hasDuplicate = /\bDUPLICATE\b/.test(up);
+    const hasBaseTxnOrAction =
+      (options.useTxnChecks && (options.tNew || options.tRen || options.tMod)) ||
+      /\bNEW\b/.test(up) ||
+      /\bRENEW(AL)?\b/.test(up) ||
+      /\bMOD(IFICATION)?\b/.test(up) ||
+      up.includes('PURCHASE/POSSESS') ||
+      (up.includes('PURCHASE') && up.includes('POSSESS')) ||
+      up.includes('SELL/TRANSFER') ||
+      up.includes('POSSESS (STORAGE)') ||
+      up.includes('PERMIT TO PURCHASE') ||
+      up.includes('PERMIT TO SELL') ||
+      up.includes('PERMIT TO POSSESS') ||
+      up.includes('DELETION CERTIFICATE') ||
+      up.includes('SPECIAL EVENT') ||
+      up.includes('VANITY');
+
+    if (hasDuplicate && !hasBaseTxnOrAction) {
+      this.applyDuplicateOthersCharge(true);
+      return;
+    }
+
+    if (up.startsWith('ROC')) {
+      const rocFlags: RocTxnFlags = {
+        txnNew: (options.useTxnChecks && options.tNew) || (up.includes('NEW') && !up.includes('RENEW')),
+        txnRenew: (options.useTxnChecks && options.tRen) || up.includes('RENEW') || up.includes('REN'),
+        txnMod: (options.useTxnChecks && options.tMod) || up.includes('MOD'),
+      };
+
+      const res = computeROC(text, options.YEARS, rocFlags, DELAY_MONTHS);
+
+      this.addToField('amRadioOperatorsCert', res.rocRadioOperatorsCert);
+      this.addToField('amApplicationFee', res.rocAF);
+      this.addToField('amFilingFee', res.rocFF);
+      this.addToField('amSeminarFee', res.rocSemFee);
+      this.addToField('amSurcharges', res.rocSurcharges);
+      this.addToField('appModificationFee', res.rocModificationFee);
+      this.addToField('dst', res.rocDST);
+      this.applyDuplicateOthersCharge(hasDuplicate);
+      return;
+    }
+
+    if (up.startsWith('AMATEUR')) {
+      const cls = this.extractAmateurClass(text);
+
+      const flags: AmateurTxnFlags = {
+        txnNew: (options.useTxnChecks && options.tNew) || (up.includes('NEW') && !up.includes('RENEW')),
+        txnRenew: (options.useTxnChecks && options.tRen) || up.includes('RENEW') || up.includes('REN'),
+        txnMod: (options.useTxnChecks && options.tMod) || up.includes('MOD'),
+      };
+
+      const res = computeAmateur(text, cls, options.YEARS, flags, DELAY_MONTHS);
+
+      this.addToField('licPermitToPurchase', res.maPermitPurchase);
+      this.addToField('licPermitToPossess', res.maPermitPossess);
+      this.addToField('appOthers', res.maStf);
+      this.addToField('amRadioStationLicense', res.maRadioStationLicense);
+      this.addToField('amRadioOperatorsCert', res.maRadioOperatorsCert);
+      this.addToField('amApplicationFee', res.maApplicationFee);
+      this.addToField('amFilingFee', res.maFilingFee);
+      this.addToField('amSurcharges', res.maSurcharges);
+      this.addToField('licConstructionPermitFee', res.maConstructionPermitFee);
+      this.addToField('appModificationFee', res.maModificationFee);
+      this.addToField('dst', res.maDST);
+      this.applyDuplicateOthersCharge(hasDuplicate);
+      return;
+    }
+
+    if (up.includes('COASTAL STATION LICENSE') || up.includes('COASTAL')) {
+      const baseText = this.cleanParticularsTxnText(text);
+
+      const isPurchasePossess =
+        up.includes('PURCHASE/POSSESS') ||
+        (up.includes('PURCHASE') && up.includes('POSSESS'));
+
+      const isSellTransfer =
+        up.includes('SELL/TRANSFER') ||
+        (up.includes('SELL') && up.includes('TRANSFER'));
+
+      const defaultCoastalUnits = Math.max(1, Math.floor(this.num(options.SHIP_UNITS, 1)));
+      const purchasePossessUnits = this.extractUnitsAfterKeyword(
+        text,
+        /PURCHASE\/POSSESS|PURCHASE AND POSSESS/,
+        defaultCoastalUnits
+      );
+      const sellTransferUnits = this.extractUnitsAfterKeyword(
+        text,
+        /SELL\/TRANSFER/,
+        defaultCoastalUnits
+      );
+
+      let coastalTxn: 'NEW' | 'RENEW' | 'MOD' = 'NEW';
+      if ((options.useTxnChecks && options.tMod) || /\bMOD(IFICATION)?\b/.test(up)) coastalTxn = 'MOD';
+      else if ((options.useTxnChecks && options.tRen) || /\bRENEW(AL)?\b/.test(up)) coastalTxn = 'RENEW';
+
+      const surMode: CoastalSurchargeMode =
+        coastalTxn === 'RENEW'
+          ? (options.s100 ? 'SUR100' : 'SUR50')
+          : 'NONE';
+
+      const coastalUnits = isPurchasePossess
+        ? purchasePossessUnits
+        : isSellTransfer
+        ? sellTransferUnits
+        : defaultCoastalUnits;
+
+      const res = computeCoastal(
+        baseText,
+        coastalTxn,
+        options.YEARS,
+        surMode,
+        coastalUnits,
+        coastalTxn === 'RENEW' ? DELAY_MONTHS : 0
+      );
+
+      if (!res || !res.row) {
+        this.applyDuplicateOthersCharge(hasDuplicate);
+        return;
+      }
+
+      if (isPurchasePossess) {
+        this.addToField('licPermitToPurchase', res.purchase);
+        this.addToField('licPermitToPossess', res.possess);
+        this.addToField('licFilingFee', res.ff);
+        this.addToField('dst', res.dst);
+      } else if (isSellTransfer) {
+        this.addToField('appOthers', res.stf);
+        this.addToField('dst', res.dst);
+      } else if (coastalTxn === 'NEW') {
+        this.addToField('licConstructionPermitFee', res.cp);
+        this.addToField('licRadioStationLicense', res.lf);
+        this.addToField('licInspectionFee', res.ifee);
+        this.addToField('dst', res.dst);
+      } else if (coastalTxn === 'RENEW') {
+        this.addToField('licRadioStationLicense', res.lf);
+        this.addToField('licInspectionFee', res.ifee);
+        this.addToField('licSurcharges', res.surcharge);
+        this.addToField('dst', res.dst);
+      } else {
+        this.addToField('licFilingFee', res.ff);
+        this.addToField('licConstructionPermitFee', res.cp);
+        this.addToField('appModificationFee', res.mod);
+        this.addToField('dst', res.dst);
+      }
+
+      this.applyDuplicateOthersCharge(hasDuplicate);
+      return;
+    }
+
+    if (up.includes('VHF') || up.includes('UHF')) {
+      const isVhfPurchasePossess =
+        up.includes('PURCHASE/POSSESS') ||
+        (up.includes('PURCHASE') && up.includes('POSSESS'));
+
+      const entryTxn =
+        /\bRENEW(AL)?\b/.test(up) ? 'RENEW' :
+        /\bMODIFICATION\b|\bMOD\b/.test(up) ? 'MOD' :
+        'NEW';
+
+      const vhfTxnUnitMarker =
+        entryTxn === 'MOD'
+          ? /MODIFICATION|\bMOD\b/
+          : entryTxn === 'RENEW'
+          ? /\bRENEW(AL)?\b/
+          : /\bNEW\b/;
+
+      const vhfTxnUnits = this.extractUnitsAfterKeyword(
+        text,
+        vhfTxnUnitMarker,
+        options.SHIP_UNITS
+      );
+
+      const vhfUnits = isVhfPurchasePossess
+        ? this.extractUnitsAfterKeyword(
+            text,
+            /PURCHASE\/POSSESS|PURCHASE AND POSSESS/,
+            options.SHIP_UNITS
+          )
+        : vhfTxnUnits;
+
+      const vhf = computeVhfUhfWithTxn(
+        text,
+        entryTxn,
+        options.YEARS,
+        vhfUnits,
+        1,
+        entryTxn === 'RENEW'
+          ? (options.s100 ? 'SUR100' : 'SUR50')
+          : 'NONE',
+        entryTxn === 'RENEW' ? DELAY_MONTHS : 0
+      );
+
+      if (!vhf?.ok) {
+        this.applyDuplicateOthersCharge(hasDuplicate);
+        return;
+      }
+
+      if (isVhfPurchasePossess) {
+        this.addToField('licPermitToPurchase', vhf.purchase * vhf.unit);
+        this.addToField('licPermitToPossess', vhf.possess * vhf.unit);
+        this.addToField('licFilingFee', vhf.filingFee * vhf.unit);
+        this.addToField('dst', vhf.dst);
+      } else if (entryTxn === 'NEW') {
+        this.addToField('licConstructionPermitFee', vhf.constructionPermit * vhf.unit);
+        this.addToField('licRadioStationLicense', (vhf.licenseFee * vhf.chUnit) * vhf.years);
+        this.addToField('licInspectionFee', (vhf.inspectionFee * vhf.unit) * vhf.years);
+        this.addToField('licSUF', (vhf.supervisionFee * vhf.chUnit) * vhf.years);
+        this.addToField('dst', vhf.dst);
+      } else if (entryTxn === 'RENEW') {
+        this.addToField('licRadioStationLicense', (vhf.licenseFee * vhf.chUnit) * vhf.years);
+        this.addToField('licInspectionFee', (vhf.inspectionFee * vhf.unit) * vhf.years);
+        this.addToField('licSUF', (vhf.supervisionFee * vhf.chUnit) * vhf.years);
+        this.addToField('licSurcharges', vhf.surchargeApplied);
+        this.addToField('dst', vhf.dst);
+      } else {
+        this.addToField('licFilingFee', vhf.filingFee * vhf.unit);
+        this.addToField('licConstructionPermitFee', vhf.constructionPermit * vhf.unit);
+        this.addToField('appModificationFee', vhf.modificationFee * vhf.unit);
+        this.addToField('dst', vhf.dst);
+      }
+
+      this.applyDuplicateOthersCharge(hasDuplicate);
+      return;
+    }
+
+    if (up.includes('MOBILE PHONE') || up.includes('MOBILEPHONE')) {
+      const flags: MobileTxnFlags = {
+        isNew: (options.useTxnChecks && options.tNew) || (/\bNEW\b/.test(up) && !/\bRENEW(AL)?\b/.test(up)),
+        isRenew: (options.useTxnChecks && options.tRen) || /\bRENEW(AL)?\b/.test(up),
+        isMod: (options.useTxnChecks && options.tMod) || /\bMOD(IFICATION)?\b/.test(up),
+      };
+
+      const mp = computeMobilePhone(text, options.YEARS_RAW || 1, flags, DELAY_MONTHS);
+
+      if (mp?.ok) {
+        this.addToField('licFilingFee', mp.ff);
+        this.addToField('licConstructionPermitFee', mp.pf);
+        this.addToField('licInspectionFee', mp.ifee);
+        this.addToField('appModificationFee', mp.mod);
+        this.addToField('dst', mp.dst);
+        this.addToField('licSurcharges', mp.sur);
+      }
+
+      this.applyDuplicateOthersCharge(hasDuplicate);
+      return;
+    }
+
+    if (up.includes('TVRO/CATV') || up.includes('TVRO') || up.includes('CATV')) {
+      const tv = computeTvroCatv(
+        text,
+        options.YEARS,
+        {
+          isNew:
+            (options.useTxnChecks && options.tNew) || (/\bNEW\b/.test(up) && !/\bRENEW(AL)?\b/.test(up)),
+          isRenew: (options.useTxnChecks && options.tRen) || /\bRENEW(AL)?\b/.test(up),
+          isMod: (options.useTxnChecks && options.tMod) || /\bMOD(IFICATION)?\b/.test(up),
+        },
+        options.s100,
+        DELAY_MONTHS
+      );
+
+      if (tv?.ok) {
+        this.addToField('appRegistrationFee', tv.reg);
+        this.addToField('licFilingFee', tv.ff);
+        this.addToField('licConstructionPermitFee', tv.cpf);
+        this.addToField('licRadioStationLicense', tv.lf);
+        this.addToField('licInspectionFee', tv.ifee);
+        this.addToField('licSurcharges', tv.sur);
+        this.addToField('dst', tv.dst);
+        this.addToField('appModificationFee', tv.mod);
+      }
+
+      this.applyDuplicateOthersCharge(hasDuplicate);
+      return;
+    }
+
+    if (parsedShipTop && !up.includes('COASTAL')) {
+      const rowKey = rowKeyFromParsed(parsedShipTop);
+      const txns = parsedShipTop.txns?.length ? [...parsedShipTop.txns] : txn ? [txn] : [];
+
+      if (hasRenewTxn && !txns.includes('RENEW')) txns.push('RENEW');
+
+      const isDeletion = parsedShipTop.kind === 'DEL';
+      if (!txns.length && !isDeletion) return;
+
+      const ship = buildShipParse(
+        rowKey,
+        options.wEq,
+        options.SHIP_UNITS,
+        options.s100,
+        parsedShipTop.purchaseUnits,
+        parsedShipTop.sellTransferUnits,
+        parsedShipTop.possessStorageUnits
+      );
+
+      const res = computeShipStation(
+        ship,
+        options.YEARS,
+        txns,
+        SHIP_STATION as Record<string, ShipStationRow>,
+        DELAY_MONTHS
+      );
+
+      this.addToField('licPermitToPurchase', res.Purchase);
+      this.addToField('licFilingFee', res.FF);
+      this.addToField('licPermitToPossess', res.Possess);
+      this.addToField('licConstructionPermitFee', res.CPF);
+      this.addToField('licRadioStationLicense', res.LF);
+      this.addToField('licInspectionFee', res.IF);
+      this.addToField('licSurcharges', res.SUR);
+      this.addToField('appClearanceCertificationFee', res.CERT);
+      this.addToField('appModificationFee', res.MOD);
+      this.addToField('appOthers', res.OTH);
+      this.addToField('dst', res.DST);
+      this.applyDuplicateOthersCharge(hasDuplicate);
+      return;
+    }
+
+    this.applyDuplicateOthersCharge(hasDuplicate);
   }
 
   private cleanParticularsTxnText(text: string): string {
@@ -682,6 +584,13 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
       .trim();
   }
 
+  private splitParticularsEntries(text: string): string[] {
+    return String(text ?? '')
+      .split('||')
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+
   private buildParticularsWithTxn(baseText: string, txnLabels: string[], duplicate: boolean): string {
     let result = baseText.trim();
 
@@ -696,13 +605,6 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
     }
 
     return result.replace(/\s+-\s+-/g, ' - ').trim();
-  }
-
-  private splitStackedVhfEntries(text: string): string[] {
-    return String(text ?? '')
-      .split('||')
-      .map((part) => part.trim())
-      .filter(Boolean);
   }
 
   private ctrl(name: string): AbstractControl | null {

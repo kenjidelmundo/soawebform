@@ -279,10 +279,16 @@ function parseHoverEntries(
     <div class="hoverDlg">
       <div class="tblWrap" *ngIf="entries.length; else emptyState">
         <table class="tbl">
-          <tr *ngFor="let row of rows">
-            <th class="rowLabel">{{ row.label }}</th>
-            <td *ngFor="let entry of entries">{{ entry[row.key] || '' }}</td>
-          </tr>
+          <thead>
+            <tr>
+              <th *ngFor="let row of rows">{{ row.label }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let entry of entries">
+              <td *ngFor="let row of rows">{{ entry[row.key] || '' }}</td>
+            </tr>
+          </tbody>
         </table>
       </div>
 
@@ -324,15 +330,9 @@ function parseHoverEntries(
     th{
       background:#eef4fb;
       font-weight:700;
-    }
-    .rowLabel{
-      width:320px;
-      min-width:320px;
-      background:#eef4fb;
       white-space:nowrap;
     }
     td{
-      min-width:148px;
       background:#fff;
     }
     .empty{
