@@ -18,7 +18,10 @@ import { SoaService } from '../soa.service';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { AddressDialogComponent } from './address-dialog.component';
 import { ParticularsDialogComponent } from './particulars-dialog.component';
-import { ParticularsHoverDialogComponent } from './particulars-hover-dialog.component';
+import {
+  ParticularsHoverDialogComponent,
+  ParticularsHoverDialogResult,
+} from './particulars-hover-dialog.component';
 import { TxnTypeDialogComponent, TxnType } from './txn-type-dialog.component';
 
 import { openRocParticularsFlow } from './particulars-roc.flow';
@@ -55,6 +58,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private addressDialogOpen = false;
   private particularsDialogOpen = false;
   private particularsHoverRef: MatDialogRef<ParticularsHoverDialogComponent> | null = null;
+  private particularsHoverCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
   private addressCoolDownUntil = 0;
   private particularsCoolDownUntil = 0;
@@ -108,11 +112,12 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       this.renderer.setStyle(partInput, 'pointer-events', 'auto');
 
       this.unlistenPartEnter = this.renderer.listen(partInput, 'mouseenter', () => {
+        this.cancelParticularsHoverClose();
         this.openParticularsHoverDialog(partInput);
       });
 
       this.unlistenPartLeave = this.renderer.listen(partInput, 'mouseleave', () => {
-        this.closeParticularsHoverDialog();
+        this.scheduleParticularsHoverClose();
       });
 
       this.unlistenPartClick = this.renderer.listen(partInput, 'click', (ev) => {
@@ -412,6 +417,23 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const existingEntries = this.splitParticularsEntries(existingText);
     const nextEntries = this.splitParticularsEntries(nextText);
     return [...existingEntries, ...nextEntries].join(' || ').trim();
+  }
+
+  private replaceParticulars(nextText: string): void {
+    const particulars = this.splitParticularsEntries(nextText).join(' || ');
+
+    this.form.get('particulars')?.setValue(particulars, { emitEvent: true });
+    this.form.get('particulars')?.updateValueAndValidity({ emitEvent: true });
+
+    if (particulars) {
+      this.applyTxnFromParticulars(particulars);
+    } else {
+      this.setTxnEverywhere({ txnNew: false, txnRenew: false, txnModification: false });
+      this.setStringDeep('txnType', '');
+      this.setStringDeep('transactionType', '');
+    }
+
+    this.applyCategoryFromParticulars(particulars);
   }
 
   private loadPayees(): void {
@@ -800,6 +822,12 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
         particulars: particularsText,
         years: yearsValue,
         licensePermitNo: '',
+        onPointerEnter: () => {
+          this.cancelParticularsHoverClose();
+        },
+        onPointerLeave: () => {
+          this.closeParticularsHoverDialog();
+        },
       },
       position: {
         left: `${left}px`,
@@ -807,14 +835,41 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       },
     });
 
-    this.particularsHoverRef.afterClosed().subscribe(() => {
+    this.particularsHoverRef.afterClosed().subscribe((result?: ParticularsHoverDialogResult) => {
+      this.cancelParticularsHoverClose();
       this.particularsHoverRef = null;
+
+      if (result?.action === 'delete') {
+        this.replaceParticulars(result.particulars);
+        return;
+      }
+
+      if (result?.action === 'edit') {
+        this.particularsCoolDownUntil = 0;
+        this.openParticularsDialog();
+      }
     });
   }
 
   private closeParticularsHoverDialog(): void {
+    this.cancelParticularsHoverClose();
     this.particularsHoverRef?.close();
     this.particularsHoverRef = null;
+  }
+
+  private scheduleParticularsHoverClose(delayMs = 180): void {
+    this.cancelParticularsHoverClose();
+    this.particularsHoverCloseTimer = setTimeout(() => {
+      this.particularsHoverCloseTimer = null;
+      this.closeParticularsHoverDialog();
+    }, delayMs);
+  }
+
+  private cancelParticularsHoverClose(): void {
+    if (this.particularsHoverCloseTimer) {
+      clearTimeout(this.particularsHoverCloseTimer);
+      this.particularsHoverCloseTimer = null;
+    }
   }
 
   private applyFinalParticulars(finalText: string, txn?: TxnType): void {

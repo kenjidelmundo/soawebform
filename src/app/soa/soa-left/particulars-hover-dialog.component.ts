@@ -6,7 +6,13 @@ type ParticularsHoverDialogData = {
   particulars?: string;
   years?: string | number | null;
   licensePermitNo?: string | null;
+  onPointerEnter?: () => void;
+  onPointerLeave?: () => void;
 };
+
+export type ParticularsHoverDialogResult =
+  | { action: 'delete'; particulars: string }
+  | { action: 'edit'; entryIndex: number };
 
 type HoverEntry = {
   status: string;
@@ -14,6 +20,9 @@ type HoverEntry = {
   years: string;
   units: string;
   licensePermitNo: string;
+  chunkIndex: number;
+  baseSegments: string[];
+  rawParts: string[];
 };
 
 const GENERIC_SERVICE_LABELS = [
@@ -180,7 +189,8 @@ function buildTypeLabel(baseSegments: string[], fallback: string): string {
 function buildEntriesForChunk(
   chunk: string,
   years: string,
-  licensePermitNo: string
+  licensePermitNo: string,
+  chunkIndex: number
 ): HoverEntry[] {
   const segments = chunk.split(' - ').map((segment) => segment.trim()).filter(Boolean);
   if (!segments.length) return [];
@@ -193,16 +203,20 @@ function buildEntriesForChunk(
 
   const entries: HoverEntry[] = [];
   let pendingUnits = '';
+  let pendingUnitsRaw = '';
 
   for (const piece of pieces) {
     if (isUnitsSegment(piece)) {
       const units = String(parseUnitsValue(piece));
+      const unitsRaw = `UNITS_${units}`;
       const lastEntry = entries[entries.length - 1];
 
       if (lastEntry && !lastEntry.units) {
         lastEntry.units = units;
+        lastEntry.rawParts.push(unitsRaw);
       } else {
         pendingUnits = units;
+        pendingUnitsRaw = unitsRaw;
       }
       continue;
     }
@@ -210,15 +224,18 @@ function buildEntriesForChunk(
     if (!isTxnSegment(piece)) continue;
 
     const status = displayStatusLabel(piece);
+    const normalizedTxn = normalizeTxnLabel(piece);
     const lastEntry = entries[entries.length - 1];
 
     if (status === 'Dup' && lastEntry) {
       lastEntry.status = combineStatus(lastEntry.status, status);
+      lastEntry.rawParts.push(normalizedTxn);
       continue;
     }
 
     if (lastEntry && !lastEntry.units && !pendingUnits && shouldCombineStatuses(lastEntry.status, status)) {
       lastEntry.status = combineStatus(lastEntry.status, status);
+      lastEntry.rawParts.push(normalizedTxn);
       continue;
     }
 
@@ -228,8 +245,12 @@ function buildEntriesForChunk(
       years,
       units: pendingUnits,
       licensePermitNo,
+      chunkIndex,
+      baseSegments: [...baseSegments],
+      rawParts: pendingUnitsRaw ? [normalizedTxn, pendingUnitsRaw] : [normalizedTxn],
     });
     pendingUnits = '';
+    pendingUnitsRaw = '';
   }
 
   if (!entries.length) {
@@ -240,6 +261,9 @@ function buildEntriesForChunk(
         years,
         units: pendingUnits,
         licensePermitNo,
+        chunkIndex,
+        baseSegments: [...baseSegments],
+        rawParts: pendingUnitsRaw ? [pendingUnitsRaw] : [],
       },
     ];
   }
@@ -264,11 +288,33 @@ function parseHoverEntries(
   const licensePermitNo = String(licensePermitNoValue ?? '').trim();
   const allEntries: HoverEntry[] = [];
 
-  for (const chunk of chunks) {
-    allEntries.push(...buildEntriesForChunk(chunk, years, licensePermitNo));
+  for (const [chunkIndex, chunk] of chunks.entries()) {
+    allEntries.push(...buildEntriesForChunk(chunk, years, licensePermitNo, chunkIndex));
   }
 
   return allEntries;
+}
+
+function serializeHoverEntries(entries: HoverEntry[]): string {
+  const grouped = new Map<number, { baseSegments: string[]; parts: string[] }>();
+
+  for (const entry of entries) {
+    const current = grouped.get(entry.chunkIndex);
+    if (current) {
+      current.parts.push(...entry.rawParts);
+      continue;
+    }
+
+    grouped.set(entry.chunkIndex, {
+      baseSegments: [...entry.baseSegments],
+      parts: [...entry.rawParts],
+    });
+  }
+
+  return Array.from(grouped.values())
+    .map(({ baseSegments, parts }) => [...baseSegments, ...parts].filter(Boolean).join(' - ').trim())
+    .filter(Boolean)
+    .join(' || ');
 }
 
 @Component({
@@ -276,17 +322,50 @@ function parseHoverEntries(
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="hoverDlg">
+    <div
+      class="hoverDlg"
+      (mouseenter)="handlePointerEnter()"
+      (mouseleave)="handlePointerLeave()"
+    >
       <div class="tblWrap" *ngIf="entries.length; else emptyState">
         <table class="tbl">
           <thead>
             <tr>
               <th *ngFor="let row of rows">{{ row.label }}</th>
+              <th class="actionsCol">Action</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let entry of entries">
+            <tr *ngFor="let entry of entries; let i = index">
               <td *ngFor="let row of rows">{{ entry[row.key] || '' }}</td>
+              <td class="actionsCell">
+                <button
+                  type="button"
+                  class="iconBtn"
+                  aria-label="Edit row"
+                  title="Edit row"
+                  (click)="editEntry(i, $event)"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm14.71-9.04a.996.996 0 0 0 0-1.41l-2.5-2.5a.996.996 0 1 0-1.41 1.41l2.5 2.5c.39.39 1.03.39 1.41 0z"
+                    />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="iconBtn danger"
+                  aria-label="Delete row"
+                  title="Delete row"
+                  (click)="deleteEntry(i, $event)"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2h4v2H4V6h4l1-2z"
+                    />
+                  </svg>
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -340,6 +419,46 @@ function parseHoverEntries(
       font:600 12px Arial,sans-serif;
       color:#475569;
     }
+    .actionsCol{
+      width:92px;
+      min-width:92px;
+      text-align:center;
+    }
+    .actionsCell{
+      white-space:nowrap;
+      text-align:center;
+    }
+    .iconBtn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:28px;
+      height:28px;
+      margin:0 2px;
+      border:1px solid #cbd5e1;
+      border-radius:7px;
+      background:#f8fafc;
+      color:#1e3a8a;
+      cursor:pointer;
+      transition:background-color .15s ease, border-color .15s ease, transform .15s ease;
+    }
+    .iconBtn:hover{
+      background:#e8f0ff;
+      border-color:#93c5fd;
+      transform:translateY(-1px);
+    }
+    .iconBtn svg{
+      width:15px;
+      height:15px;
+      fill:currentColor;
+    }
+    .iconBtn.danger{
+      color:#b42318;
+    }
+    .iconBtn.danger:hover{
+      background:#fff1f2;
+      border-color:#fda4af;
+    }
   `],
 })
 export class ParticularsHoverDialogComponent {
@@ -351,6 +470,8 @@ export class ParticularsHoverDialogComponent {
     { label: 'Units (optional)', key: 'units' },
     { label: 'License No / Permit No.', key: 'licensePermitNo' },
   ];
+  private readonly onPointerEnterCallback?: () => void;
+  private readonly onPointerLeaveCallback?: () => void;
 
   constructor(
     private ref: MatDialogRef<ParticularsHoverDialogComponent>,
@@ -361,9 +482,36 @@ export class ParticularsHoverDialogComponent {
       data?.years,
       data?.licensePermitNo
     );
+    this.onPointerEnterCallback = data?.onPointerEnter;
+    this.onPointerLeaveCallback = data?.onPointerLeave;
   }
 
   close(): void {
     this.ref.close();
+  }
+
+  editEntry(entryIndex: number, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.ref.close({ action: 'edit', entryIndex });
+  }
+
+  deleteEntry(entryIndex: number, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const nextEntries = this.entries.filter((_, index) => index !== entryIndex);
+    this.ref.close({
+      action: 'delete',
+      particulars: serializeHoverEntries(nextEntries),
+    });
+  }
+
+  handlePointerEnter(): void {
+    this.onPointerEnterCallback?.();
+  }
+
+  handlePointerLeave(): void {
+    this.onPointerLeaveCallback?.();
   }
 }
