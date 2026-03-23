@@ -14,7 +14,7 @@ export type ParticularsHoverDialogResult =
   | { action: 'delete'; particulars: string }
   | { action: 'edit'; entryIndex: number };
 
-type HoverEntry = {
+export type ParticularsHoverEntry = {
   status: string;
   type: string;
   years: string;
@@ -191,7 +191,7 @@ function buildEntriesForChunk(
   years: string,
   licensePermitNo: string,
   chunkIndex: number
-): HoverEntry[] {
+): ParticularsHoverEntry[] {
   const segments = chunk.split(' - ').map((segment) => segment.trim()).filter(Boolean);
   if (!segments.length) return [];
 
@@ -201,7 +201,7 @@ function buildEntriesForChunk(
   const tailSegments = firstTxnIndex >= 0 ? segments.slice(firstTxnIndex) : [];
   const pieces = tailSegments.flatMap((segment) => splitSlashSeparated(segment));
 
-  const entries: HoverEntry[] = [];
+  const entries: ParticularsHoverEntry[] = [];
   let pendingUnits = '';
   let pendingUnitsRaw = '';
 
@@ -271,11 +271,11 @@ function buildEntriesForChunk(
   return entries;
 }
 
-function parseHoverEntries(
+export function parseParticularsHoverEntries(
   raw: string,
   yearsValue: string | number | null | undefined,
   licensePermitNoValue: string | null | undefined
-): HoverEntry[] {
+): ParticularsHoverEntry[] {
   const particulars = String(raw ?? '').trim();
   if (!particulars) return [];
 
@@ -286,7 +286,7 @@ function parseHoverEntries(
 
   const years = formatYearsValue(yearsValue);
   const licensePermitNo = String(licensePermitNoValue ?? '').trim();
-  const allEntries: HoverEntry[] = [];
+  const allEntries: ParticularsHoverEntry[] = [];
 
   for (const [chunkIndex, chunk] of chunks.entries()) {
     allEntries.push(...buildEntriesForChunk(chunk, years, licensePermitNo, chunkIndex));
@@ -295,7 +295,7 @@ function parseHoverEntries(
   return allEntries;
 }
 
-function serializeHoverEntries(entries: HoverEntry[]): string {
+export function serializeParticularsHoverEntries(entries: ParticularsHoverEntry[]): string {
   const grouped = new Map<number, { baseSegments: string[]; parts: string[] }>();
 
   for (const entry of entries) {
@@ -462,8 +462,8 @@ function serializeHoverEntries(entries: HoverEntry[]): string {
   `],
 })
 export class ParticularsHoverDialogComponent {
-  readonly entries: HoverEntry[];
-  readonly rows: Array<{ label: string; key: keyof HoverEntry }> = [
+  readonly entries: ParticularsHoverEntry[];
+  readonly rows: Array<{ label: string; key: keyof ParticularsHoverEntry }> = [
     { label: 'Status', key: 'status' },
     { label: 'Type', key: 'type' },
     { label: 'Years', key: 'years' },
@@ -477,7 +477,7 @@ export class ParticularsHoverDialogComponent {
     private ref: MatDialogRef<ParticularsHoverDialogComponent>,
     @Inject(MAT_DIALOG_DATA) data: ParticularsHoverDialogData
   ) {
-    this.entries = parseHoverEntries(
+    this.entries = parseParticularsHoverEntries(
       data?.particulars ?? '',
       data?.years,
       data?.licensePermitNo
@@ -503,7 +503,7 @@ export class ParticularsHoverDialogComponent {
     const nextEntries = this.entries.filter((_, index) => index !== entryIndex);
     this.ref.close({
       action: 'delete',
-      particulars: serializeHoverEntries(nextEntries),
+      particulars: serializeParticularsHoverEntries(nextEntries),
     });
   }
 

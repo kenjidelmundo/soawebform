@@ -21,6 +21,9 @@ import { ParticularsDialogComponent } from './particulars-dialog.component';
 import {
   ParticularsHoverDialogComponent,
   ParticularsHoverDialogResult,
+  ParticularsHoverEntry,
+  parseParticularsHoverEntries,
+  serializeParticularsHoverEntries,
 } from './particulars-hover-dialog.component';
 import { TxnTypeDialogComponent, TxnType } from './txn-type-dialog.component';
 
@@ -623,12 +626,46 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private openParticularsDialog(): void {
+  private normalizeParticularsEntries(entries: ParticularsHoverEntry[]): ParticularsHoverEntry[] {
+    return entries.map((entry, index) => ({
+      ...entry,
+      chunkIndex: index,
+    }));
+  }
+
+  private replaceParticularsEntry(
+    existingText: string,
+    replacementText: string,
+    entryIndex: number
+  ): string {
+    const yearsValue = this.form?.get('periodYears')?.value;
+    const currentEntries = this.normalizeParticularsEntries(
+      parseParticularsHoverEntries(existingText, yearsValue, '')
+    );
+    const replacementEntries = parseParticularsHoverEntries(replacementText, yearsValue, '');
+
+    if (entryIndex < 0 || entryIndex >= currentEntries.length) {
+      return this.appendParticulars(existingText, replacementText);
+    }
+
+    const nextEntries = this.normalizeParticularsEntries([
+      ...currentEntries.slice(0, entryIndex),
+      ...replacementEntries,
+      ...currentEntries.slice(entryIndex + 1),
+    ]);
+
+    return serializeParticularsHoverEntries(nextEntries);
+  }
+
+  private openParticularsDialog(replaceEntryIndex?: number): void {
     if (this.particularsDialogOpen) return;
 
     this.closeParticularsHoverDialog();
     this.particularsCoolDownUntil = Date.now() + this.COOLDOWN_MS;
     this.particularsDialogOpen = true;
+    const applyParticulars = (finalText: string, txn?: TxnType) => {
+      this.applyFinalParticulars(finalText, txn, replaceEntryIndex);
+    };
 
     const ref = this.dialog.open(ParticularsDialogComponent, {
       width: '640px',
@@ -662,7 +699,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       switch (kind) {
         case 'ROC':
           openRocParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
-            this.applyFinalParticulars(finalText, txn);
+            applyParticulars(finalText, txn);
           });
           return;
 
@@ -671,7 +708,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
             this.dialog,
             () => {},
             (finalText: string, txn?: TxnType) => {
-              this.applyFinalParticulars(finalText, txn);
+              applyParticulars(finalText, txn);
             }
           );
           return;
@@ -681,7 +718,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
             this.dialog,
             () => {},
             (finalText: string, txn?: TxnType) => {
-              this.applyFinalParticulars(finalText, txn);
+              applyParticulars(finalText, txn);
             }
           );
           return;
@@ -691,14 +728,14 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
             this.dialog,
             () => {},
             (finalText: string, txn?: TxnType) => {
-              this.applyFinalParticulars(finalText, txn);
+              applyParticulars(finalText, txn);
             }
           );
           return;
 
         case 'VHFUHF':
           openVhfUhfParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
-            this.applyFinalParticulars(finalText, txn);
+            applyParticulars(finalText, txn);
           });
           return;
 
@@ -707,7 +744,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
             this.dialog,
             () => {},
             (finalText: string, txn?: TxnType) => {
-              this.applyFinalParticulars(finalText, txn);
+              applyParticulars(finalText, txn);
             }
           );
           return;
@@ -717,7 +754,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
             this.dialog,
             () => {},
             (finalText: string, txn?: TxnType) => {
-              this.applyFinalParticulars(finalText, txn);
+              applyParticulars(finalText, txn);
             }
           );
           return;
@@ -728,7 +765,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           this.dialog,
           () => {},
           (finalText: string, txn?: TxnType) => {
-            this.applyFinalParticulars(finalText, txn);
+            applyParticulars(finalText, txn);
           }
         );
         return;
@@ -736,7 +773,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
       if (kind.includes('AMATEUR') || kind.includes('AT-') || kind.includes('MA')) {
         openAmateurParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
-          this.applyFinalParticulars(finalText, txn);
+          applyParticulars(finalText, txn);
         });
         return;
       }
@@ -746,7 +783,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           this.dialog,
           () => {},
           (finalText: string, txn?: TxnType) => {
-            this.applyFinalParticulars(finalText, txn);
+            applyParticulars(finalText, txn);
           }
         );
         return;
@@ -754,7 +791,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
       if (kind.includes('VHF') || kind.includes('UHF')) {
         openVhfUhfParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
-          this.applyFinalParticulars(finalText, txn);
+          applyParticulars(finalText, txn);
         });
         return;
       }
@@ -764,7 +801,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           this.dialog,
           () => {},
           (finalText: string, txn?: TxnType) => {
-            this.applyFinalParticulars(finalText, txn);
+            applyParticulars(finalText, txn);
           }
         );
         return;
@@ -775,7 +812,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           this.dialog,
           () => {},
           (finalText: string, txn?: TxnType) => {
-            this.applyFinalParticulars(finalText, txn);
+            applyParticulars(finalText, txn);
           }
         );
         return;
@@ -783,13 +820,13 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
       if (/\bROC\b/.test(kind)) {
         openRocParticularsFlow(this.dialog, () => {}, (finalText: string, txn?: TxnType) => {
-          this.applyFinalParticulars(finalText, txn);
+          applyParticulars(finalText, txn);
         });
         return;
       }
 
       const txt = String(res?.finalText ?? res?.text ?? '').trim();
-      if (txt) this.applyFinalParticulars(txt, undefined);
+      if (txt) applyParticulars(txt, undefined);
 
       this.particularsCoolDownUntil = Date.now() + this.COOLDOWN_MS;
     });
@@ -846,7 +883,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
       if (result?.action === 'edit') {
         this.particularsCoolDownUntil = 0;
-        this.openParticularsDialog();
+        this.openParticularsDialog(result.entryIndex);
       }
     });
   }
@@ -872,11 +909,16 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private applyFinalParticulars(finalText: string, txn?: TxnType): void {
-    const mergedText = this.appendParticulars(
-      String(this.form?.get('particulars')?.value ?? ''),
-      finalText
-    );
+  private applyFinalParticulars(
+    finalText: string,
+    txn?: TxnType,
+    replaceEntryIndex?: number
+  ): void {
+    const currentText = String(this.form?.get('particulars')?.value ?? '');
+    const mergedText =
+      typeof replaceEntryIndex === 'number'
+        ? this.replaceParticularsEntry(currentText, finalText, replaceEntryIndex)
+        : this.appendParticulars(currentText, finalText);
 
     const patch: any = {
       particulars: mergedText,
