@@ -22,6 +22,8 @@ import {
   ParticularsHoverDialogComponent,
   ParticularsHoverDialogResult,
   ParticularsHoverEntry,
+  ParticularsTableDialogComponent,
+  ParticularsTableDialogResult,
   parseParticularsHoverEntries,
   serializeParticularsHoverEntries,
 } from './particulars-hover-dialog.component';
@@ -422,6 +424,37 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     return [...existingEntries, ...nextEntries].join(' || ').trim();
   }
 
+  private normalizeParticularsEntries(entries: ParticularsHoverEntry[]): ParticularsHoverEntry[] {
+    return entries.map((entry, index) => ({
+      ...entry,
+      chunkIndex: index,
+    }));
+  }
+
+  private replaceParticularsEntry(
+    existingText: string,
+    replacementText: string,
+    entryIndex: number
+  ): string {
+    const yearsValue = this.form?.get('periodYears')?.value;
+    const currentEntries = this.normalizeParticularsEntries(
+      parseParticularsHoverEntries(existingText, yearsValue, '')
+    );
+    const replacementEntries = parseParticularsHoverEntries(replacementText, yearsValue, '');
+
+    if (entryIndex < 0 || entryIndex >= currentEntries.length) {
+      return this.appendParticulars(existingText, replacementText);
+    }
+
+    const nextEntries = this.normalizeParticularsEntries([
+      ...currentEntries.slice(0, entryIndex),
+      ...replacementEntries,
+      ...currentEntries.slice(entryIndex + 1),
+    ]);
+
+    return serializeParticularsHoverEntries(nextEntries);
+  }
+
   private replaceParticulars(nextText: string): void {
     const particulars = this.splitParticularsEntries(nextText).join(' || ');
 
@@ -626,37 +659,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private normalizeParticularsEntries(entries: ParticularsHoverEntry[]): ParticularsHoverEntry[] {
-    return entries.map((entry, index) => ({
-      ...entry,
-      chunkIndex: index,
-    }));
-  }
-
-  private replaceParticularsEntry(
-    existingText: string,
-    replacementText: string,
-    entryIndex: number
-  ): string {
-    const yearsValue = this.form?.get('periodYears')?.value;
-    const currentEntries = this.normalizeParticularsEntries(
-      parseParticularsHoverEntries(existingText, yearsValue, '')
-    );
-    const replacementEntries = parseParticularsHoverEntries(replacementText, yearsValue, '');
-
-    if (entryIndex < 0 || entryIndex >= currentEntries.length) {
-      return this.appendParticulars(existingText, replacementText);
-    }
-
-    const nextEntries = this.normalizeParticularsEntries([
-      ...currentEntries.slice(0, entryIndex),
-      ...replacementEntries,
-      ...currentEntries.slice(entryIndex + 1),
-    ]);
-
-    return serializeParticularsHoverEntries(nextEntries);
-  }
-
   private openParticularsDialog(replaceEntryIndex?: number): void {
     if (this.particularsDialogOpen) return;
 
@@ -846,7 +848,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const top = Math.min(rect.bottom + gap, Math.max(12, window.innerHeight - 100));
     const yearsValue = this.form?.get('periodYears')?.value;
 
-    this.particularsHoverRef = this.dialog.open(ParticularsHoverDialogComponent, {
+    const hoverRef = this.dialog.open(ParticularsHoverDialogComponent, {
       width: `${dialogWidth}px`,
       maxWidth: '96vw',
       panelClass: ['soa-dlg', 'soa-hover-dlg'],
@@ -872,10 +874,40 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       },
     });
 
-    this.particularsHoverRef.afterClosed().subscribe((result?: ParticularsHoverDialogResult) => {
-      this.cancelParticularsHoverClose();
-      this.particularsHoverRef = null;
+    this.particularsHoverRef = hoverRef;
 
+    hoverRef.afterClosed().subscribe(() => {
+      this.cancelParticularsHoverClose();
+      if (this.particularsHoverRef === hoverRef) {
+        this.particularsHoverRef = null;
+      }
+    });
+
+    hoverRef.afterClosed().subscribe((result?: ParticularsHoverDialogResult) => {
+      if (result?.action === 'showTable') {
+        this.openParticularsTableDialog();
+      }
+    });
+  }
+
+  private openParticularsTableDialog(): void {
+    const particularsText = String(this.form?.get('particulars')?.value ?? '').trim();
+    if (!particularsText) return;
+
+    const yearsValue = this.form?.get('periodYears')?.value;
+    const entries = parseParticularsHoverEntries(particularsText, yearsValue, '');
+    const tableRef = this.dialog.open(ParticularsTableDialogComponent, {
+      width: '920px',
+      maxWidth: '96vw',
+      panelClass: 'soa-dlg',
+      autoFocus: false,
+      restoreFocus: false,
+      data: {
+        entries,
+      },
+    });
+
+    tableRef.afterClosed().subscribe((result?: ParticularsTableDialogResult) => {
       if (result?.action === 'delete') {
         this.replaceParticulars(result.particulars);
         return;
@@ -891,7 +923,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private closeParticularsHoverDialog(): void {
     this.cancelParticularsHoverClose();
     this.particularsHoverRef?.close();
-    this.particularsHoverRef = null;
   }
 
   private scheduleParticularsHoverClose(delayMs = 180): void {

@@ -10,10 +10,6 @@ type ParticularsHoverDialogData = {
   onPointerLeave?: () => void;
 };
 
-export type ParticularsHoverDialogResult =
-  | { action: 'delete'; particulars: string }
-  | { action: 'edit'; entryIndex: number };
-
 export type ParticularsHoverEntry = {
   status: string;
   type: string;
@@ -24,6 +20,31 @@ export type ParticularsHoverEntry = {
   baseSegments: string[];
   rawParts: string[];
 };
+
+type ParticularsHoverTableRow = {
+  label: string;
+  key: keyof ParticularsHoverEntry;
+};
+
+type ParticularsTableDialogData = {
+  entries: ParticularsHoverEntry[];
+};
+
+export type ParticularsHoverDialogResult = {
+  action: 'showTable';
+};
+
+export type ParticularsTableDialogResult =
+  | { action: 'delete'; particulars: string }
+  | { action: 'edit'; entryIndex: number };
+
+const PARTICULARS_TABLE_ROWS: ParticularsHoverTableRow[] = [
+  { label: 'Status', key: 'status' },
+  { label: 'Type', key: 'type' },
+  { label: 'Years', key: 'years' },
+  { label: 'Units (optional)', key: 'units' },
+  { label: 'License No / Permit No.', key: 'licensePermitNo' },
+];
 
 const GENERIC_SERVICE_LABELS = [
   'ROC',
@@ -318,6 +339,216 @@ export function serializeParticularsHoverEntries(entries: ParticularsHoverEntry[
 }
 
 @Component({
+  selector: 'app-particulars-table-dialog',
+  standalone: true,
+  imports: [CommonModule],
+  template: `
+    <div class="tableDlg">
+      <div class="tableDlgHeader">
+        <h3 class="tableDlgTitle">Particulars Table</h3>
+        <button type="button" class="tableDlgCloseBtn" (click)="close()">Close</button>
+      </div>
+
+      <div class="tableDlgBody" *ngIf="entries.length; else emptyState">
+        <div class="tblWrap">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th *ngFor="let row of rows">{{ row.label }}</th>
+                <th class="actionsCol">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let entry of entries; let i = index">
+                <td *ngFor="let row of rows">{{ entry[row.key] || '' }}</td>
+                <td class="actionsCell">
+                  <button
+                    type="button"
+                    class="iconBtn"
+                    aria-label="Edit row"
+                    title="Edit row"
+                    (click)="editEntry(i, $event)"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm14.71-9.04a.996.996 0 0 0 0-1.41l-2.5-2.5a.996.996 0 1 0-1.41 1.41l2.5 2.5c.39.39 1.03.39 1.41 0z"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="iconBtn danger"
+                    aria-label="Delete row"
+                    title="Delete row"
+                    (click)="deleteEntry(i, $event)"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2h4v2H4V6h4l1-2z"
+                      />
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <ng-template #emptyState>
+        <div class="empty">No particulars to preview.</div>
+      </ng-template>
+    </div>
+  `,
+  styles: [`
+    .tableDlg{
+      width:100%;
+      background:#fffef7;
+      border:1px solid #a8b0bf;
+      border-radius:12px;
+      box-shadow:0 18px 40px rgba(15,23,42,.18);
+      overflow:hidden;
+    }
+    .tableDlgHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:14px 16px;
+      background:#eef4fb;
+      border-bottom:1px solid #d7dde6;
+    }
+    .tableDlgTitle{
+      margin:0;
+      font:700 14px Arial,sans-serif;
+      color:#1f2937;
+    }
+    .tableDlgCloseBtn{
+      padding:7px 12px;
+      border:1px solid #b9c7da;
+      border-radius:8px;
+      background:#fff;
+      color:#1f2937;
+      font:600 12px Arial,sans-serif;
+      cursor:pointer;
+    }
+    .tableDlgCloseBtn:hover{
+      background:#f8fafc;
+    }
+    .tableDlgBody{
+      padding:0;
+    }
+    .tblWrap{
+      overflow:auto;
+      max-height:min(70vh, 560px);
+    }
+    .tbl{
+      width:100%;
+      border-collapse:collapse;
+      table-layout:auto;
+      font-family:Arial,sans-serif;
+      font-size:12px;
+      color:#1f2937;
+    }
+    th, td{
+      padding:7px 9px;
+      border:1px solid #d7dde6;
+      vertical-align:top;
+      text-align:left;
+      word-break:break-word;
+    }
+    th{
+      position:sticky;
+      top:0;
+      z-index:1;
+      background:#eef4fb;
+      font-weight:700;
+      white-space:nowrap;
+    }
+    td{
+      background:#fff;
+    }
+    .actionsCol{
+      width:92px;
+      min-width:92px;
+      text-align:center;
+    }
+    .actionsCell{
+      white-space:nowrap;
+      text-align:center;
+    }
+    .iconBtn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:28px;
+      height:28px;
+      margin:0 2px;
+      border:1px solid #cbd5e1;
+      border-radius:7px;
+      background:#f8fafc;
+      color:#1e3a8a;
+      cursor:pointer;
+      transition:background-color .15s ease, border-color .15s ease, transform .15s ease;
+    }
+    .iconBtn:hover{
+      background:#e8f0ff;
+      border-color:#93c5fd;
+      transform:translateY(-1px);
+    }
+    .iconBtn svg{
+      width:15px;
+      height:15px;
+      fill:currentColor;
+    }
+    .iconBtn.danger{
+      color:#b42318;
+    }
+    .iconBtn.danger:hover{
+      background:#fff1f2;
+      border-color:#fda4af;
+    }
+    .empty{
+      padding:16px;
+      font:600 12px Arial,sans-serif;
+      color:#475569;
+    }
+  `],
+})
+export class ParticularsTableDialogComponent {
+  readonly entries: ParticularsHoverEntry[];
+  readonly rows = PARTICULARS_TABLE_ROWS;
+
+  constructor(
+    private ref: MatDialogRef<ParticularsTableDialogComponent>,
+    @Inject(MAT_DIALOG_DATA) data: ParticularsTableDialogData
+  ) {
+    this.entries = Array.isArray(data?.entries) ? data.entries : [];
+  }
+
+  close(): void {
+    this.ref.close();
+  }
+
+  editEntry(entryIndex: number, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.ref.close({ action: 'edit', entryIndex } satisfies ParticularsTableDialogResult);
+  }
+
+  deleteEntry(entryIndex: number, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const nextEntries = this.entries.filter((_, index) => index !== entryIndex);
+    this.ref.close({
+      action: 'delete',
+      particulars: serializeParticularsHoverEntries(nextEntries),
+    } satisfies ParticularsTableDialogResult);
+  }
+}
+
+@Component({
   selector: 'app-particulars-hover-dialog',
   standalone: true,
   imports: [CommonModule],
@@ -332,40 +563,11 @@ export function serializeParticularsHoverEntries(entries: ParticularsHoverEntry[
           <thead>
             <tr>
               <th *ngFor="let row of rows">{{ row.label }}</th>
-              <th class="actionsCol">Action</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let entry of entries; let i = index">
+            <tr *ngFor="let entry of entries">
               <td *ngFor="let row of rows">{{ entry[row.key] || '' }}</td>
-              <td class="actionsCell">
-                <button
-                  type="button"
-                  class="iconBtn"
-                  aria-label="Edit row"
-                  title="Edit row"
-                  (click)="editEntry(i, $event)"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm14.71-9.04a.996.996 0 0 0 0-1.41l-2.5-2.5a.996.996 0 1 0-1.41 1.41l2.5 2.5c.39.39 1.03.39 1.41 0z"
-                    />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  class="iconBtn danger"
-                  aria-label="Delete row"
-                  title="Delete row"
-                  (click)="deleteEntry(i, $event)"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2h4v2H4V6h4l1-2z"
-                    />
-                  </svg>
-                </button>
-              </td>
             </tr>
           </tbody>
         </table>
@@ -374,6 +576,12 @@ export function serializeParticularsHoverEntries(entries: ParticularsHoverEntry[
       <ng-template #emptyState>
         <div class="empty">No particulars to preview.</div>
       </ng-template>
+
+      <div class="hoverActions">
+        <button type="button" class="showTableBtn" (click)="openTableDialog($event)">
+          Show table
+        </button>
+      </div>
     </div>
   `,
   styles: [`
@@ -419,57 +627,32 @@ export function serializeParticularsHoverEntries(entries: ParticularsHoverEntry[
       font:600 12px Arial,sans-serif;
       color:#475569;
     }
-    .actionsCol{
-      width:92px;
-      min-width:92px;
-      text-align:center;
+    .hoverActions{
+      display:flex;
+      justify-content:flex-end;
+      padding:10px 12px;
+      border-top:1px solid #d7dde6;
+      background:#f9fbff;
     }
-    .actionsCell{
-      white-space:nowrap;
-      text-align:center;
-    }
-    .iconBtn{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      width:28px;
-      height:28px;
-      margin:0 2px;
-      border:1px solid #cbd5e1;
-      border-radius:7px;
-      background:#f8fafc;
-      color:#1e3a8a;
+    .showTableBtn{
+      padding:7px 12px;
+      border:1px solid #9db9ff;
+      border-radius:8px;
+      background:#eaf2ff;
+      color:#1d4ed8;
+      font:700 12px Arial,sans-serif;
       cursor:pointer;
-      transition:background-color .15s ease, border-color .15s ease, transform .15s ease;
+      transition:background-color .15s ease, border-color .15s ease;
     }
-    .iconBtn:hover{
-      background:#e8f0ff;
-      border-color:#93c5fd;
-      transform:translateY(-1px);
-    }
-    .iconBtn svg{
-      width:15px;
-      height:15px;
-      fill:currentColor;
-    }
-    .iconBtn.danger{
-      color:#b42318;
-    }
-    .iconBtn.danger:hover{
-      background:#fff1f2;
-      border-color:#fda4af;
+    .showTableBtn:hover{
+      background:#dbeafe;
+      border-color:#7ea6ff;
     }
   `],
 })
 export class ParticularsHoverDialogComponent {
   readonly entries: ParticularsHoverEntry[];
-  readonly rows: Array<{ label: string; key: keyof ParticularsHoverEntry }> = [
-    { label: 'Status', key: 'status' },
-    { label: 'Type', key: 'type' },
-    { label: 'Years', key: 'years' },
-    { label: 'Units (optional)', key: 'units' },
-    { label: 'License No / Permit No.', key: 'licensePermitNo' },
-  ];
+  readonly rows = PARTICULARS_TABLE_ROWS;
   private readonly onPointerEnterCallback?: () => void;
   private readonly onPointerLeaveCallback?: () => void;
 
@@ -490,21 +673,10 @@ export class ParticularsHoverDialogComponent {
     this.ref.close();
   }
 
-  editEntry(entryIndex: number, event: Event): void {
+  openTableDialog(event: Event): void {
     event.preventDefault();
     event.stopPropagation();
-    this.ref.close({ action: 'edit', entryIndex });
-  }
-
-  deleteEntry(entryIndex: number, event: Event): void {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const nextEntries = this.entries.filter((_, index) => index !== entryIndex);
-    this.ref.close({
-      action: 'delete',
-      particulars: serializeParticularsHoverEntries(nextEntries),
-    });
+    this.ref.close({ action: 'showTable' } satisfies ParticularsHoverDialogResult);
   }
 
   handlePointerEnter(): void {
