@@ -32,7 +32,7 @@ import { TxnTypeDialogComponent, TxnType } from './txn-type-dialog.component';
 import { openRocParticularsFlow } from './particulars-roc.flow';
 import { openShipStationParticularsFlow } from './particulars-ship.flow';
 import { openAmateurParticularsFlow } from './particulars-amateur.flow';
-import { openCoastalParticularsFlow } from './particulars-coastal.flow';
+import { openCoastalLicenseParticularsFlow } from './particulars-c.license.flow';
 import { openVhfUhfParticularsFlow } from './particulars-vhfuhf.flow';
 import { openMobilePhoneParticularsFlow } from './particulars-mobilephone.flow';
 import { openTvroCatvParticularsFlow } from './particulars-tvrocatv.flow';
@@ -725,7 +725,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
           return;
 
         case 'COASTAL':
-          openCoastalParticularsFlow(
+          openCoastalLicenseParticularsFlow(
             this.dialog,
             () => {},
             (finalText: string, txn?: TxnType) => {
@@ -780,7 +780,7 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       if (kind.includes('COASTAL')) {
-        openCoastalParticularsFlow(
+        openCoastalLicenseParticularsFlow(
           this.dialog,
           () => {},
           (finalText: string, txn?: TxnType) => {

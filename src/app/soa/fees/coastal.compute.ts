@@ -1,13 +1,24 @@
 export type TxnType = 'NEW' | 'RENEW' | 'MOD';
 
-export type CoastalSubtype = 'CoastalStations' | 'HF';
+export type CoastalSubtype =
+  | 'PublicCoastalStations'
+  | 'PublicHF'
+  | 'PrivateTelegraphy'
+  | 'PrivateTelephony';
 
 export type CoastalOption =
-  | 'HighPoweredAbove100W'
-  | 'MediumPowered25To100W'
-  | 'LowPowered25WBelow'
-  | 'HF'
-  | 'VHF';
+  | 'PUBLIC_COASTAL_HIGH'
+  | 'PUBLIC_COASTAL_MED'
+  | 'PUBLIC_COASTAL_LOW'
+  | 'PUBLIC_HF_HIGH'
+  | 'PUBLIC_HF_MED'
+  | 'PUBLIC_HF_LOW'
+  | 'PUBLIC_HF_VHF'
+  | 'PRIVATE_RT_HIGH'
+  | 'PRIVATE_RT_MED'
+  | 'PRIVATE_RT_LOW'
+  | 'PRIVATE_RP_HF'
+  | 'PRIVATE_RP_VHF';
 
 export type CoastalServiceType =
   | 'PURCHASE_POSSESS'
@@ -59,8 +70,101 @@ export type CoastalComputed = {
 };
 
 export const COASTAL_TABLE: Record<CoastalOption, CoastalRow> = {
-  HighPoweredAbove100W: {
-    key: 'HighPoweredAbove100W',
+  PUBLIC_COASTAL_HIGH: {
+    key: 'PUBLIC_COASTAL_HIGH',
+    ff: 180,
+    purchase: 240,
+    possess: 120,
+    cp: 1200,
+    lf: 2160,
+    ifee: 840,
+    mod: 180,
+    dst: 30,
+    sur50: 1080,
+    sur100: 2160,
+  },
+  PUBLIC_COASTAL_MED: {
+    key: 'PUBLIC_COASTAL_MED',
+    ff: 180,
+    purchase: 120,
+    possess: 96,
+    cp: 840,
+    lf: 1680,
+    ifee: 840,
+    mod: 180,
+    dst: 30,
+    sur50: 840,
+    sur100: 1680,
+  },
+  PUBLIC_COASTAL_LOW: {
+    key: 'PUBLIC_COASTAL_LOW',
+    ff: 180,
+    purchase: 96,
+    possess: 60,
+    cp: 480,
+    lf: 1200,
+    ifee: 840,
+    mod: 180,
+    dst: 30,
+    sur50: 600,
+    sur100: 1200,
+  },
+
+  PUBLIC_HF_HIGH: {
+    key: 'PUBLIC_HF_HIGH',
+    ff: 180,
+    purchase: 240,
+    possess: 120,
+    cp: 480,
+    lf: 1560,
+    ifee: 840,
+    mod: 180,
+    dst: 30,
+    sur50: 780,
+    sur100: 1560,
+  },
+  PUBLIC_HF_MED: {
+    key: 'PUBLIC_HF_MED',
+    ff: 180,
+    purchase: 120,
+    possess: 96,
+    cp: 480,
+    lf: 1080,
+    ifee: 720,
+    mod: 180,
+    dst: 30,
+    sur50: 540,
+    sur100: 1080,
+  },
+  PUBLIC_HF_LOW: {
+    key: 'PUBLIC_HF_LOW',
+    ff: 180,
+    purchase: 120,
+    possess: 96,
+    cp: 480,
+    lf: 480,
+    ifee: 720,
+    mod: 180,
+    dst: 30,
+    sur50: 240,
+    sur100: 480,
+  },
+  PUBLIC_HF_VHF: {
+    key: 'PUBLIC_HF_VHF',
+    ff: 180,
+    purchase: 96,
+    possess: 60,
+    cp: 480,
+    lf: 1200,
+    ifee: 480,
+    mod: 180,
+    dst: 30,
+    sur50: 600,
+    sur100: 1200,
+  },
+
+  PRIVATE_RT_HIGH: {
+    key: 'PRIVATE_RT_HIGH',
     ff: 180,
     purchase: 240,
     possess: 120,
@@ -72,8 +176,8 @@ export const COASTAL_TABLE: Record<CoastalOption, CoastalRow> = {
     sur50: 720,
     sur100: 1440,
   },
-  MediumPowered25To100W: {
-    key: 'MediumPowered25To100W',
+  PRIVATE_RT_MED: {
+    key: 'PRIVATE_RT_MED',
     ff: 180,
     purchase: 120,
     possess: 96,
@@ -85,8 +189,8 @@ export const COASTAL_TABLE: Record<CoastalOption, CoastalRow> = {
     sur50: 600,
     sur100: 1200,
   },
-  LowPowered25WBelow: {
-    key: 'LowPowered25WBelow',
+  PRIVATE_RT_LOW: {
+    key: 'PRIVATE_RT_LOW',
     ff: 180,
     purchase: 96,
     possess: 60,
@@ -98,9 +202,8 @@ export const COASTAL_TABLE: Record<CoastalOption, CoastalRow> = {
     sur50: 540,
     sur100: 1080,
   },
-
-  HF: {
-    key: 'HF',
+  PRIVATE_RP_HF: {
+    key: 'PRIVATE_RP_HF',
     ff: 180,
     purchase: 120,
     possess: 96,
@@ -112,8 +215,8 @@ export const COASTAL_TABLE: Record<CoastalOption, CoastalRow> = {
     sur50: 360,
     sur100: 720,
   },
-  VHF: {
-    key: 'VHF',
+  PRIVATE_RP_VHF: {
+    key: 'PRIVATE_RP_VHF',
     ff: 180,
     purchase: 120,
     possess: 96,
@@ -144,9 +247,9 @@ export function parseCoastalParticulars(particulars: string): CoastalParsed | nu
   if (hasPurchasePossess) serviceType = 'PURCHASE_POSSESS';
   else if (hasSellTransfer) serviceType = 'SELL_TRANSFER';
 
-  const isTelephony = t.includes('RADIO TELEPHONY');
-  const isHF = t.includes('HIGH FREQUENCY') || /\bHF\b/.test(t);
-  const subtype: CoastalSubtype = isTelephony ? 'HF' : 'CoastalStations';
+  const isPrivateTelegraphy = t.includes('RADIO TELEGRAPHY');
+  const isPrivateTelephony = t.includes('RADIO TELEPHONY');
+  const isPublicHF = t.includes('HIGH FREQUENCY') || /\bHF\b/.test(t);
   const hasHighPowered =
     t.includes('HIGH POWERED') ||
     t.includes('ABOVE 100W') ||
@@ -160,25 +263,47 @@ export function parseCoastalParticulars(particulars: string): CoastalParsed | nu
     t.includes('25W BELOW') ||
     t.includes('25W AND BELOW');
 
-  if (isTelephony && t.includes('VHF')) {
-    return { subtype: 'HF', option: 'VHF', serviceType };
+  if (isPrivateTelegraphy) {
+    if (hasMediumPowered) {
+      return { subtype: 'PrivateTelegraphy', option: 'PRIVATE_RT_MED', serviceType };
+    }
+    if (hasLowPowered) {
+      return { subtype: 'PrivateTelegraphy', option: 'PRIVATE_RT_LOW', serviceType };
+    }
+    return { subtype: 'PrivateTelegraphy', option: 'PRIVATE_RT_HIGH', serviceType };
   }
 
-  if (isTelephony || isHF) {
-    return { subtype: 'HF', option: 'HF', serviceType };
+  if (isPrivateTelephony) {
+    if (t.includes('VHF')) {
+      return { subtype: 'PrivateTelephony', option: 'PRIVATE_RP_VHF', serviceType };
+    }
+    return { subtype: 'PrivateTelephony', option: 'PRIVATE_RP_HF', serviceType };
+  }
+
+  if (isPublicHF) {
+    if (t.includes('VHF')) {
+      return { subtype: 'PublicHF', option: 'PUBLIC_HF_VHF', serviceType };
+    }
+    if (hasMediumPowered) {
+      return { subtype: 'PublicHF', option: 'PUBLIC_HF_MED', serviceType };
+    }
+    if (hasLowPowered) {
+      return { subtype: 'PublicHF', option: 'PUBLIC_HF_LOW', serviceType };
+    }
+    return { subtype: 'PublicHF', option: 'PUBLIC_HF_HIGH', serviceType };
   }
 
   if (hasMediumPowered) {
-    return { subtype: 'CoastalStations', option: 'MediumPowered25To100W', serviceType };
+    return { subtype: 'PublicCoastalStations', option: 'PUBLIC_COASTAL_MED', serviceType };
   }
   if (hasLowPowered) {
-    return { subtype: 'CoastalStations', option: 'LowPowered25WBelow', serviceType };
+    return { subtype: 'PublicCoastalStations', option: 'PUBLIC_COASTAL_LOW', serviceType };
   }
   if (hasHighPowered) {
-    return { subtype: 'CoastalStations', option: 'HighPoweredAbove100W', serviceType };
+    return { subtype: 'PublicCoastalStations', option: 'PUBLIC_COASTAL_HIGH', serviceType };
   }
 
-  return { subtype: 'CoastalStations', option: 'MediumPowered25To100W', serviceType };
+  return { subtype: 'PublicCoastalStations', option: 'PUBLIC_COASTAL_MED', serviceType };
 }
 
 export function computeCoastal(
