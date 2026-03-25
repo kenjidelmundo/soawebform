@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 
@@ -6,10 +6,9 @@ export type ShipLicenseScope = 'DOMESTIC' | 'INTERNATIONAL';
 export type ShipStationLicenseScopeDialogResult = { value: ShipLicenseScope };
 
 @Component({
-  selector: 'app-ship-station-license-scope-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-ship-station-license-scope-dialog',
+    imports: [],
+    template: `
     <div class="dlg">
       <div class="dlgHead">Ship Station License</div>
       <div class="sub">Choose scope</div>
@@ -34,7 +33,7 @@ export type ShipStationLicenseScopeDialogResult = { value: ShipLicenseScope };
       </div>
     </div>
   `,
-  styles: [`
+    styles: [`
     .dlg { width:100%; max-width:92vw; padding:14px; box-sizing:border-box; overflow-x:hidden; font-family:Arial,sans-serif; background:#fff; }
     .dlgHead { font-size:18px; font-weight:700; margin-bottom:4px; }
     .sub { font-size:13px; font-weight:700; margin-bottom:10px; opacity:.8; }

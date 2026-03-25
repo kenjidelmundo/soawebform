@@ -1,8 +1,7 @@
 <div class="box" [formGroup]="form">
 
-  <ng-container *ngIf="mode === 'left'">
+  @if (mode === 'left') {
     <div class="sec">FOR LICENSES</div>
-
     <div class="r"><div class="l">Permit to Purchase</div><input type="number" class="a" formControlName="licPermitToPurchase"></div>
     <div class="r"><div class="l">Filing Fee</div><input type="number" class="a" formControlName="licFilingFee"></div>
     <div class="r"><div class="l">Permit to Possess/Storage</div><input type="number" class="a" formControlName="licPermitToPossess"></div>
@@ -12,9 +11,7 @@
     <div class="r"><div class="l">Spectrum User&#39;s Fee (SUF)</div><input type="number" class="a" formControlName="licSUF"></div>
     <div class="r"><div class="l">Fines and Penalties</div><input type="number" class="a" formControlName="licFinesPenalties"></div>
     <div class="r"><div class="l short">Surcharges</div><input type="number" class="a" formControlName="licSurcharges"></div>
-
     <div class="sec">OTHER APPLICATION</div>
-
     <div class="r"><div class="l">Registration Fee</div><input type="number" class="a" formControlName="appRegistrationFee"></div>
     <div class="r"><div class="l">Supervision And Regulation Fee</div><input type="number" class="a" formControlName="appSupervisionRegulationFee"></div>
     <div class="r"><div class="l">Verification Fee And Authentication</div><input type="number" class="a" formControlName="appVerificationAuthFee"></div>
@@ -23,11 +20,10 @@
     <div class="r"><div class="l">Modification Fee</div><input type="number" class="a" formControlName="appModificationFee"></div>
     <div class="r"><div class="l">Miscellaneous Income</div><input type="number" class="a" formControlName="appMiscIncome"></div>
     <div class="r"><div class="l short">Others</div><input type="number" class="a" formControlName="appOthers"></div>
-  </ng-container>
+  }
 
-  <ng-container *ngIf="mode === 'mid'">
+  @if (mode === 'mid') {
     <div class="sec">FOR PERMITS</div>
-
     <div class="r">
       <div class="l">
         Permit Fees (Dealers/Reseller/Service<br>
@@ -38,25 +34,21 @@
     <div class="r"><div class="l">Inspection Fee</div><input type="number" class="a" formControlName="perInspectionFee"></div>
     <div class="r"><div class="l">Filing Fee</div><input type="number" class="a" formControlName="perFilingFee"></div>
     <div class="r"><div class="l short">Surcharges</div><input type="number" class="a" formControlName="perSurcharges"></div>
-
     <div class="sec">FOR AMATUER AND ROC</div>
-
     <div class="r"><div class="l">Radio Station License</div><input type="number" class="a right" formControlName="amRadioStationLicense"></div>
     <div class="r"><div class="l">Radio Operator&#39;s Cert.</div><input type="number" class="a right" formControlName="amRadioOperatorsCert"></div>
     <div class="r"><div class="l">Application Fee</div><input type="number" class="a" formControlName="amApplicationFee"></div>
     <div class="r"><div class="l">Filing Fee</div><input type="number" class="a" formControlName="amFilingFee"></div>
     <div class="r"><div class="l">Seminar Fee</div><input type="number" class="a" formControlName="amSeminarFee"></div>
     <div class="r"><div class="l short">Surcharges</div><input type="number" class="a right" formControlName="amSurcharges"></div>
-
     <div class="sec small">Documentary Stamp</div>
     <div class="r"><div class="l">Documentary Stamp Tax (DST)</div><input type="number" class="a right" formControlName="dst"></div>
-
     <div class="totalRow">
-  <div class="totalLbl">TOTAL AMOUNT</div>
-  <div class="totalBox">
-    <input
-      type="number"
-      class="totalIn"
+      <div class="totalLbl">TOTAL AMOUNT</div>
+      <div class="totalBox">
+        <input
+          type="number"
+          class="totalIn"
       [value]="
         (form.get('licPermitToPurchase')?.value || 0) +
         (form.get('licFilingFee')?.value || 0) +
@@ -91,11 +83,10 @@
 
         (form.get('dst')?.value || 0)
       "
-      readonly
-    />
-  </div>
-</div>
-
-  </ng-container>
+          readonly
+          />
+      </div>
+    </div>
+  }
 
 </div>

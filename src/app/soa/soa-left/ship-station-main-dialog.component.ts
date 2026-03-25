@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 
@@ -10,10 +10,9 @@ export type ShipMain =
 export type ShipStationMainDialogResult = { value: ShipMain };
 
 @Component({
-  selector: 'app-ship-station-main-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-ship-station-main-dialog',
+    imports: [],
+    template: `
     <div class="dlg">
       <div class="dlgHead">Ship Station - Subtype</div>
 
@@ -47,7 +46,7 @@ export type ShipStationMainDialogResult = { value: ShipMain };
       </div>
     </div>
   `,
-  styles: [`
+    styles: [`
     .dlg {
       width: 100%;
       max-width: 92vw;
@@ -90,7 +89,7 @@ export type ShipStationMainDialogResult = { value: ShipMain };
     @media (max-width: 560px) {
       .grid { grid-template-columns: 1fr; }
     }
-  `],
+  `]
 })
 export class ShipStationMainDialogComponent {
   constructor(

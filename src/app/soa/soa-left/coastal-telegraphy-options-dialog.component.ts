@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 
@@ -24,111 +24,110 @@ export type CoastalTelegraphyOptionsResult = {
 };
 
 @Component({
-  selector: 'app-coastal-telegraphy-options-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-coastal-telegraphy-options-dialog',
+    imports: [],
+    template: `
     <div class="dlg">
       <div class="title">Coastal Station License</div>
       <div class="sub">Choose service + transaction + powered/band</div>
       <div class="context">Coastal Station License</div>
-
+    
       <div class="grid">
         <!-- LEFT -->
         <div class="col">
           <div class="head">Transaction</div>
-
+    
           <label class="row">
             <input class="cb" type="checkbox" [checked]="isCheckedTxn('NEW')" (change)="onTxnChange('NEW', $event)" />
             <span class="txt">New</span>
           </label>
-
+    
           <label class="row">
             <input class="cb" type="checkbox" [checked]="isCheckedTxn('RENEW')" (change)="onTxnChange('RENEW', $event)" />
             <span class="txt">Renew</span>
           </label>
-
+    
           <label class="row">
             <input class="cb" type="checkbox" [checked]="isCheckedTxn('MOD')" (change)="onTxnChange('MOD', $event)" />
             <span class="txt">Mod</span>
           </label>
-
+    
           <label class="row">
             <input class="cb" type="checkbox" [checked]="duplicate" (change)="toggleDuplicate()" />
             <span class="txt">Duplicate</span>
           </label>
-
+    
           <label class="row">
             <input class="cb" type="checkbox" [checked]="purchasePossess" (change)="togglePurchasePossess()" />
             <span class="txt">Permit to Purchase/Possess</span>
           </label>
-          <div class="unitsRow" *ngIf="purchasePossess">
-            <span class="unitsLabel">Units:</span>
-            <input class="unitsInput" type="number" min="1" step="1" [value]="purchaseUnits"
-              (click)="$event.stopPropagation()" (input)="onPurchaseUnits($event)" />
-          </div>
-
+          @if (purchasePossess) {
+            <div class="unitsRow">
+              <span class="unitsLabel">Units:</span>
+              <input class="unitsInput" type="number" min="1" step="1" [value]="purchaseUnits"
+                (click)="$event.stopPropagation()" (input)="onPurchaseUnits($event)" />
+            </div>
+          }
+    
           <label class="row">
             <input class="cb" type="checkbox" [checked]="sellTransfer" (change)="toggleSellTransfer()" />
             <span class="txt">Permit to Sell/Transfer</span>
           </label>
-          <div class="unitsRow" *ngIf="sellTransfer">
-            <span class="unitsLabel">Units:</span>
-            <input class="unitsInput" type="number" min="1" step="1" [value]="sellTransferUnits"
-              (click)="$event.stopPropagation()" (input)="onSellUnits($event)" />
-          </div>
+          @if (sellTransfer) {
+            <div class="unitsRow">
+              <span class="unitsLabel">Units:</span>
+              <input class="unitsInput" type="number" min="1" step="1" [value]="sellTransferUnits"
+                (click)="$event.stopPropagation()" (input)="onSellUnits($event)" />
+            </div>
+          }
         </div>
-
+    
         <!-- POWER / BAND -->
         <div class="col">
           <div class="head">{{ service === 'RADIO_TELEGRAPHY' ? 'Powered' : 'Band' }}</div>
-
-          <ng-container *ngIf="service === 'RADIO_TELEGRAPHY'; else telephony">
-          <label class="row">
-            <input class="cb" type="checkbox" [checked]="power==='HIGH_POWERED'" (change)="pickPower('HIGH_POWERED')" />
-            <span class="txt">High Powered</span>
-          </label>
-
-          <label class="row">
-            <input class="cb" type="checkbox" [checked]="power==='MEDIUM_POWERED'" (change)="pickPower('MEDIUM_POWERED')" />
-            <span class="txt">Medium Powered</span>
-          </label>
-
-          <label class="row">
-            <input class="cb" type="checkbox" [checked]="power==='LOW_POWERED'" (change)="pickPower('LOW_POWERED')" />
-            <span class="txt">Low Powered</span>
-          </label>
-        </ng-container>
-
-        <ng-template #telephony>
-          <label class="row">
-            <input class="cb" type="checkbox" [checked]="power==='HF'" (change)="pickPower('HF')" />
-            <span class="txt">HF</span>
-          </label>
-
-          <label class="row">
-            <input class="cb" type="checkbox" [checked]="power==='VHF'" (change)="pickPower('VHF')" />
-            <span class="txt">VHF</span>
-          </label>
-        </ng-template>
-      </div>
-
+    
+          @if (service === 'RADIO_TELEGRAPHY') {
+            <label class="row">
+              <input class="cb" type="checkbox" [checked]="power==='HIGH_POWERED'" (change)="pickPower('HIGH_POWERED')" />
+              <span class="txt">High Powered</span>
+            </label>
+            <label class="row">
+              <input class="cb" type="checkbox" [checked]="power==='MEDIUM_POWERED'" (change)="pickPower('MEDIUM_POWERED')" />
+              <span class="txt">Medium Powered</span>
+            </label>
+            <label class="row">
+              <input class="cb" type="checkbox" [checked]="power==='LOW_POWERED'" (change)="pickPower('LOW_POWERED')" />
+              <span class="txt">Low Powered</span>
+            </label>
+          } @else {
+            <label class="row">
+              <input class="cb" type="checkbox" [checked]="power==='HF'" (change)="pickPower('HF')" />
+              <span class="txt">HF</span>
+            </label>
+            <label class="row">
+              <input class="cb" type="checkbox" [checked]="power==='VHF'" (change)="pickPower('VHF')" />
+              <span class="txt">VHF</span>
+            </label>
+          }
+    
+        </div>
+    
         <!-- SERVICE -->
         <div class="col">
           <div class="head">Service</div>
-
+    
           <label class="row">
             <input class="cb" type="checkbox" [checked]="service==='RADIO_TELEGRAPHY'" (change)="pickService('RADIO_TELEGRAPHY')" />
             <span class="txt">Radio Telegraphy</span>
           </label>
-
+    
           <label class="row">
             <input class="cb" type="checkbox" [checked]="service==='RADIO_TELEPHONY'" (change)="pickService('RADIO_TELEPHONY')" />
             <span class="txt">Radio Telephony</span>
           </label>
         </div>
       </div>
-
+    
       <div class="foot">
         <button type="button" class="btn" (click)="close()">Cancel</button>
         <button type="button" class="btn primary" [disabled]="(!txnNew && !txnRenew && !txnMod) || !power" (click)="submit()">
@@ -136,8 +135,8 @@ export type CoastalTelegraphyOptionsResult = {
         </button>
       </div>
     </div>
-  `,
-  styles: [`
+    `,
+    styles: [`
     .dlg{
       width: 100%;
       max-width: 92vw;
@@ -203,7 +202,7 @@ export type CoastalTelegraphyOptionsResult = {
     .btn{ height:34px; padding:0 14px; border:1px solid #999; background:#fff; border-radius:6px; cursor:pointer; }
     .btn.primary{ border-color:#2f74ff; background:#2f74ff; color:#fff; }
     .btn:disabled{ opacity:.55; cursor:not-allowed; }
-  `],
+  `]
 })
 export class CoastalTelegraphyOptionsDialogComponent {
   txnNew = false;

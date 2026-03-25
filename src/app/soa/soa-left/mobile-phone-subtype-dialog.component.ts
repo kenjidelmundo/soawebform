@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 
@@ -18,10 +18,9 @@ export type MobilePhoneSubtypeDialogResult = {
 };
 
 @Component({
-  selector: 'app-mobile-phone-subtype-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-mobile-phone-subtype-dialog',
+    imports: [],
+    template: `
     <div class="dlg">
       <div class="dlgHead">Mobile Phone Permits - Select Subtype</div>
 
@@ -68,7 +67,7 @@ export type MobilePhoneSubtypeDialogResult = {
       </div>
     </div>
   `,
-  styles: [`
+    styles: [`
     .dlg{ width:100%; max-width:92vw; padding:14px; box-sizing:border-box; overflow-x:hidden;
           font-family:Arial,sans-serif; background:#fff; }
     .dlgHead{ font-size:18px; font-weight:700; margin-bottom:12px; }
@@ -79,7 +78,7 @@ export type MobilePhoneSubtypeDialogResult = {
     .txt{ font-size:14px; font-weight:700; text-align:center; padding:0 8px; }
     .dlgFoot{ margin-top:14px; display:flex; justify-content:flex-end; }
     .btn{ height:34px; padding:0 12px; border:1px solid #999; background:#fff; border-radius:6px; cursor:pointer; }
-  `],
+  `]
 })
 export class MobilePhoneSubtypeDialogComponent {
   constructor(

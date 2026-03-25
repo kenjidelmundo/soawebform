@@ -8,18 +8,17 @@ import {
   AfterViewInit,
   ElementRef,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormGroup, ReactiveFormsModule, AbstractControl } from '@angular/forms';
 import { SoaPdfService } from '../soa-pdf/soa-pdf.service';
 import { Subject, merge, interval } from 'rxjs';
 import { startWith, takeUntil, filter, map, distinctUntilChanged } from 'rxjs/operators';
 
 @Component({
-  selector: 'app-soa-right-panel',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  templateUrl: './soa-right-panel.component.html',
-  styleUrls: ['./soa-right-panel.component.css'],
+    selector: 'app-soa-right-panel',
+    imports: [ReactiveFormsModule],
+    templateUrl: './soa-right-panel.component.html',
+    styleUrls: ['./soa-right-panel.component.css']
 })
 export class SoaRightPanelComponent implements OnInit, AfterViewInit, OnDestroy {
   @Input() form!: FormGroup;

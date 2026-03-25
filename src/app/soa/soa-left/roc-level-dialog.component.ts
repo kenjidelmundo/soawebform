@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
@@ -6,10 +6,9 @@ export type RocLevelDialogData = { base: 'RTG' | 'PHN' };
 export type RocLevelDialogResult = { value: string }; // 1RTG / 2RTG / 3RTG or 1PHN / 2PHN / 3PHN
 
 @Component({
-  selector: 'app-roc-level-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-roc-level-dialog',
+    imports: [],
+    template: `
     <div class="dlg">
       <div class="dlgHead">Select {{ data.base }} Level</div>
 
@@ -24,7 +23,7 @@ export type RocLevelDialogResult = { value: string }; // 1RTG / 2RTG / 3RTG or 1
       </div>
     </div>
   `,
-  styles: [`
+    styles: [`
     .dlg { width: 420px; max-width: 92vw; padding: 14px; font-family: Arial, sans-serif; }
     .dlgHead { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
 

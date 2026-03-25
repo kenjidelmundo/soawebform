@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 
 export type TvroCatvSubtype =
@@ -7,10 +7,9 @@ export type TvroCatvSubtype =
   | 'CATV Station License';
 
 @Component({
-  selector: 'app-tvrocatv-subtype-dialog',
-  standalone: true,
-  imports: [CommonModule, MatDialogModule],
-  template: `
+    selector: 'app-tvrocatv-subtype-dialog',
+    imports: [MatDialogModule],
+    template: `
     <div class="dlg">
       <div class="dlgHead">TVRO / CATV</div>
       <div class="sub">Select Subtype</div>
@@ -30,7 +29,7 @@ export type TvroCatvSubtype =
       </div>
     </div>
   `,
-  styles: [`
+    styles: [`
     .dlg{ width:100%; max-width:92vw; padding:14px; box-sizing:border-box; overflow-x:hidden;
           font-family:Arial,sans-serif; background:#fff; }
     .dlgHead{ font-size:18px; font-weight:700; margin-bottom:4px; }
@@ -44,7 +43,7 @@ export type TvroCatvSubtype =
 
     .dlgFoot{ margin-top:14px; display:flex; justify-content:flex-end; }
     .btn{ height:34px; padding:0 12px; border:1px solid #999; background:#fff; border-radius:6px; cursor:pointer; }
-  `],
+  `]
 })
 export class TvroCatvSubtypeDialogComponent {
   options: TvroCatvSubtype[] = [

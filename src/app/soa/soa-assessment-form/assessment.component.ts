@@ -13,11 +13,10 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 @Component({
-  selector: 'app-assessment',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  templateUrl: './assessment.component.html',
-  styleUrls: ['./assessment.component.css'],
+    selector: 'app-assessment',
+    imports: [CommonModule, ReactiveFormsModule],
+    templateUrl: './assessment.component.html',
+    styleUrls: ['./assessment.component.css']
 })
 export class AssessmentComponent implements OnDestroy {
   @Input() form!: FormGroup;

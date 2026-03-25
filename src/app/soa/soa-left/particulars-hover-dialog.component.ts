@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
@@ -339,68 +339,74 @@ export function serializeParticularsHoverEntries(entries: ParticularsHoverEntry[
 }
 
 @Component({
-  selector: 'app-particulars-table-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-particulars-table-dialog',
+    imports: [],
+    template: `
     <div class="tableDlg">
       <div class="tableDlgHeader">
         <h3 class="tableDlgTitle">Particulars Table</h3>
         <button type="button" class="tableDlgCloseBtn" (click)="close()">Close</button>
       </div>
-
-      <div class="tableDlgBody" *ngIf="entries.length; else emptyState">
-        <div class="tblWrap">
-          <table class="tbl">
-            <thead>
-              <tr>
-                <th *ngFor="let row of rows">{{ row.label }}</th>
-                <th class="actionsCol">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let entry of entries; let i = index">
-                <td *ngFor="let row of rows">{{ entry[row.key] || '' }}</td>
-                <td class="actionsCell">
-                  <button
-                    type="button"
-                    class="iconBtn"
-                    aria-label="Edit row"
-                    title="Edit row"
-                    (click)="editEntry(i, $event)"
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path
-                        d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm14.71-9.04a.996.996 0 0 0 0-1.41l-2.5-2.5a.996.996 0 1 0-1.41 1.41l2.5 2.5c.39.39 1.03.39 1.41 0z"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    class="iconBtn danger"
-                    aria-label="Delete row"
-                    title="Delete row"
-                    (click)="deleteEntry(i, $event)"
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path
-                        d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2h4v2H4V6h4l1-2z"
-                      />
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+    
+      @if (entries.length) {
+        <div class="tableDlgBody">
+          <div class="tblWrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  @for (row of rows; track row) {
+                    <th>{{ row.label }}</th>
+                  }
+                  <th class="actionsCol">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (entry of entries; track entry; let i = $index) {
+                  <tr>
+                    @for (row of rows; track row) {
+                      <td>{{ entry[row.key] || '' }}</td>
+                    }
+                    <td class="actionsCell">
+                      <button
+                        type="button"
+                        class="iconBtn"
+                        aria-label="Edit row"
+                        title="Edit row"
+                        (click)="editEntry(i, $event)"
+                        >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm14.71-9.04a.996.996 0 0 0 0-1.41l-2.5-2.5a.996.996 0 1 0-1.41 1.41l2.5 2.5c.39.39 1.03.39 1.41 0z"
+                            />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        class="iconBtn danger"
+                        aria-label="Delete row"
+                        title="Delete row"
+                        (click)="deleteEntry(i, $event)"
+                        >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2h4v2H4V6h4l1-2z"
+                            />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-
-      <ng-template #emptyState>
+      } @else {
         <div class="empty">No particulars to preview.</div>
-      </ng-template>
+      }
+    
     </div>
-  `,
-  styles: [`
+    `,
+    styles: [`
     .tableDlg{
       width:100%;
       background:#fffef7;
@@ -513,7 +519,7 @@ export function serializeParticularsHoverEntries(entries: ParticularsHoverEntry[
       font:600 12px Arial,sans-serif;
       color:#475569;
     }
-  `],
+  `]
 })
 export class ParticularsTableDialogComponent {
   readonly entries: ParticularsHoverEntry[];
@@ -549,42 +555,48 @@ export class ParticularsTableDialogComponent {
 }
 
 @Component({
-  selector: 'app-particulars-hover-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-particulars-hover-dialog',
+    imports: [],
+    template: `
     <div
       class="hoverDlg"
       (mouseenter)="handlePointerEnter()"
       (mouseleave)="handlePointerLeave()"
-    >
-      <div class="tblWrap" *ngIf="entries.length; else emptyState">
-        <table class="tbl">
-          <thead>
-            <tr>
-              <th *ngFor="let row of rows">{{ row.label }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let entry of entries">
-              <td *ngFor="let row of rows">{{ entry[row.key] || '' }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <ng-template #emptyState>
+      >
+      @if (entries.length) {
+        <div class="tblWrap">
+          <table class="tbl">
+            <thead>
+              <tr>
+                @for (row of rows; track row) {
+                  <th>{{ row.label }}</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (entry of entries; track entry) {
+                <tr>
+                  @for (row of rows; track row) {
+                    <td>{{ entry[row.key] || '' }}</td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
         <div class="empty">No particulars to preview.</div>
-      </ng-template>
-
+      }
+    
+    
       <div class="hoverActions">
         <button type="button" class="showTableBtn" (click)="openTableDialog($event)">
           Show table
         </button>
       </div>
     </div>
-  `,
-  styles: [`
+    `,
+    styles: [`
     .hoverDlg{
       width:100%;
       min-height:48px;
@@ -648,7 +660,7 @@ export class ParticularsTableDialogComponent {
       background:#dbeafe;
       border-color:#7ea6ff;
     }
-  `],
+  `]
 })
 export class ParticularsHoverDialogComponent {
   readonly entries: ParticularsHoverEntry[];

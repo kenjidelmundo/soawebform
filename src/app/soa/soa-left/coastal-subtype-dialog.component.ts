@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 
@@ -7,10 +7,9 @@ export type CoastalSubtype = 'CoastalStations' | 'HF';
 export type CoastalSubtypeDialogResult = { value: CoastalSubtype };
 
 @Component({
-  selector: 'app-coastal-subtype-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-coastal-subtype-dialog',
+    imports: [],
+    template: `
     <div class="dlg">
       <div class="dlgHead">Select Coastal Subtype</div>
 
@@ -29,7 +28,7 @@ export type CoastalSubtypeDialogResult = { value: CoastalSubtype };
       </div>
     </div>
   `,
-  styles: [`
+    styles: [`
     .dlg{
       width:100%;
       max-width:92vw;
@@ -73,7 +72,7 @@ export type CoastalSubtypeDialogResult = { value: CoastalSubtype };
       border-radius:6px;
       cursor:pointer;
     }
-  `],
+  `]
 })
 export class CoastalSubtypeDialogComponent {
   constructor(

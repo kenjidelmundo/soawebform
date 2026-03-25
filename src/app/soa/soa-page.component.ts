@@ -1,5 +1,5 @@
 import { Component, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 
 import { SoaService } from './soa.service';
@@ -11,19 +11,17 @@ import { SoaRightPanelComponent } from './soa-right/soa-right-panel.component';
 import { AssessmentComponent } from './soa-assessment-form/assessment.component';
 
 @Component({
-  selector: 'app-soa-page',
-  standalone: true,
-  imports: [
-    CommonModule,
+    selector: 'app-soa-page',
+    imports: [
     ReactiveFormsModule,
     SoaHeaderComponent,
     SoaLeftFormComponent,
     SoaRightPanelComponent,
     SoaFeesComponent,
-    AssessmentComponent,
-  ],
-  templateUrl: './soa-page.component.html',
-  styleUrls: ['./soa-page.component.css'],
+    AssessmentComponent
+],
+    templateUrl: './soa-page.component.html',
+    styleUrls: ['./soa-page.component.css']
 })
 export class SoaPageComponent {
   form: FormGroup;

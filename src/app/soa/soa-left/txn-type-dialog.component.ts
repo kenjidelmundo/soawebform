@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
@@ -29,14 +29,15 @@ type TxnTypeDialogData = {
 };
 
 @Component({
-  selector: 'app-txn-type-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-txn-type-dialog',
+    imports: [],
+    template: `
     <div class="dlg">
       <div class="dlgHead">Transaction Type</div>
-      <div class="contextTitle" *ngIf="contextTitle">{{ contextTitle }}</div>
-
+      @if (contextTitle) {
+        <div class="contextTitle">{{ contextTitle }}</div>
+      }
+    
       <div class="list" [class.twoCol]="showPurchasePossess">
         <div class="ppWrap">
           <label class="row" (click)="$event.preventDefault(); toggle('NEW')">
@@ -46,57 +47,62 @@ type TxnTypeDialogData = {
               [checked]="isChecked('NEW')"
               tabindex="-1"
               aria-hidden="true"
-            />
+              />
             <span class="box" [class.on]="isChecked('NEW')"></span>
             <span class="txt">New</span>
           </label>
-
-          <div class="unitsRow" *ngIf="showStandaloneUnits && isChecked('NEW')">
-            <label class="unitsLabel" for="txnUnitsNew">Unit:</label>
-            <input
-              id="txnUnitsNew"
-              type="number"
-              class="unitsInput"
-              min="1"
-              step="1"
-              [value]="standaloneUnits"
-              (click)="$event.stopPropagation()"
-              (input)="onStandaloneUnitsInput($event)"
-            />
-          </div>
+    
+          @if (showStandaloneUnits && isChecked('NEW')) {
+            <div class="unitsRow">
+              <label class="unitsLabel" for="txnUnitsNew">Unit:</label>
+              <input
+                id="txnUnitsNew"
+                type="number"
+                class="unitsInput"
+                min="1"
+                step="1"
+                [value]="standaloneUnits"
+                (click)="$event.stopPropagation()"
+                (input)="onStandaloneUnitsInput($event)"
+                />
+            </div>
+          }
         </div>
-
-        <div class="ppWrap" *ngIf="showPurchasePossess">
-          <label
-            class="row"
-            (click)="$event.preventDefault(); togglePurchasePossess()"
-          >
-            <input
-              type="checkbox"
-              class="cb"
-              [checked]="purchasePossess"
-              tabindex="-1"
-              aria-hidden="true"
-            />
-            <span class="box" [class.on]="purchasePossess"></span>
-            <span class="txt">Purchase and Possess</span>
-          </label>
-
-          <div class="unitsRow" *ngIf="purchasePossess">
-            <label class="unitsLabel" for="ppUnits">Unit:</label>
-            <input
-              id="ppUnits"
-              type="number"
-              class="unitsInput"
-              min="1"
-              step="1"
-              [value]="purchasePossessUnits"
-              (click)="$event.stopPropagation()"
-              (input)="onUnitsInput($event)"
-            />
+    
+        @if (showPurchasePossess) {
+          <div class="ppWrap">
+            <label
+              class="row"
+              (click)="$event.preventDefault(); togglePurchasePossess()"
+              >
+              <input
+                type="checkbox"
+                class="cb"
+                [checked]="purchasePossess"
+                tabindex="-1"
+                aria-hidden="true"
+                />
+              <span class="box" [class.on]="purchasePossess"></span>
+              <span class="txt">Purchase and Possess</span>
+            </label>
+            @if (purchasePossess) {
+              <div class="unitsRow">
+                <label class="unitsLabel" for="ppUnits">Unit:</label>
+                <input
+                  id="ppUnits"
+                  type="number"
+                  class="unitsInput"
+                  min="1"
+                  step="1"
+                  [value]="purchasePossessUnits"
+                  (click)="$event.stopPropagation()"
+                  (input)="onUnitsInput($event)"
+                  />
+              </div>
+            }
           </div>
-        </div>
-
+        }
+    
         <div class="ppWrap">
           <label class="row" (click)="$event.preventDefault(); toggle('RENEW')">
             <input
@@ -105,98 +111,107 @@ type TxnTypeDialogData = {
               [checked]="isChecked('RENEW')"
               tabindex="-1"
               aria-hidden="true"
-            />
+              />
             <span class="box" [class.on]="isChecked('RENEW')"></span>
             <span class="txt">Renew</span>
           </label>
-
-          <div class="unitsRow" *ngIf="showStandaloneUnits && isChecked('RENEW')">
-            <label class="unitsLabel" for="txnUnitsRenew">Unit:</label>
-            <input
-              id="txnUnitsRenew"
-              type="number"
-              class="unitsInput"
-              min="1"
-              step="1"
-              [value]="standaloneUnits"
-              (click)="$event.stopPropagation()"
-              (input)="onStandaloneUnitsInput($event)"
-            />
-          </div>
+    
+          @if (showStandaloneUnits && isChecked('RENEW')) {
+            <div class="unitsRow">
+              <label class="unitsLabel" for="txnUnitsRenew">Unit:</label>
+              <input
+                id="txnUnitsRenew"
+                type="number"
+                class="unitsInput"
+                min="1"
+                step="1"
+                [value]="standaloneUnits"
+                (click)="$event.stopPropagation()"
+                (input)="onStandaloneUnitsInput($event)"
+                />
+            </div>
+          }
         </div>
-
-        <label
-          class="row"
-          *ngIf="showDuplicate"
-          (click)="$event.preventDefault(); toggle('DUPLICATE')"
-        >
-          <input
-            type="checkbox"
-            class="cb"
-            [checked]="isChecked('DUPLICATE')"
-            tabindex="-1"
-            aria-hidden="true"
-          />
-          <span class="box" [class.on]="isChecked('DUPLICATE')"></span>
-          <span class="txt">Duplicate</span>
-        </label>
-
-        <div class="ppWrap" *ngIf="showSellTransfer">
-          <label class="row" (click)="$event.preventDefault(); toggleSellTransfer()">
+    
+        @if (showDuplicate) {
+          <label
+            class="row"
+            (click)="$event.preventDefault(); toggle('DUPLICATE')"
+            >
             <input
               type="checkbox"
               class="cb"
-              [checked]="sellTransfer"
+              [checked]="isChecked('DUPLICATE')"
               tabindex="-1"
               aria-hidden="true"
-            />
-            <span class="box" [class.on]="sellTransfer"></span>
-            <span class="txt">Permit to Sell/Transfer</span>
+              />
+            <span class="box" [class.on]="isChecked('DUPLICATE')"></span>
+            <span class="txt">Duplicate</span>
           </label>
-
-          <div class="unitsRow" *ngIf="sellTransfer">
-            <label class="unitsLabel" for="stUnits">Unit:</label>
-            <input
-              id="stUnits"
-              type="number"
-              class="unitsInput"
-              min="1"
-              step="1"
-              [value]="sellTransferUnits"
-              (click)="$event.stopPropagation()"
-              (input)="onSellTransferUnitsInput($event)"
-            />
+        }
+    
+        @if (showSellTransfer) {
+          <div class="ppWrap">
+            <label class="row" (click)="$event.preventDefault(); toggleSellTransfer()">
+              <input
+                type="checkbox"
+                class="cb"
+                [checked]="sellTransfer"
+                tabindex="-1"
+                aria-hidden="true"
+                />
+              <span class="box" [class.on]="sellTransfer"></span>
+              <span class="txt">Permit to Sell/Transfer</span>
+            </label>
+            @if (sellTransfer) {
+              <div class="unitsRow">
+                <label class="unitsLabel" for="stUnits">Unit:</label>
+                <input
+                  id="stUnits"
+                  type="number"
+                  class="unitsInput"
+                  min="1"
+                  step="1"
+                  [value]="sellTransferUnits"
+                  (click)="$event.stopPropagation()"
+                  (input)="onSellTransferUnitsInput($event)"
+                  />
+              </div>
+            }
           </div>
-        </div>
-
-        <div class="ppWrap" *ngIf="showPossessStorage">
-          <label class="row" (click)="$event.preventDefault(); togglePossessStorage()">
-            <input
-              type="checkbox"
-              class="cb"
-              [checked]="possessStorage"
-              tabindex="-1"
-              aria-hidden="true"
-            />
-            <span class="box" [class.on]="possessStorage"></span>
-            <span class="txt">Possess(Storage)</span>
-          </label>
-
-          <div class="unitsRow" *ngIf="possessStorage">
-            <label class="unitsLabel" for="psUnits">Unit:</label>
-            <input
-              id="psUnits"
-              type="number"
-              class="unitsInput"
-              min="1"
-              step="1"
-              [value]="possessStorageUnits"
-              (click)="$event.stopPropagation()"
-              (input)="onPossessStorageUnitsInput($event)"
-            />
+        }
+    
+        @if (showPossessStorage) {
+          <div class="ppWrap">
+            <label class="row" (click)="$event.preventDefault(); togglePossessStorage()">
+              <input
+                type="checkbox"
+                class="cb"
+                [checked]="possessStorage"
+                tabindex="-1"
+                aria-hidden="true"
+                />
+              <span class="box" [class.on]="possessStorage"></span>
+              <span class="txt">Possess(Storage)</span>
+            </label>
+            @if (possessStorage) {
+              <div class="unitsRow">
+                <label class="unitsLabel" for="psUnits">Unit:</label>
+                <input
+                  id="psUnits"
+                  type="number"
+                  class="unitsInput"
+                  min="1"
+                  step="1"
+                  [value]="possessStorageUnits"
+                  (click)="$event.stopPropagation()"
+                  (input)="onPossessStorageUnitsInput($event)"
+                  />
+              </div>
+            }
           </div>
-        </div>
-
+        }
+    
         <div class="ppWrap">
           <label class="row" (click)="$event.preventDefault(); toggle('MOD')">
             <input
@@ -205,42 +220,46 @@ type TxnTypeDialogData = {
               [checked]="isChecked('MOD')"
               tabindex="-1"
               aria-hidden="true"
-            />
+              />
             <span class="box" [class.on]="isChecked('MOD')"></span>
             <span class="txt">Modification</span>
           </label>
-
-          <div class="unitsRow" *ngIf="showStandaloneUnits && isChecked('MOD')">
-            <label class="unitsLabel" for="txnUnitsMod">Unit:</label>
-            <input
-              id="txnUnitsMod"
-              type="number"
-              class="unitsInput"
-              min="1"
-              step="1"
-              [value]="standaloneUnits"
-              (click)="$event.stopPropagation()"
-              (input)="onStandaloneUnitsInput($event)"
-            />
-          </div>
+    
+          @if (showStandaloneUnits && isChecked('MOD')) {
+            <div class="unitsRow">
+              <label class="unitsLabel" for="txnUnitsMod">Unit:</label>
+              <input
+                id="txnUnitsMod"
+                type="number"
+                class="unitsInput"
+                min="1"
+                step="1"
+                [value]="standaloneUnits"
+                (click)="$event.stopPropagation()"
+                (input)="onStandaloneUnitsInput($event)"
+                />
+            </div>
+          }
         </div>
       </div>
-
+    
       <div class="dlgFoot">
-        <button type="button" class="btn" *ngIf="showBack" (click)="back()">Back</button>
+        @if (showBack) {
+          <button type="button" class="btn" (click)="back()">Back</button>
+        }
         <button type="button" class="btn" (click)="close()">Cancel</button>
         <button
           type="button"
           class="btn primary"
           [disabled]="!canSubmit()"
           (click)="submit()"
-        >
+          >
           Submit
         </button>
       </div>
     </div>
-  `,
-  styles: [`
+    `,
+    styles: [`
     .dlg {
       width: 100%;
       max-width: 100%;
@@ -381,7 +400,7 @@ type TxnTypeDialogData = {
       opacity: .55;
       cursor: not-allowed;
     }
-  `],
+  `]
 })
 export class TxnTypeDialogComponent {
   selected: TxnType[] = [];

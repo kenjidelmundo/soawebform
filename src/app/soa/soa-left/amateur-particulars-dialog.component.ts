@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 
@@ -22,44 +22,48 @@ export type AmateurParticularsDialogResult = { amateurChoice: AmateurChoice };
 type Item = { label: string; value: AmateurChoice; hint?: string };
 
 @Component({
-  selector: 'app-amateur-particulars-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-amateur-particulars-dialog',
+    imports: [],
+    template: `
     <div class="dlg">
       <div class="dlgHead">Select Amateur Particular</div>
-
+    
       <!-- ✅ Search WITHOUT ngModel -->
       <input
         class="search"
         type="text"
         placeholder="Search (Class A, Lifetime, Permit...)"
         (input)="onSearch($event)"
-      />
-
+        />
+    
       <div class="listWrap">
         <div class="grid">
-          <button
-            type="button"
-            class="item"
-            *ngFor="let it of filtered"
-            (click)="pick(it.value)"
-            [title]="it.label"
-          >
-            <div class="label">{{ it.label }}</div>
-            <div class="hint" *ngIf="it.hint">{{ it.hint }}</div>
-          </button>
+          @for (it of filtered; track it) {
+            <button
+              type="button"
+              class="item"
+              (click)="pick(it.value)"
+              [title]="it.label"
+              >
+              <div class="label">{{ it.label }}</div>
+              @if (it.hint) {
+                <div class="hint">{{ it.hint }}</div>
+              }
+            </button>
+          }
         </div>
-
-        <div class="empty" *ngIf="filtered.length === 0">No match.</div>
+    
+        @if (filtered.length === 0) {
+          <div class="empty">No match.</div>
+        }
       </div>
-
+    
       <div class="dlgFoot">
         <button type="button" class="btn" (click)="close()">Cancel</button>
       </div>
     </div>
-  `,
-  styles: [`
+    `,
+    styles: [`
     .dlg{ width:520px; max-width:92vw; padding:14px; box-sizing:border-box; overflow-x:hidden;
           font-family:Arial,sans-serif; background:#fff; }
     .dlgHead{ font-size:18px; font-weight:700; margin-bottom:10px; }

@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
@@ -47,10 +47,9 @@ function getRememberedVhfUhfSubtypeSelection(): VhfUhfSubtypeDialogData | null {
 }
 
 @Component({
-  selector: 'app-vhf-uhf-subtype-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-vhf-uhf-subtype-dialog',
+    imports: [],
+    template: `
     <div class="dlg">
       <div class="dlgHead">VHF / UHF Radio Stations</div>
 
@@ -86,7 +85,7 @@ function getRememberedVhfUhfSubtypeSelection(): VhfUhfSubtypeDialogData | null {
       </div>
     </div>
   `,
-  styles: [`
+    styles: [`
     .dlg{
       width:100%;
       max-width:92vw;
@@ -140,7 +139,7 @@ function getRememberedVhfUhfSubtypeSelection(): VhfUhfSubtypeDialogData | null {
     }
     .btn.primary{ border-color:#2f74ff; }
     .btn[disabled]{ opacity:.5; cursor:not-allowed; }
-  `],
+  `]
 })
 export class VhfUhfSubtypeDialogComponent {
   baseRadio: VhfUhfBaseRadio | null = null;

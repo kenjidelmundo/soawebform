@@ -7,7 +7,7 @@ import {
   ElementRef,
   Renderer2,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { Overlay } from '@angular/cdk/overlay';
 import { FormGroup, ReactiveFormsModule, AbstractControl, FormControl } from '@angular/forms';
 import { Subject, combineLatest, interval } from 'rxjs';
@@ -42,11 +42,10 @@ import { AddressService } from './address.service';
 type PayeeItem = { id: number; name: string };
 
 @Component({
-  selector: 'app-soa-left-form',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatDialogModule],
-  templateUrl: './soa-left-form.component.html',
-  styleUrls: ['./soa-left-form.component.css'],
+    selector: 'app-soa-left-form',
+    imports: [ReactiveFormsModule, MatDialogModule],
+    templateUrl: './soa-left-form.component.html',
+    styleUrls: ['./soa-left-form.component.css']
 })
 export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   @Input() form!: FormGroup;

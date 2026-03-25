@@ -13,6 +13,9 @@ export type MobilePhonePicked = {
   duplicate?: boolean;
 };
 
+type PrimaryTxnType = Exclude<TxnType, 'DUPLICATE'>;
+const PRIMARY_TXN_ORDER: PrimaryTxnType[] = ['NEW', 'RENEW', 'MOD'];
+
 // labels must match your screenshot text
 function mobileSubtypeLabel(s: MobilePhoneSubtype): string {
   switch (s) {
@@ -89,7 +92,7 @@ export function openMobilePhoneParticularsFlow(
         : r2?.value
         ? [r2.value as TxnType]
         : [];
-      const primarySelected = selected.filter((t) => t !== 'DUPLICATE');
+      const primarySelected = selected.filter((t): t is PrimaryTxnType => t !== 'DUPLICATE');
 
       if (!selected.length) {
         cancel();
@@ -105,9 +108,9 @@ export function openMobilePhoneParticularsFlow(
       }
 
       const duplicate = selected.includes('DUPLICATE');
-      const orderedPrimary = ['NEW', 'RENEW', 'MOD'].filter((t) =>
-        primarySelected.includes(t as TxnType)
-      ) as TxnType[];
+      const orderedPrimary: PrimaryTxnType[] = PRIMARY_TXN_ORDER.filter((t) =>
+        primarySelected.includes(t)
+      );
 
       const picked: MobilePhonePicked = { subtype, txns: orderedPrimary, duplicate };
       const finalText = buildParticularsText(picked);

@@ -6,6 +6,9 @@ import {
   TvroCatvSubtypeDialogComponent,
 } from './tvrocatv-subtype-dialog.component';
 
+type PrimaryTxnType = Exclude<TxnType, 'DUPLICATE'>;
+const PRIMARY_TXN_ORDER: PrimaryTxnType[] = ['NEW', 'RENEW', 'MOD'];
+
 /**
  * Flow:
  * 1) subtype (TVRO/CATV)
@@ -51,7 +54,7 @@ export function openTvroCatvParticularsFlow(
         : r2?.value
         ? [r2.value as TxnType]
         : [];
-      const primarySelected = selected.filter((v) => v !== 'DUPLICATE');
+      const primarySelected = selected.filter((v): v is PrimaryTxnType => v !== 'DUPLICATE');
 
       if (!selected.length) {
         cancel();
@@ -69,7 +72,9 @@ export function openTvroCatvParticularsFlow(
         return;
       }
 
-      const orderedPrimary = ['NEW', 'RENEW', 'MOD'].filter((v) => primarySelected.includes(v as TxnType));
+      const orderedPrimary: PrimaryTxnType[] = PRIMARY_TXN_ORDER.filter((v) =>
+        primarySelected.includes(v)
+      );
       const parts = txn === 'DUPLICATE'
         ? ['DUPLICATE']
         : [

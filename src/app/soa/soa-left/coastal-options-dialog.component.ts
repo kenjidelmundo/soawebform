@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
@@ -26,68 +26,66 @@ export type CoastalOptionsDialogResult = {
 };
 
 @Component({
-  selector: 'app-coastal-options-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-coastal-options-dialog',
+    imports: [],
+    template: `
     <div class="dlg">
       <div class="dlgHead">
         Select Option
-        <div class="sub" *ngIf="data?.subtype === 'CoastalStations'">Coastal Stations</div>
-        <div class="sub" *ngIf="data?.subtype === 'HF'">HIGH FREQUENCY (HF)</div>
+        @if (data.subtype === 'CoastalStations') {
+          <div class="sub">Coastal Stations</div>
+        }
+        @if (data.subtype === 'HF') {
+          <div class="sub">HIGH FREQUENCY (HF)</div>
+        }
       </div>
-
+    
       <!-- COASTAL STATIONS -->
-      <ng-container *ngIf="data?.subtype === 'CoastalStations'">
+      @if (data.subtype === 'CoastalStations') {
         <div class="btnGrid">
           <button type="button" class="pickBtn" (click)="pick('HighPoweredAbove100W')">
             <span class="txt">High Powered</span>
             <span class="hint">above 100W</span>
           </button>
-
           <button type="button" class="pickBtn" (click)="pick('MediumPowered25To100W')">
             <span class="txt">Medium Powered</span>
             <span class="hint">above 25W up to 100W</span>
           </button>
-
           <button type="button" class="pickBtn" (click)="pick('LowPowered25WBelow')">
             <span class="txt">Low Powered</span>
             <span class="hint">25W below</span>
           </button>
         </div>
-      </ng-container>
-
+      }
+    
       <!-- HIGH FREQUENCY (HF) -->
-      <ng-container *ngIf="data?.subtype === 'HF'">
+      @if (data.subtype === 'HF') {
         <div class="btnGrid">
           <button type="button" class="pickBtn" (click)="pick('HFHighPowered100W')">
             <span class="txt">HF High Powered</span>
             <span class="hint">100W</span>
           </button>
-
           <button type="button" class="pickBtn" (click)="pick('HFMediumPowered25To100W')">
             <span class="txt">HF Medium Powered</span>
             <span class="hint">25W up to 100W</span>
           </button>
-
           <button type="button" class="pickBtn" (click)="pick('HFLowPowered25WBelow')">
             <span class="txt">HF Low Powered</span>
             <span class="hint">25W below</span>
           </button>
-
           <button type="button" class="pickBtn" (click)="pick('VHF')">
             <span class="txt">VHF</span>
             <span class="hint">Option</span>
           </button>
         </div>
-      </ng-container>
-
+      }
+    
       <div class="dlgFoot">
         <button type="button" class="btn" (click)="close()">Cancel</button>
       </div>
     </div>
-  `,
-  styles: [`
+    `,
+    styles: [`
     .dlg{
       width:100%;
       max-width:92vw;
@@ -131,7 +129,7 @@ export type CoastalOptionsDialogResult = {
       border-radius:6px;
       cursor:pointer;
     }
-  `],
+  `]
 })
 export class CoastalOptionsDialogComponent {
   constructor(

@@ -9,7 +9,9 @@
     <div class="val">
       <select class="payeeSel" formControlName="payeeName">
         <option value="">-- Select Payee --</option>
-        <option *ngFor="let p of payees" [value]="p.id">{{ p.name }}</option>
+        @for (p of payees; track p) {
+          <option [value]="p.id">{{ p.name }}</option>
+        }
       </select>
     </div>
   </div>
@@ -25,7 +27,7 @@
       <input
         type="text"
         formControlName="particulars"
-      >
+        >
     </div>
   </div>
 

@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { AbstractControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Subject, combineLatest, of } from 'rxjs';
@@ -22,11 +22,10 @@ import { computeMobilePhone, TxnFlags as MobileTxnFlags } from './mobilephone.co
 import { computeTvroCatv } from './tvrocatv.compute';
 
 @Component({
-  selector: 'app-soa-fees',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  templateUrl: './soa-fees.component.html',
-  styleUrls: ['./soa-fees.component.css'],
+    selector: 'app-soa-fees',
+    imports: [ReactiveFormsModule],
+    templateUrl: './soa-fees.component.html',
+    styleUrls: ['./soa-fees.component.css']
 })
 export class SoaFeesComponent implements OnInit, OnDestroy {
   @Input() form!: FormGroup;

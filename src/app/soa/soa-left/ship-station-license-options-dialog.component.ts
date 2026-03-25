@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 import { ShipLicenseScope } from './ship-station-license-scope-dialog.component';
@@ -30,128 +30,133 @@ export type ShipStationLicenseOptionsResult = {
 export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsResult;
 
 @Component({
-  selector: 'app-ship-station-license-options-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-ship-station-license-options-dialog',
+    imports: [],
+    template: `
     <div class="dlg">
       <div class="title">Ship Station License</div>
       <div class="sub">Choose transaction + power / option + scope</div>
-
+    
       <div class="grid">
         <!-- TRANSACTION -->
         <div class="col">
           <div class="head">Transaction</div>
-
+    
           <label class="row" (click)="onTxnClick($event, 'NEW')">
             <input class="cb" type="checkbox" [checked]="isTxnChecked('NEW')" tabindex="-1" aria-hidden="true" />
             <span class="box" [class.on]="isTxnChecked('NEW')"></span>
             <span class="txt">New</span>
           </label>
-
+    
           <label class="row" (click)="onTxnClick($event, 'RENEW')">
             <input class="cb" type="checkbox" [checked]="isTxnChecked('RENEW')" tabindex="-1" aria-hidden="true" />
             <span class="box" [class.on]="isTxnChecked('RENEW')"></span>
             <span class="txt">Renew</span>
           </label>
-
+    
           <label class="row" (click)="onTxnClick($event, 'MOD')">
             <input class="cb" type="checkbox" [checked]="isTxnChecked('MOD')" tabindex="-1" aria-hidden="true" />
             <span class="box" [class.on]="isTxnChecked('MOD')"></span>
             <span class="txt">Mod</span>
           </label>
-
+    
           <label class="row" (click)="onTxnClick($event, 'DUPLICATE')">
             <input class="cb" type="checkbox" [checked]="isTxnChecked('DUPLICATE')" tabindex="-1" aria-hidden="true" />
             <span class="box" [class.on]="isTxnChecked('DUPLICATE')"></span>
             <span class="txt">Duplicate</span>
           </label>
-
+    
           <label class="row" (click)="onTxnClick($event, 'PURCHASE_POSSESS')">
             <input class="cb" type="checkbox" [checked]="isTxnChecked('PURCHASE_POSSESS')" tabindex="-1" aria-hidden="true" />
             <span class="box" [class.on]="isTxnChecked('PURCHASE_POSSESS')"></span>
             <span class="txt">Permit to Purchase / Possess</span>
           </label>
-          <div class="unitRow" *ngIf="isTxnChecked('PURCHASE_POSSESS')">
-            <span class="unitLabel">Unit:</span>
-            <input
-              class="unitInput"
-              type="number"
-              min="1"
-              step="1"
-              [value]="purchasePossessUnits"
-              (click)="$event.stopPropagation()"
-              (input)="onUnitsInput($event, 'PURCHASE_POSSESS')"
-            />
-          </div>
-
+          @if (isTxnChecked('PURCHASE_POSSESS')) {
+            <div class="unitRow">
+              <span class="unitLabel">Unit:</span>
+              <input
+                class="unitInput"
+                type="number"
+                min="1"
+                step="1"
+                [value]="purchasePossessUnits"
+                (click)="$event.stopPropagation()"
+                (input)="onUnitsInput($event, 'PURCHASE_POSSESS')"
+                />
+            </div>
+          }
+    
           <label class="row" (click)="onTxnClick($event, 'SELL_TRANSFER')">
             <input class="cb" type="checkbox" [checked]="isTxnChecked('SELL_TRANSFER')" tabindex="-1" aria-hidden="true" />
             <span class="box" [class.on]="isTxnChecked('SELL_TRANSFER')"></span>
             <span class="txt">Permit to Sell / Transfer</span>
           </label>
-          <div class="unitRow" *ngIf="isTxnChecked('SELL_TRANSFER')">
-            <span class="unitLabel">Unit:</span>
-            <input
-              class="unitInput"
-              type="number"
-              min="1"
-              step="1"
-              [value]="sellTransferUnits"
-              (click)="$event.stopPropagation()"
-              (input)="onUnitsInput($event, 'SELL_TRANSFER')"
-            />
-          </div>
-
+          @if (isTxnChecked('SELL_TRANSFER')) {
+            <div class="unitRow">
+              <span class="unitLabel">Unit:</span>
+              <input
+                class="unitInput"
+                type="number"
+                min="1"
+                step="1"
+                [value]="sellTransferUnits"
+                (click)="$event.stopPropagation()"
+                (input)="onUnitsInput($event, 'SELL_TRANSFER')"
+                />
+            </div>
+          }
+    
           <label class="row" (click)="onTxnClick($event, 'POSSESS_STORAGE')">
             <input class="cb" type="checkbox" [checked]="isTxnChecked('POSSESS_STORAGE')" tabindex="-1" aria-hidden="true" />
             <span class="box" [class.on]="isTxnChecked('POSSESS_STORAGE')"></span>
             <span class="txt">Possess (Storage)</span>
           </label>
-          <div class="unitRow" *ngIf="isTxnChecked('POSSESS_STORAGE')">
-            <span class="unitLabel">Unit:</span>
-            <input
-              class="unitInput"
-              type="number"
-              min="1"
-              step="1"
-              [value]="possessStorageUnits"
-              (click)="$event.stopPropagation()"
-              (input)="onUnitsInput($event, 'POSSESS_STORAGE')"
-            />
-          </div>
-
+          @if (isTxnChecked('POSSESS_STORAGE')) {
+            <div class="unitRow">
+              <span class="unitLabel">Unit:</span>
+              <input
+                class="unitInput"
+                type="number"
+                min="1"
+                step="1"
+                [value]="possessStorageUnits"
+                (click)="$event.stopPropagation()"
+                (input)="onUnitsInput($event, 'POSSESS_STORAGE')"
+                />
+            </div>
+          }
+    
         </div>
-
+    
         <!-- POWER / OPTION -->
         <div class="col">
           <div class="head">Powered / Option</div>
-
+    
           <label class="row" (click)="pickPower('HIGH_POWERED')">
             <input class="cb" type="checkbox" [checked]="power==='HIGH_POWERED'" tabindex="-1" aria-hidden="true" />
             <span class="box" [class.on]="power==='HIGH_POWERED'"></span>
             <span class="txt">High Powered</span>
           </label>
-
+    
           <label class="row" (click)="pickPower('MEDIUM_POWERED')">
             <input class="cb" type="checkbox" [checked]="power==='MEDIUM_POWERED'" tabindex="-1" aria-hidden="true" />
             <span class="box" [class.on]="power==='MEDIUM_POWERED'"></span>
             <span class="txt">Medium Powered</span>
           </label>
-
+    
           <label class="row" (click)="pickPower('LOW_POWERED')">
             <input class="cb" type="checkbox" [checked]="power==='LOW_POWERED'" tabindex="-1" aria-hidden="true" />
             <span class="box" [class.on]="power==='LOW_POWERED'"></span>
             <span class="txt">Low Powered</span>
           </label>
-
+    
           <div class="divider"></div>
-
+    
           <label
             class="row"
             [class.disabled]="scope==='DOMESTIC'"
             (click)="pickPower('SESCL_LRIT_SSAS_SESFB')"
-          >
+            >
             <input
               class="cb"
               type="checkbox"
@@ -159,22 +164,22 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
               tabindex="-1"
               aria-hidden="true"
               [disabled]="scope==='DOMESTIC'"
-            />
+              />
             <span class="box" [class.on]="power==='SESCL_LRIT_SSAS_SESFB'"></span>
             <span class="txt">SESCL / LRIT / SSAS / SESFB</span>
           </label>
         </div>
-
+    
         <!-- SCOPE -->
         <div class="col">
           <div class="head">Scope</div>
-
+    
           <label class="row" (click)="pickScope('DOMESTIC')">
             <input class="cb" type="checkbox" [checked]="scope==='DOMESTIC'" tabindex="-1" aria-hidden="true" />
             <span class="box" [class.on]="scope==='DOMESTIC'"></span>
             <span class="txt">Domestic</span>
           </label>
-
+    
           <label class="row" (click)="pickScope('INTERNATIONAL')">
             <input class="cb" type="checkbox" [checked]="scope==='INTERNATIONAL'" tabindex="-1" aria-hidden="true" />
             <span class="box" [class.on]="scope==='INTERNATIONAL'"></span>
@@ -182,14 +187,14 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
           </label>
         </div>
       </div>
-
+    
       <div class="foot">
         <button type="button" class="btn" (click)="close()">Cancel</button>
         <button type="button" class="btn primary" [disabled]="!hasPrimaryTxn() || !power || !scope || !unitsOk()" (click)="submit()">Submit</button>
       </div>
     </div>
-  `,
-  styles: [`
+    `,
+    styles: [`
     .dlg{
       width: 100%;
       max-width: 860px;
@@ -360,7 +365,7 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
         grid-template-columns: 1fr;
       }
     }
-  `],
+  `]
 })
 export class ShipStationLicenseOptionsDialogComponent {
   txns: ShipTxn[] = [];

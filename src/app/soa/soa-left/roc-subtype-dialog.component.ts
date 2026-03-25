@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 
@@ -14,10 +14,9 @@ export type RocSubtype =
 export type RocSubtypeDialogResult = { value: RocSubtype };
 
 @Component({
-  selector: 'app-roc-subtype-dialog',
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: 'app-roc-subtype-dialog',
+    imports: [],
+    template: `
     <div class="dlg">
       <div class="dlgHead">ROC Subtype</div>
 
@@ -38,7 +37,7 @@ export type RocSubtypeDialogResult = { value: RocSubtype };
       </div>
     </div>
   `,
-  styles: [`
+    styles: [`
     .dlg { width: 520px; max-width: 92vw; padding: 14px; font-family: Arial, sans-serif; }
     .dlgHead { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
 

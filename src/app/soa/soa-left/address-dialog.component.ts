@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, Inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
@@ -25,52 +25,57 @@ export type AddressDialogResult = {
 };
 
 @Component({
-  selector: 'app-address-dialog',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: 'app-address-dialog',
+    imports: [ReactiveFormsModule],
+    template: `
     <div class="dlg">
       <div class="dlgHead">Select Address</div>
-
+    
       <form [formGroup]="fg" class="dlgBody">
         <div class="row">
           <label>Province</label>
           <select formControlName="province">
             <option value="">-- Select Province --</option>
-            <option *ngFor="let p of provinces" [value]="p.province">
-              {{ p.province }}
-            </option>
+            @for (p of provinces; track p) {
+              <option [value]="p.province">
+                {{ p.province }}
+              </option>
+            }
           </select>
         </div>
-
+    
         <div class="row">
           <label>Town/City</label>
           <select formControlName="townCity">
             <option value="">-- Select Town/City --</option>
-            <option *ngFor="let t of towns" [value]="t.townCity">
-              {{ t.townCity }}
-            </option>
+            @for (t of towns; track t) {
+              <option [value]="t.townCity">
+                {{ t.townCity }}
+              </option>
+            }
           </select>
         </div>
-
+    
         <div class="row">
           <label>Brgy</label>
           <select formControlName="brgy">
             <option value="">-- Select Brgy --</option>
-            <option *ngFor="let b of brgys" [value]="b">{{ b }}</option>
+            @for (b of brgys; track b) {
+              <option [value]="b">{{ b }}</option>
+            }
           </select>
         </div>
-
+    
         <div class="row">
           <label>Unit # / Bldg / Street / Purok</label>
           <input
             type="text"
             formControlName="line4"
             placeholder="e.g. Unit 2, ABC Bldg, Purok 3"
-          />
+            />
         </div>
       </form>
-
+    
       <div class="dlgFoot">
         <button type="button" class="btn" (click)="close()">Cancel</button>
         <button
@@ -78,14 +83,14 @@ export type AddressDialogResult = {
           class="btn primary"
           [disabled]="fg.invalid"
           (click)="useAddress()"
-        >
+          >
           Use Address
         </button>
       </div>
     </div>
-  `,
-  styles: [
-    `
+    `,
+    styles: [
+        `
       .dlg {
         width: 520px;
         max-width: 92vw;
@@ -141,7 +146,7 @@ export type AddressDialogResult = {
         cursor: not-allowed;
       }
     `,
-  ],
+    ]
 })
 export class AddressDialogComponent {
   provinces: AddressProvince[] = [];
