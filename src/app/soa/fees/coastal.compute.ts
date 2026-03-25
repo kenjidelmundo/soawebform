@@ -6,9 +6,7 @@ export type CoastalOption =
   | 'HighPoweredAbove100W'
   | 'MediumPowered25To100W'
   | 'LowPowered25WBelow'
-  | 'HFHighPowered100W'
-  | 'HFMediumPowered25To100W'
-  | 'HFLowPowered25WBelow'
+  | 'HF'
   | 'VHF';
 
 export type CoastalServiceType =
@@ -66,60 +64,33 @@ export const COASTAL_TABLE: Record<CoastalOption, CoastalRow> = {
     ff: 180,
     purchase: 240,
     possess: 120,
-    cp: 1200,
-    lf: 2160,
-    ifee: 840,
+    cp: 1320,
+    lf: 1440,
+    ifee: 720,
     mod: 180,
     dst: 30,
-    sur50: 1080,
-    sur100: 2160,
+    sur50: 720,
+    sur100: 1440,
   },
   MediumPowered25To100W: {
     key: 'MediumPowered25To100W',
     ff: 180,
     purchase: 120,
     possess: 96,
-    cp: 840,
-    lf: 1680,
-    ifee: 840,
+    cp: 960,
+    lf: 1200,
+    ifee: 720,
     mod: 180,
     dst: 30,
-    sur50: 840,
-    sur100: 1680,
+    sur50: 600,
+    sur100: 1200,
   },
   LowPowered25WBelow: {
     key: 'LowPowered25WBelow',
     ff: 180,
     purchase: 96,
     possess: 60,
-    cp: 480,
-    lf: 1200,
-    ifee: 840,
-    mod: 180,
-    dst: 30,
-    sur50: 600,
-    sur100: 1200,
-  },
-
-  HFHighPowered100W: {
-    key: 'HFHighPowered100W',
-    ff: 180,
-    purchase: 240,
-    possess: 120,
-    cp: 480,
-    lf: 1560,
-    ifee: 840,
-    mod: 180,
-    dst: 30,
-    sur50: 780,
-    sur100: 1560,
-  },
-  HFMediumPowered25To100W: {
-    key: 'HFMediumPowered25To100W',
-    ff: 180,
-    purchase: 240,
-    possess: 120,
-    cp: 480,
+    cp: 600,
     lf: 1080,
     ifee: 720,
     mod: 180,
@@ -127,31 +98,32 @@ export const COASTAL_TABLE: Record<CoastalOption, CoastalRow> = {
     sur50: 540,
     sur100: 1080,
   },
-  HFLowPowered25WBelow: {
-    key: 'HFLowPowered25WBelow',
+
+  HF: {
+    key: 'HF',
+    ff: 180,
+    purchase: 120,
+    possess: 96,
+    cp: 480,
+    lf: 720,
+    ifee: 720,
+    mod: 180,
+    dst: 30,
+    sur50: 360,
+    sur100: 720,
+  },
+  VHF: {
+    key: 'VHF',
     ff: 180,
     purchase: 120,
     possess: 96,
     cp: 480,
     lf: 480,
-    ifee: 720,
+    ifee: 480,
     mod: 180,
     dst: 30,
     sur50: 240,
     sur100: 480,
-  },
-  VHF: {
-    key: 'VHF',
-    ff: 180,
-    purchase: 96,
-    possess: 60,
-    cp: 480,
-    lf: 1200,
-    ifee: 480,
-    mod: 180,
-    dst: 30,
-    sur50: 600,
-    sur100: 1200,
   },
 };
 
@@ -172,8 +144,9 @@ export function parseCoastalParticulars(particulars: string): CoastalParsed | nu
   if (hasPurchasePossess) serviceType = 'PURCHASE_POSSESS';
   else if (hasSellTransfer) serviceType = 'SELL_TRANSFER';
 
+  const isTelephony = t.includes('RADIO TELEPHONY');
   const isHF = t.includes('HIGH FREQUENCY') || /\bHF\b/.test(t);
-  const subtype: CoastalSubtype = isHF ? 'HF' : 'CoastalStations';
+  const subtype: CoastalSubtype = isTelephony ? 'HF' : 'CoastalStations';
   const hasHighPowered =
     t.includes('HIGH POWERED') ||
     t.includes('ABOVE 100W') ||
@@ -187,23 +160,12 @@ export function parseCoastalParticulars(particulars: string): CoastalParsed | nu
     t.includes('25W BELOW') ||
     t.includes('25W AND BELOW');
 
-  if (t.includes('VHF')) {
+  if (isTelephony && t.includes('VHF')) {
     return { subtype: 'HF', option: 'VHF', serviceType };
   }
 
-  if (isHF) {
-    // Do not match generic "HIGH" here because "HIGH FREQUENCY" would
-    // incorrectly force HF high-powered for medium/low selections.
-    if (hasMediumPowered) {
-      return { subtype: 'HF', option: 'HFMediumPowered25To100W', serviceType };
-    }
-    if (hasLowPowered) {
-      return { subtype: 'HF', option: 'HFLowPowered25WBelow', serviceType };
-    }
-    if (hasHighPowered) {
-      return { subtype: 'HF', option: 'HFHighPowered100W', serviceType };
-    }
-    return { subtype: 'HF', option: 'HFHighPowered100W', serviceType };
+  if (isTelephony || isHF) {
+    return { subtype: 'HF', option: 'HF', serviceType };
   }
 
   if (hasMediumPowered) {
@@ -247,7 +209,7 @@ export function computeCoastal(
 
   if (row && parsed) {
     if (parsed.serviceType === 'PURCHASE_POSSESS') {
-      ff = row.ff;
+      ff = row.ff * u;
       purchase = row.purchase * u;
       possess = row.possess * u;
       dst = row.dst;

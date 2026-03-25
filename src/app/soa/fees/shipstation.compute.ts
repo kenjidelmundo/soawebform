@@ -83,6 +83,8 @@ const num = (v: any): number => {
 const round2 = (n: number): number =>
   Math.round((num(n) + Number.EPSILON) * 100) / 100;
 
+const SELL_TRANSFER_STF_PER_UNIT = 50;
+
 const norm = (s: any) =>
   String(s ?? '')
     .toUpperCase()
@@ -391,7 +393,7 @@ export function computeShipStation(
         break;
       }
       case 'SELL_TRANSFER': {
-        Purchase += num(row.Purchase) * sellUnits;
+        OTH += SELL_TRANSFER_STF_PER_UNIT * sellUnits;
         DST += num(row.DST);
         break;
       }

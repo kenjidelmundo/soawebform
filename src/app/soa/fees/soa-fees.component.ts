@@ -728,9 +728,9 @@ export class SoaFeesComponent implements OnInit, OnDestroy {
 
   private extractAmateurClass(text: string): string {
     const up = text.toUpperCase();
-    if (up.includes('CLASS B') || up.includes('AT-RSL B') || up.includes('RSL B')) return 'B';
-    if (up.includes('CLASS C') || up.includes('AT-RSL C') || up.includes('RSL C')) return 'C';
-    if (up.includes('CLASS D') || up.includes('AT-RSL D') || up.includes('RSL D')) return 'D';
+    if (/\bCLASS\s+B\b|\bAT-RSL\s+B\b|\bRSL\s+B\b/.test(up)) return 'B';
+    if (/\bCLASS\s+C\b|\bAT-RSL\s+C\b|\bRSL\s+C\b/.test(up)) return 'C';
+    if (/\bCLASS\s+D\b|\bAT-RSL\s+D\b|\bRSL\s+D\b/.test(up)) return 'D';
     return 'A';
   }
 
