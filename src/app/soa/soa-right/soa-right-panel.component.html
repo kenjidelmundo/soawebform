@@ -40,7 +40,7 @@
     <label><input type="checkbox" formControlName="opEndorsedForPayment"> <b>Endorsed for Payment</b></label>
 
     <div class="note"><b>Note:</b> To be paid on or before</div>
-    <input class="noteIn" type="text" formControlName="opNotePayOnOrBefore" />
+    <input class="noteIn" type="date" formControlName="opNotePayOnOrBefore" />
     <div class="foot"><b>otherwise subject to reassessment.</b></div>
   </div>
 
@@ -76,6 +76,18 @@
     <div class="orRow">
       <div class="orLbl">Date Paid:</div>
       <input type="date" formControlName="datePaid" />
+    </div>
+
+    <div class="authorizedBy">
+      <span>Developed by:</span>
+      <button class="authorizedByLink" type="button" (click)="openAuthorizedByPage()">
+        <span>DWCL IT INTERNS</span>
+        <img
+          class="authorizedByLogo"
+          src="assets/dwclLOGO.png"
+          alt="Divine Word College of Legazpi logo"
+        />
+      </button>
     </div>
   </div>
 </div>

@@ -5,9 +5,8 @@ import {
   Output,
   OnInit,
   OnDestroy,
-  AfterViewInit,
-  ElementRef,
 } from '@angular/core';
+import { Router } from '@angular/router';
 
 import { FormGroup, ReactiveFormsModule, AbstractControl } from '@angular/forms';
 import { SoaPdfService } from '../soa-pdf/soa-pdf.service';
@@ -20,7 +19,7 @@ import { startWith, takeUntil, filter, map, distinctUntilChanged } from 'rxjs/op
     templateUrl: './soa-right-panel.component.html',
     styleUrls: ['./soa-right-panel.component.css']
 })
-export class SoaRightPanelComponent implements OnInit, AfterViewInit, OnDestroy {
+export class SoaRightPanelComponent implements OnInit, OnDestroy {
   @Input() form!: FormGroup;
 
   @Output() onSave = new EventEmitter<void>();
@@ -34,16 +33,12 @@ export class SoaRightPanelComponent implements OnInit, AfterViewInit, OnDestroy 
 
   constructor(
     private soaPdf: SoaPdfService,
-    private elRef: ElementRef<HTMLElement>
+    private router: Router
   ) {}
 
   ngOnInit(): void {
     this.setupTxnCheckboxRules();
     this.setupTxnAutoSyncPolling();
-  }
-
-  ngAfterViewInit(): void {
-    this.forcePayOnOrBeforeAsDateInput();
   }
 
   ngOnDestroy(): void {
@@ -56,21 +51,7 @@ export class SoaRightPanelComponent implements OnInit, AfterViewInit, OnDestroy 
   printSoa(): void { this.onPrintSOA.emit(); }
   assessment(): void { this.onAssessment.emit(); }
   printOp(): void { this.onPrintOP.emit(); }
-
-  // ======================================================
-  // ✅ Make "To be paid on or before" use calendar
-  // HTML remains unchanged
-  // ======================================================
-  private forcePayOnOrBeforeAsDateInput(): void {
-    const host = this.elRef?.nativeElement;
-    if (!host) return;
-
-    const input = host.querySelector('.noteIn') as HTMLInputElement | null;
-    if (!input) return;
-
-    input.type = 'date';
-    input.setAttribute('type', 'date');
-  }
+  openAuthorizedByPage(): void { void this.router.navigate(['/authorized-by']); }
 
   // ======================================================
   // Keep NEW and RENEW mutually exclusive. MOD is independent.

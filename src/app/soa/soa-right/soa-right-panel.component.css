@@ -1,279 +1,285 @@
-/* =========================
-   RP = MAIN GRID
-   ========================= */
 .rp{
   width: 100%;
+  max-width: 520px;
   box-sizing: border-box;
-
-  /* ✅ MAIN GRID:
-     col1 = chkBox area (290)
-     col2 = buttons area (180)
-  */
   display: grid;
-  grid-template-columns: 290px 180px;
-  column-gap: 50px;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  column-gap: 16px;
   row-gap: 10px;
-
-  /* ✅ your global left offset */
-  padding-left: 50px;
+  margin-left: auto;
 }
 
-/* ✅ Make children of .topRow become direct children of .rp (NO HTML CHANGE) */
 .topRow{
   display: contents;
 }
 
-/* =========================
-   CHECKBOX CONTAINER
-   ========================= */
 .chkBox{
   grid-column: 1;
   grid-row: 1;
-
-  background: var(--rightBlue);
-  border: 1px solid var(--line);
-  padding: 12px 9px;
+  background: linear-gradient(180deg, rgba(144, 178, 221, 0.96), rgba(122, 162, 212, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  padding: 14px 12px;
   display: grid;
-  border-radius: 3%;
+  border-radius: 14px;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  font-size: 14px;
+  gap: 12px;
   box-sizing: border-box;
 }
 
-.col{ display: grid; gap: 2px; }
+.col{ display: grid; gap: 6px; }
 
 .col label{
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-weight: bold;
+  gap: 10px;
+  font: 600 14px -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+}
+
+.chkBox input[type="checkbox"]{
+  accent-color: #0a84ff;
 }
 
 .othersIn{
-  height: 18px;
-  border: 1px solid var(--line);
+  height: 20px;
+  border: 1px solid rgba(85, 103, 128, 0.18);
   background: #fff;
-  margin-top: 2px;
-  padding: 0 6px;
-  box-sizing: border-box;
+  border-radius: 8px;
 }
 
-/* =========================
-   BUTTONS
-   ========================= */
 .btnCol{
   grid-column: 2;
   grid-row: 1;
 
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .btn{
-  height: 28px;
-  border-radius: 5%;
-  border: 1px solid var(--line);
-  font-weight: bold;
+  height: 30px;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 73, 94, 0.16);
+  font: 700 13px -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
   cursor: pointer;
-  box-sizing: border-box;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 1px 2px rgba(15, 23, 32, 0.14), 0 4px 8px rgba(15, 23, 32, 0.08);
+  transition: transform 140ms ease, box-shadow 140ms ease;
 }
 
-.btn.save{ background: var(--btnGreen); }
-.btn.new{ background: var(--btnGreen); }
-.btn.soa{ background: var(--btnBlue); }
-.btn.assess{ background: var(--btnAssess); color:#fff; }
+.btn:hover{
+  filter: brightness(1.03);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 2px 4px rgba(15, 23, 32, 0.16), 0 7px 12px rgba(15, 23, 32, 0.1);
+}
 
-/* =========================
-   OP PREVIEW BAR
-   ========================= */
+.btn:active{
+  transform: translateY(1px) scale(0.985);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(15, 23, 32, 0.12);
+}
+
+.btn:focus-visible{
+  outline: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 0 0 3px rgba(10, 132, 255, 0.28), 0 5px 10px rgba(15, 23, 32, 0.12);
+}
+
+.btn.save,
+.btn.new,
+.btn.soa,
+.btn.assess{
+  background: linear-gradient(180deg, rgba(208, 232, 184, 0.92), rgba(186, 216, 156, 0.92));
+}
+
 .opBar{
   grid-column: 1 / -1;
   grid-row: 2;
-
-  width: 520px;
-  height: 26px;
-  background: var(--peach);
-  border: 1px solid var(--line);
+  height: 28px;
+  background: linear-gradient(180deg, rgba(194, 223, 171, 0.88), rgba(170, 205, 144, 0.88));
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 14px;
   display: grid;
-  align-items: center;
-  justify-items: center;
-  box-sizing: border-box;
+  place-items: center;
 }
 
 .opBtn{
   border: 0;
-  font-size: 14px;
   background: transparent;
-  font-weight: bold;
-  cursor: pointer;
 }
 
-/* =========================
-   OP BOX
-   ========================= */
 .opBox{
   grid-column: 1 / -1;
   grid-row: 3;
-
-  width: 520px;
-  background: var(--rightBlue);
-  border: 1px solid var(--line);
-  padding: 10px 12px;
-  font-size: 14px;
+  background: linear-gradient(180deg, rgba(144, 178, 221, 0.96), rgba(122, 162, 212, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 14px;
+  padding: 12px;
   box-sizing: border-box;
 }
 
 .opBox label{
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
-
-.note{ margin-top: 2px; }
 
 .noteIn{
   width: 100%;
-  height: 20px;
-  margin-top: 4px;
-  background: #f6d9c6;
+  height: 22px;
+  background: #fff;
   padding: 0 6px;
-  border: 1px solid var(--line);
-  box-sizing: border-box;
+  border: 1px solid rgba(85, 103, 128, 0.18);
+  border-radius: 8px;
 }
 
-.foot{ margin-top: 8px; }
-
-/* =========================
-   PA
-   ========================= */
 .pa{
   grid-column: 1 / -1;
   grid-row: 4;
-
-  width: 520px;
   display: grid;
   gap: 6px;
-  font-size: 14px;
-  box-sizing: border-box;
 }
 
 .paRow{
   display: grid;
-  grid-template-columns: 90px 1fr;
-  gap: 8px;
+  grid-template-columns: 72px 1fr;
+  gap: 6px;
   align-items: center;
 }
 
-.paRow .lbl{ font-weight: bold; }
-
-.paRow select{
-  height: 22px;
-  padding: 0 6px;
-  border: 1px solid var(--line);
-  background: #fff;
-  box-sizing: border-box;
+.paRow .lbl{
+  font-weight: bold;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
-/* =========================
-   ✅ ROW 5: REMARKS (LEFT) + OP SERIES (RIGHT) SAME ROW
-   ========================= */
+.paRow select{
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid rgba(85, 103, 128, 0.18);
+  border-radius: 8px;
+  background: #fff;
+}
 
-/* LEFT: Remarks */
+.chkBox,.opBar,.opBox{ box-shadow: 0 6px 14px #0002; }
+
+.othersIn,.noteIn,.paRow select{ box-shadow: 0 1px 3px #0001; }
+
 .remarks{
-  grid-column: 1;   /* ✅ left column */
-  grid-row: 5;      /* ✅ same row as opSeries */
-
+  grid-column: 1;
+  grid-row: 5;
   width: 150px;
   justify-self: start;
 }
 
 .rt{
-  font-weight: bold;
-  font-size: 16px;
-  color: #666;
+  font-weight: 600;
+  font-size: 15px;
+  color: #5f6876;
   margin-bottom: 4px;
-
-  /* optional: align label to right */
   text-align: right;
 }
 
 .remarks textarea{
-  width: 100%;
   height: 120px;
-  border: 1px solid var(--line);
-  background: #fff;
   padding: 6px;
   box-sizing: border-box;
   resize: none;
 }
 
-/* RIGHT: OP SERIES beside remarks */
 .opSeries{
-  grid-column: 2;   /* ✅ RIGHT COLUMN (THIS FIXES IT) */
+  grid-column: 1 / -1;
   grid-row: 5;
-  width: auto;        /* ✅ no 500px here */
-  justify-self: end;  /* ✅ stick to the far right */
+  width: 332px;
+  justify-self: end;
+  align-self: start;
 
   display: grid;
-  justify-items: auto; /* ✅ label + input align right */
   gap: 6px;
 
-  margin-top: 0;
+  margin-top: -2px;
 }
 
 .opTitle{
-  margin-top: 30px;
   color: #d40000;
-  font-weight: bold;
-  font-size: 15px;
-  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+  width: 220px;
+  justify-self: end;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .opSeriesIn{
-  width: 260px;
+  width: 220px;
   height: 24px;
-  margin-bottom: 40px;
+  justify-self: end;
   text-align: right;
   font-weight: bold;
   padding: 0 6px;
-  border: 1px solid var(--line);
-  background: #fff;
-  box-sizing: border-box;
 }
 
-/* ✅ If your right column is too narrow and you want no overflow, use this instead:
-.opSeriesIn{ width: 180px; }
-*/
-
-/* =========================
-   OR BLOCK
-   ========================= */
 .orBlock{
-  grid-column: 2 / 1;
-  grid-row: 5;
-  width: 500px;
-  margin-left: 220px;
-  margin-top: 100px;
+  grid-column: 1 / -1;
+  grid-row: 6;
+  width: 332px;
+  margin-top: -120px;
+  padding-bottom: 8px;
+  position: relative;
   display: grid;
-  gap: 8px;
-  justify-self: auto;
+  gap: 10px;
+  justify-self: end;
 }
 
 .orRow{
-  width: 300px;
-  margin-bottom: px;
   display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 10px;
-  align-items: auto;
+  grid-template-columns: 100px 220px;
+  gap: 12px;
+  justify-content: end;
+  align-items: center;
 }
 
-.orLbl{ font-weight: bold; }
+.orLbl{font-size:14px;font-weight:600;}
 
 .orRow input{
+  width: 100%;
   height: 22px;
   padding: 0 6px;
-  border: 1px solid var(--line);
+}
+
+.remarks textarea,.opSeriesIn,.orRow input{
+  border: 1px solid rgba(85, 103, 128, 0.18);
+  border-radius: 10px;
   background: #fff;
-  box-sizing: border-box;
+  box-shadow: 0 1px 3px #0001;
+}
+
+.authorizedBy{
+  position: absolute;
+  bottom: -96px;
+  left: 118px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: normal;
+  white-space: nowrap;
+}
+
+.authorizedByLink{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #0b57d0;
+  font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.authorizedByLink:hover{
+  color: #003ea8;
+}
+
+.authorizedByLogo{
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  object-fit: contain;
 }

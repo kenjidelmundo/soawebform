@@ -4,9 +4,13 @@
    ========================= */
 
 .hdr{
+  width: 100%;
+  max-width: 1428px;
+  margin: 0 auto;
   display: grid;
-  grid-template-columns: 220px 1fr 520px;
+  grid-template-columns: 220px minmax(0, 1fr) 520px;
   align-items: start;
+  box-sizing: border-box;
 }
 
 /* LEFT: ID AREA */

@@ -27,8 +27,6 @@ export class SoaPageComponent {
   form: FormGroup;
   saving = false;
 
-  // ✅ FIX: do NOT use @ViewChild('assess') unless your HTML has #assess
-  // This will find the first <app-assessment> in your template automatically.
   @ViewChild(AssessmentComponent) assess!: AssessmentComponent;
 
   constructor(private fb: FormBuilder, private soaService: SoaService) {
@@ -333,7 +331,6 @@ export class SoaPageComponent {
     console.log('printOp');
   }
 
-  // ✅ FIXED: will now find the component and call exportPDF()
   assessmentOnly(): void {
     if (!this.form) {
       alert('Parent form not ready.');
@@ -347,9 +344,7 @@ export class SoaPageComponent {
       return;
     }
 
-    // ensure current typed changes are committed
     this.form.updateValueAndValidity({ emitEvent: false });
-
     this.assess.exportPDF();
   }
 }
