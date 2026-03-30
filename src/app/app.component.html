@@ -1,1 +1,59 @@
-<router-outlet></router-outlet>
+<div class="app-shell">
+  <c-sidebar
+    class="app-sidebar"
+    colorScheme="dark"
+    position="fixed"
+    [visible]="sidebarVisible"
+    (visibleChange)="sidebarVisible = $event"
+  >
+    <c-sidebar-header class="app-sidebar__header">
+      <c-sidebar-brand routerLink="/">
+        <div class="app-sidebar__brand">
+          <img src="assets/NTC-Logo.png" alt="National Telecommunications Commission logo" />
+          <div>
+            <p>SOA Webform</p>
+            <span>CoreUI Operations Panel</span>
+          </div>
+        </div>
+      </c-sidebar-brand>
+    </c-sidebar-header>
+
+    <div class="app-sidebar__section">Operations</div>
+    <c-nav class="flex-column app-sidebar__nav">
+      @for (item of navItems; track item.label) {
+        <c-nav-item>
+          <a
+            cNavLink
+            [routerLink]="item.route"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: item.exact }"
+            (click)="closeSidebarOnMobile()"
+          >
+            <c-icon class="nav-icon" [content]="item.icon" size="lg"></c-icon>
+            <span class="nav-copy">
+              <strong>{{ item.label }}</strong>
+              <small>{{ item.caption }}</small>
+            </span>
+          </a>
+        </c-nav-item>
+      }
+    </c-nav>
+
+    <div class="app-sidebar__section">Theme</div>
+    <div class="app-sidebar__callout">
+      <c-badge color="info" shape="rounded-pill">CoreUI</c-badge>
+      <p>Angular 21 admin shell with your existing SOA workflow preserved inside it.</p>
+    </div>
+  </c-sidebar>
+
+  <div class="app-wrapper">
+    <main class="app-main">
+      <button cButton color="light" variant="ghost" class="app-mobile-menu" type="button" aria-label="Toggle sidebar" (click)="toggleSidebar()">
+        <c-icon [content]="icons.menu" size="lg"></c-icon>
+      </button>
+      <c-container fluid class="app-main__container">
+        <router-outlet></router-outlet>
+      </c-container>
+    </main>
+  </div>
+</div>

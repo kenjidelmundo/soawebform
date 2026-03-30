@@ -1,6 +1,11 @@
 import { Component, ViewChild } from '@angular/core';
 
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import {
+  CardBodyComponent,
+  CardComponent,
+  CardHeaderComponent,
+} from '@coreui/angular';
 
 import { SoaService } from './soa.service';
 
@@ -14,6 +19,9 @@ import { AssessmentComponent } from './soa-assessment-form/assessment.component'
     selector: 'app-soa-page',
     imports: [
     ReactiveFormsModule,
+    CardComponent,
+    CardHeaderComponent,
+    CardBodyComponent,
     SoaHeaderComponent,
     SoaLeftFormComponent,
     SoaRightPanelComponent,
@@ -47,6 +55,10 @@ export class SoaPageComponent {
       licensee: [''],
 
       address: [''],
+      province: [''],
+      townCity: [''],
+      brgy: [''],
+      line4: [''],
       particulars: [''],
       periodFrom: [null],
       periodTo: [null],

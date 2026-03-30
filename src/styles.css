@@ -8,14 +8,18 @@
   --btnGreen: #9dbf61;
   --btnBlue: #b9d5e8;
   --btnAssess: #2ebd5b;
+  --shell-bg: #eef4f9;
+  --shell-ink: #11263f;
 }
 
 html, body{
   height:100%;
   margin:0;
-  background: var(--bg);
-  font-family: Arial, Helvetica, sans-serif;
-  color:#000;
+  background:
+    radial-gradient(circle at top left, rgba(9, 92, 160, 0.12), transparent 28%),
+    linear-gradient(180deg, #f4f8fb 0%, var(--shell-bg) 100%);
+  font-family: var(--cui-body-font-family, Arial, Helvetica, sans-serif);
+  color: var(--shell-ink);
 }
 *, *::before, *::after{ box-sizing:border-box; }
 
@@ -32,8 +36,13 @@ input[type="text"], textarea, select{
 
 textarea{ resize:none; }
 
-html, body { height: 100%; }
-body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+body{
+  line-height: 1.5;
+}
+
+a{
+  color: inherit;
+}
 
 .soa-hover-dlg .mat-mdc-dialog-container{
   padding: 0;

@@ -1,44 +1,57 @@
-<div class="canvas" [formGroup]="form">
-  <app-soa-header [form]="form"></app-soa-header>
+<section class="soa-page-shell">
+  <div class="canvas" [formGroup]="form">
+    <app-soa-header [form]="form"></app-soa-header>
 
-  <div class="grid">
-    <div class="infoSpan">
-      <app-soa-left-form [form]="form"></app-soa-left-form>
-    </div>
+    <div class="grid">
+      <c-card class="panel-card infoSpan">
+        <c-card-header>Statement Details</c-card-header>
+        <c-card-body class="panel-card__body">
+          <app-soa-left-form [form]="form"></app-soa-left-form>
+        </c-card-body>
+      </c-card>
 
-    <div class="rightSpan">
-      <div style="position:fixed; left:-10000px; top:0; pointer-events:none;">
-        <app-assessment #assess [form]="form"></app-assessment>
-      </div>
+      <c-card class="panel-card panel-card--action rightSpan">
+        <c-card-header>Actions and Review</c-card-header>
+        <c-card-body class="panel-card__body panel-card__body--actions">
+          <div style="position:fixed; left:-10000px; top:0; pointer-events:none;">
+            <app-assessment #assess [form]="form"></app-assessment>
+          </div>
 
-      <app-soa-right-panel
-        [form]="form"
-        (onSave)="save()"
-        (onNewRecord)="newRecord()"
-        (onPrintSOA)="printSoa()"
-        (onAssessment)="assess.exportPDF()"
-        (onPrintOP)="printOp()"
-      ></app-soa-right-panel>
+          <app-soa-right-panel
+            [form]="form"
+            (onSave)="save()"
+            (onNewRecord)="newRecord()"
+            (onPrintSOA)="printSoa()"
+            (onAssessment)="assess.exportPDF()"
+            (onPrintOP)="printOp()"
+          ></app-soa-right-panel>
+        </c-card-body>
+      </c-card>
 
-    </div>
+      <c-card class="panel-card feesLeft">
+        <c-card-header>Licenses and Other Application</c-card-header>
+        <c-card-body class="panel-card__body panel-card__body--fees">
+          <app-soa-fees [form]="form" mode="left"></app-soa-fees>
 
-    <div class="feesLeft">
-      <app-soa-fees [form]="form" mode="left"></app-soa-fees>
+          <div class="acct">
+            <div class="acctRow">
+              <div class="acctLbl">Accounting</div>
+              <input class="acctIn" type="text" formControlName="accounting" />
+            </div>
+            <div class="acctRow">
+              <div class="acctLbl">Accounting Position</div>
+              <input class="acctIn wide" type="text" formControlName="accountingPosition" />
+            </div>
+          </div>
+        </c-card-body>
+      </c-card>
 
-      <div class="acct">
-        <div class="acctRow">
-          <div class="acctLbl">Accounting</div>
-          <input class="acctIn" type="text" formControlName="accounting" />
-        </div>
-        <div class="acctRow">
-          <div class="acctLbl">AccountingPosition</div>
-          <input class="acctIn wide" type="text" formControlName="accountingPosition" />
-        </div>
-      </div>
-    </div>
-
-    <div class="feesMid">
-      <app-soa-fees [form]="form" mode="mid"></app-soa-fees>
+      <c-card class="panel-card feesMid">
+        <c-card-header>Permits, ROC and Totals</c-card-header>
+        <c-card-body class="panel-card__body panel-card__body--fees">
+          <app-soa-fees [form]="form" mode="mid"></app-soa-fees>
+        </c-card-body>
+      </c-card>
     </div>
   </div>
-</div>
+</section>

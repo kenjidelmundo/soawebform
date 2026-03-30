@@ -1,17 +1,40 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import {
+  BadgeComponent,
+  ButtonDirective,
+  CardBodyComponent,
+  CardComponent,
+  CardHeaderComponent,
+} from '@coreui/angular';
 
 @Component({
   selector: 'app-authorized-by-page',
-  imports: [RouterLink],
+  imports: [
+    RouterLink,
+    CardComponent,
+    CardHeaderComponent,
+    CardBodyComponent,
+    BadgeComponent,
+    ButtonDirective,
+  ],
   template: `
     <section class="authorized-page">
       <div class="watermark"></div>
-      <div class="card">
-        <a class="backButton" routerLink="/" aria-label="Back to SOA">↩</a>
-        <div class="cardDate">INTERNSHIP PERIOD: JANUARY 2026 - MAY 2026</div>
-        <h1>DWCL IT INTERNS</h1>
-        <div class="profiles">
+      <c-card class="card">
+        <c-card-header class="cardHeader">
+          <a cButton class="backButton" color="light" variant="ghost" routerLink="/" aria-label="Back to SOA">
+            Back
+          </a>
+          <div class="cardHeaderText">
+            <p>DWCL IT INTERNS</p>
+            <small>Internship Period: January 2026 - May 2026</small>
+          </div>
+          <c-badge color="info" shape="rounded-pill">CoreUI Profile Board</c-badge>
+        </c-card-header>
+
+        <c-card-body class="cardBody">
+          <div class="profiles">
           <div class="profileItem">
             <div class="profilePhotoFrame">
               <img class="profilePhoto" src="/assets/karl.JPG" alt="Karl Sebhastian L. Aringo" />
@@ -52,8 +75,9 @@ import { RouterLink } from '@angular/router';
             <div class="profileRole">(Web Developer)</div>
             <div class="profileWork">Analysis • Design • Implementation • Testing and Integration • Maintenance</div>
           </div>
-        </div>
-      </div>
+          </div>
+        </c-card-body>
+      </c-card>
     </section>
   `,
   styles: [`
@@ -84,45 +108,53 @@ import { RouterLink } from '@angular/router';
       position: relative;
       z-index: 1;
       width: min(100%, 780px);
-      display: grid;
-      justify-items: center;
-      gap: 18px;
-      background: rgba(255, 255, 255, 0.5);
       border: none;
       border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(17, 71, 182, 0.08);
-      padding: 32px 28px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(17, 71, 182, 0.14);
+      background: rgba(255, 255, 255, 0.55);
       box-sizing: border-box;
-      text-align: center;
     }
 
-    .cardDate{
-      position: absolute;
-      top: 14px;
-      right: 18px;
-      font-size: 10px;
-      font-weight: 600;
-      color: #222;
-      letter-spacing: 0.4px;
+    .cardHeader{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 22px;
+      background: linear-gradient(135deg, rgba(8, 61, 110, 0.98), rgba(18, 110, 179, 0.92));
+      color: #fff;
     }
 
     .backButton{
-      position: absolute;
-      top: 10px;
-      left: 14px;
-      width: 34px;
-      height: 34px;
-      display: grid;
-      place-items: center;
-      border-radius: 999px;
-      color: #111;
-      text-decoration: none;
-      font-size: 24px;
-      line-height: 1;
+      white-space: nowrap;
     }
 
-    .backButton:hover{
-      background: rgba(0, 0, 0, 0.06);
+    .cardHeaderText{
+      flex: 1;
+      min-width: 0;
+      text-align: center;
+    }
+
+    .cardHeaderText p{
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .cardHeaderText small{
+      display: block;
+      margin-top: 4px;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .cardBody{
+      padding: 28px;
+      text-align: center;
     }
 
     .profiles{
@@ -176,15 +208,15 @@ import { RouterLink } from '@angular/router';
       line-height: 1.35;
     }
 
-    h1{
-      margin: 0;
-      font-size: 24px;
-      color: #111;
-    }
+    @media (max-width: 767.98px){
+      .cardHeader{
+        flex-direction: column;
+        align-items: stretch;
+      }
 
-    p{
-      margin: 0 0 18px;
-      color: #333;
+      .cardHeaderText{
+        text-align: left;
+      }
     }
 
   `]

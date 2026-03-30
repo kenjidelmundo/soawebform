@@ -54,7 +54,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
-  private unlistenAddressClick?: () => void;
   private unlistenPartEnter?: () => void;
   private unlistenPartLeave?: () => void;
   private unlistenPartClick?: () => void;
@@ -97,13 +96,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       this.renderer.setAttribute(addressInput, 'readonly', 'true');
       this.renderer.setStyle(addressInput, 'cursor', 'pointer');
       this.renderer.setStyle(addressInput, 'pointer-events', 'auto');
-
-      this.unlistenAddressClick = this.renderer.listen(addressInput, 'click', (ev) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        if (Date.now() < this.addressCoolDownUntil) return;
-        this.openAddressDialog();
-      });
     }
 
     const partInput = this.el.nativeElement.querySelector(
@@ -114,23 +106,6 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
       this.renderer.setAttribute(partInput, 'readonly', 'true');
       this.renderer.setStyle(partInput, 'cursor', 'pointer');
       this.renderer.setStyle(partInput, 'pointer-events', 'auto');
-
-      this.unlistenPartEnter = this.renderer.listen(partInput, 'mouseenter', () => {
-        this.cancelParticularsHoverClose();
-        this.openParticularsHoverDialog(partInput);
-      });
-
-      this.unlistenPartLeave = this.renderer.listen(partInput, 'mouseleave', () => {
-        this.scheduleParticularsHoverClose();
-      });
-
-      this.unlistenPartClick = this.renderer.listen(partInput, 'click', (ev) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        this.closeParticularsHoverDialog();
-        if (Date.now() < this.particularsCoolDownUntil) return;
-        this.openParticularsDialog();
-      });
     }
 
     const dateInput = this.el.nativeElement.querySelector(
@@ -165,13 +140,36 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.unlistenAddressClick?.();
     this.unlistenPartEnter?.();
     this.unlistenPartLeave?.();
     this.unlistenPartClick?.();
     this.closeParticularsHoverDialog();
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  handleAddressClick(ev: Event): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (Date.now() < this.addressCoolDownUntil) return;
+    this.openAddressDialog();
+  }
+
+  handleParticularsEnter(anchor: HTMLInputElement | HTMLTextAreaElement): void {
+    this.cancelParticularsHoverClose();
+    this.openParticularsHoverDialog(anchor);
+  }
+
+  handleParticularsLeave(): void {
+    this.scheduleParticularsHoverClose();
+  }
+
+  handleParticularsClick(ev: Event): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.closeParticularsHoverDialog();
+    if (Date.now() < this.particularsCoolDownUntil) return;
+    this.openParticularsDialog();
   }
 
   private ensureDelayMonthsControl(): void {
@@ -532,6 +530,10 @@ export class SoaLeftFormComponent implements OnInit, AfterViewInit, OnDestroy {
                 id: realId,
                 licensee: String(dto?.licensee ?? dto?.Licensee ?? '').trim(),
                 address: String(dto?.address ?? dto?.Address ?? ''),
+                province: String(dto?.province ?? dto?.Province ?? ''),
+                townCity: String(dto?.townCity ?? dto?.TownCity ?? dto?.municipality ?? dto?.Municipality ?? ''),
+                brgy: String(dto?.brgy ?? dto?.Brgy ?? dto?.barangay ?? dto?.Barangay ?? ''),
+                line4: String(dto?.line4 ?? dto?.Line4 ?? ''),
                 particulars: '',
                 catROC: false,
                 catMA: false,

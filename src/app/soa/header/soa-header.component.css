@@ -5,10 +5,10 @@
 
 .hdr{
   width: 100%;
-  max-width: 1428px;
+  max-width: 1192px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 520px;
+  grid-template-columns: 118px minmax(0, 1fr) 414px;
   align-items: start;
   box-sizing: border-box;
 }
@@ -17,13 +17,13 @@
 .idArea{
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding-top: 6px;
+  gap: 8px;
+  padding-top: 4px;
 }
 
 .idLbl{
   font-weight: bold;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .idVal{
@@ -47,19 +47,19 @@
   text-align: center;
   font-weight: bold;
   line-height: 1.2;
-  padding-top: 2px;
+  padding-top: 1px;
 }
 
-.t1{ font-size: 13px; }
-.t2{ font-size: 12px; }
-.t3{ font-size: 12px; }
+.t1{ font-size: 12px; }
+.t2{ font-size: 11px; }
+.t3{ font-size: 11px; }
 
 /* RIGHT: TOP BLOCK */
 .rightTop{
   justify-self: end;
-  width: 520px;
+  width: 414px;
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 /* mobile checkbox */
@@ -67,32 +67,32 @@
   justify-self: end;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 11px;
 }
 
 /* Series row */
 .seriesLine{
   display: grid;
-  grid-template-columns: 52px 1fr 140px;
-  gap: 10px;
+  grid-template-columns: 42px minmax(0, 1fr) 112px;
+  gap: 6px;
   align-items: center;
   justify-self: end;
-  width: 520px;
+  width: 414px;
 }
 
 .seriesRed{
   color: #d40000;
   font-weight: bold;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .seriesNote{
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .seriesNum{
-  height: 22px;
+  height: 20px;
   text-align: center;
   font-weight: bold;
   padding: 0 6px;
@@ -102,16 +102,16 @@
 /* SOA Series row */
 .soaSeriesRow{
   display: grid;
-  grid-template-columns: 90px 1fr;
-  gap: 10px;
+  grid-template-columns: 68px 1fr;
+  gap: 6px;
   align-items: center;
   justify-self: end;
-  width: 520px;
+  width: 414px;
 }
 
 .soaSeriesLbl{
   font-weight: bold;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .soaSeriesIn{

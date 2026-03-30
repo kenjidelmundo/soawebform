@@ -7,6 +7,7 @@ import {
   OnDestroy,
 } from '@angular/core';
 import { Router } from '@angular/router';
+import { ButtonDirective } from '@coreui/angular';
 
 import { FormGroup, ReactiveFormsModule, AbstractControl } from '@angular/forms';
 import { SoaPdfService } from '../soa-pdf/soa-pdf.service';
@@ -15,7 +16,7 @@ import { startWith, takeUntil, filter, map, distinctUntilChanged } from 'rxjs/op
 
 @Component({
     selector: 'app-soa-right-panel',
-    imports: [ReactiveFormsModule],
+    imports: [ReactiveFormsModule, ButtonDirective],
     templateUrl: './soa-right-panel.component.html',
     styleUrls: ['./soa-right-panel.component.css']
 })

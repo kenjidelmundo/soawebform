@@ -1,10 +1,10 @@
 .rp{
   width: 100%;
-  max-width: 520px;
+  max-width: 100%;
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 180px;
-  column-gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 156px;
+  column-gap: 12px;
   row-gap: 10px;
   margin-left: auto;
 }
@@ -16,13 +16,13 @@
 .chkBox{
   grid-column: 1;
   grid-row: 1;
-  background: linear-gradient(180deg, rgba(144, 178, 221, 0.96), rgba(122, 162, 212, 0.96));
+  background: linear-gradient(180deg, rgba(173, 206, 245, 0.5), rgba(138, 182, 232, 0.5));
   border: 1px solid rgba(255, 255, 255, 0.34);
-  padding: 14px 12px;
+  padding: 9px 9px;
   display: grid;
-  border-radius: 14px;
+  border-radius: 12px;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
   box-sizing: border-box;
 }
 
@@ -31,8 +31,8 @@
 .col label{
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font: 600 14px -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  gap: 7px;
+  font: 700 11px -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
 }
 
 .chkBox input[type="checkbox"]{
@@ -40,7 +40,7 @@
 }
 
 .othersIn{
-  height: 20px;
+  height: 18px;
   border: 1px solid rgba(85, 103, 128, 0.18);
   background: #fff;
   border-radius: 8px;
@@ -51,75 +51,69 @@
   grid-row: 1;
 
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .btn{
   height: 30px;
-  border-radius: 10px;
-  border: 1px solid rgba(56, 73, 94, 0.16);
-  font: 700 13px -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  border-radius: 9px;
+  font: 700 11px -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 1px 2px rgba(15, 23, 32, 0.14), 0 4px 8px rgba(15, 23, 32, 0.08);
+  box-shadow: 0 5px 10px rgba(15, 23, 42, 0.1);
   transition: transform 140ms ease, box-shadow 140ms ease;
 }
 
 .btn:hover{
-  filter: brightness(1.03);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 2px 4px rgba(15, 23, 32, 0.16), 0 7px 12px rgba(15, 23, 32, 0.1);
+  box-shadow: 0 8px 14px rgba(15, 23, 42, 0.13);
 }
 
 .btn:active{
   transform: translateY(1px) scale(0.985);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(15, 23, 32, 0.12);
+  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.14);
 }
 
 .btn:focus-visible{
   outline: 0;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 0 0 3px rgba(10, 132, 255, 0.28), 0 5px 10px rgba(15, 23, 32, 0.12);
-}
-
-.btn.save,
-.btn.new,
-.btn.soa,
-.btn.assess{
-  background: linear-gradient(180deg, rgba(208, 232, 184, 0.92), rgba(186, 216, 156, 0.92));
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.22), 0 6px 12px rgba(15, 23, 42, 0.12);
 }
 
 .opBar{
   grid-column: 1 / -1;
   grid-row: 2;
-  height: 28px;
-  background: linear-gradient(180deg, rgba(194, 223, 171, 0.88), rgba(170, 205, 144, 0.88));
-  border: 1px solid rgba(255, 255, 255, 0.32);
-  border-radius: 14px;
+  min-height: 32px;
+  padding: 0.2rem;
+  background: linear-gradient(180deg, rgba(227, 240, 233, 0.8), rgba(205, 230, 216, 0.8));
+  border: 1px solid rgba(17, 94, 58, 0.12);
+  border-radius: 12px;
   display: grid;
   place-items: center;
 }
 
 .opBtn{
-  border: 0;
-  background: transparent;
+  width: 100%;
+  font-weight: 700;
+  font-size: 12px;
 }
 
 .opBox{
   grid-column: 1 / -1;
   grid-row: 3;
-  background: linear-gradient(180deg, rgba(144, 178, 221, 0.96), rgba(122, 162, 212, 0.96));
+  background: linear-gradient(180deg, rgba(173, 206, 245, 0.5), rgba(138, 182, 232, 0.5));
   border: 1px solid rgba(255, 255, 255, 0.34);
-  border-radius: 14px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 9px;
   box-sizing: border-box;
 }
 
 .opBox label{
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
 }
 
 .noteIn{
   width: 100%;
-  height: 22px;
+  height: 19px;
   background: #fff;
   padding: 0 6px;
   border: 1px solid rgba(85, 103, 128, 0.18);
@@ -130,24 +124,24 @@
   grid-column: 1 / -1;
   grid-row: 4;
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .paRow{
   display: grid;
   grid-template-columns: 72px 1fr;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
 }
 
 .paRow .lbl{
   font-weight: bold;
-  font-size: 12px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
 .paRow select{
-  height: 24px;
+  height: 22px;
   padding: 0 8px;
   border: 1px solid rgba(85, 103, 128, 0.18);
   border-radius: 8px;
@@ -161,20 +155,20 @@
 .remarks{
   grid-column: 1;
   grid-row: 5;
-  width: 150px;
+  width: 120px;
   justify-self: start;
 }
 
 .rt{
   font-weight: 600;
-  font-size: 15px;
+  font-size: 12px;
   color: #5f6876;
   margin-bottom: 4px;
   text-align: right;
 }
 
 .remarks textarea{
-  height: 120px;
+  height: 84px;
   padding: 6px;
   box-sizing: border-box;
   resize: none;
@@ -183,7 +177,7 @@
 .opSeries{
   grid-column: 1 / -1;
   grid-row: 5;
-  width: 332px;
+  width: 252px;
   justify-self: end;
   align-self: start;
 
@@ -195,17 +189,17 @@
 
 .opTitle{
   color: #d40000;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
-  width: 220px;
+  width: 184px;
   justify-self: end;
   text-align: center;
   white-space: nowrap;
 }
 
 .opSeriesIn{
-  width: 220px;
-  height: 24px;
+  width: 184px;
+  height: 20px;
   justify-self: end;
   text-align: right;
   font-weight: bold;
@@ -215,28 +209,32 @@
 .orBlock{
   grid-column: 1 / -1;
   grid-row: 6;
-  width: 332px;
-  margin-top: -120px;
-  padding-bottom: 8px;
+  width: 252px;
+  margin-top: -70px;
+  padding-bottom: 4px;
   position: relative;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   justify-self: end;
 }
 
 .orRow{
   display: grid;
-  grid-template-columns: 100px 220px;
-  gap: 12px;
+  grid-template-columns: 68px 184px;
+  gap: 6px;
   justify-content: end;
   align-items: center;
 }
 
-.orLbl{font-size:14px;font-weight:600;}
+.orLbl{
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 .orRow input{
   width: 100%;
-  height: 22px;
+  height: 20px;
   padding: 0 6px;
 }
 
@@ -248,12 +246,11 @@
 }
 
 .authorizedBy{
-  position: absolute;
-  bottom: -96px;
-  left: 118px;
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-top: 54px;
+  justify-self: end;
   text-align: left;
   font-size: 11px;
   font-weight: normal;
@@ -265,8 +262,6 @@
   align-items: center;
   gap: 6px;
   padding: 0;
-  border: 0;
-  background: transparent;
   color: #0b57d0;
   font-size: 11px;
   text-decoration: underline;
@@ -278,8 +273,58 @@
 }
 
 .authorizedByLogo{
-  width: 44px;
-  height: 44px;
+  width: 34px;
+  height: 34px;
   flex: 0 0 auto;
   object-fit: contain;
+}
+
+@media (max-width: 767.98px){
+  .rp{
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chkBox,
+  .btnCol,
+  .remarks,
+  .opSeries,
+  .orBlock{
+    grid-column: 1;
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .btnCol{
+    grid-row: 2;
+  }
+
+  .remarks{
+    grid-row: 5;
+  }
+
+  .opSeries{
+    grid-row: 6;
+    margin-top: 0;
+  }
+
+  .opTitle,
+  .opSeriesIn{
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .orBlock{
+    grid-row: 7;
+    margin-top: 0;
+  }
+
+  .orRow{
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+
+  .authorizedBy{
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
 }
