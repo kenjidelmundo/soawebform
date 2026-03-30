@@ -25,7 +25,9 @@ export function openRocParticularsFlow(
 
     const openTxn = (base: string) => {
       const refTxn = dialog.open(TxnTypeDialogComponent, {
-        width: '460px',
+        width: '760px',
+        maxWidth: '94vw',
+        panelClass: 'soa-dlg',
         disableClose: true,
         autoFocus: false,
         restoreFocus: false,

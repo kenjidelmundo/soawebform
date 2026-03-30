@@ -28,7 +28,9 @@ export function openAmateurParticularsFlow(
     const isTemporary = choiceUpper.includes('TEMPORARY PERMIT');
 
     const refTxn = dialog.open(TxnTypeDialogComponent, {
-      width: '520px',
+      width: '760px',
+      maxWidth: '94vw',
+      panelClass: 'soa-dlg',
       disableClose: true,
       autoFocus: false,
       restoreFocus: false,

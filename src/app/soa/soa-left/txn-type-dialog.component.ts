@@ -32,276 +32,272 @@ type TxnTypeDialogData = {
     selector: 'app-txn-type-dialog',
     imports: [],
     template: `
-    <div class="dlg">
-      <div class="dlgHead">Transaction Type</div>
+    <div class="txnDlg">
+      <div class="txnDlgHead">Transaction Type</div>
       @if (contextTitle) {
-        <div class="contextTitle">{{ contextTitle }}</div>
+        <div class="txnContextTitle">{{ contextTitle }}</div>
       }
-    
-      <div class="list" [class.twoCol]="showPurchasePossess">
-        <div class="ppWrap">
-          <label class="row" (click)="$event.preventDefault(); toggle('NEW')">
+
+      <div class="txnList" [class.twoCol]="showPurchasePossess">
+        <div class="txnWrap">
+          <label class="txnRow" (click)="$event.preventDefault(); toggle('NEW')">
             <input
               type="checkbox"
-              class="cb"
+              class="txnCb"
               [checked]="isChecked('NEW')"
               tabindex="-1"
               aria-hidden="true"
-              />
-            <span class="box" [class.on]="isChecked('NEW')"></span>
-            <span class="txt">New</span>
+            />
+            <span class="txnBox" [class.on]="isChecked('NEW')"></span>
+            <span class="txnText">New</span>
           </label>
-    
+
           @if (showStandaloneUnits && isChecked('NEW')) {
-            <div class="unitsRow">
-              <label class="unitsLabel" for="txnUnitsNew">Unit:</label>
+            <div class="txnUnitsRow">
+              <label class="txnUnitsLabel" for="txnUnitsNew">Unit:</label>
               <input
                 id="txnUnitsNew"
                 type="number"
-                class="unitsInput"
+                class="txnUnitsInput"
                 min="1"
                 step="1"
                 [value]="standaloneUnits"
                 (click)="$event.stopPropagation()"
                 (input)="onStandaloneUnitsInput($event)"
-                />
+              />
             </div>
           }
         </div>
-    
+
         @if (showPurchasePossess) {
-          <div class="ppWrap">
-            <label
-              class="row"
-              (click)="$event.preventDefault(); togglePurchasePossess()"
-              >
+          <div class="txnWrap">
+            <label class="txnRow" (click)="$event.preventDefault(); togglePurchasePossess()">
               <input
                 type="checkbox"
-                class="cb"
+                class="txnCb"
                 [checked]="purchasePossess"
                 tabindex="-1"
                 aria-hidden="true"
-                />
-              <span class="box" [class.on]="purchasePossess"></span>
-              <span class="txt">Purchase and Possess</span>
+              />
+              <span class="txnBox" [class.on]="purchasePossess"></span>
+              <span class="txnText">Purchase and Possess</span>
             </label>
             @if (purchasePossess) {
-              <div class="unitsRow">
-                <label class="unitsLabel" for="ppUnits">Unit:</label>
+              <div class="txnUnitsRow">
+                <label class="txnUnitsLabel" for="ppUnits">Unit:</label>
                 <input
                   id="ppUnits"
                   type="number"
-                  class="unitsInput"
+                  class="txnUnitsInput"
                   min="1"
                   step="1"
                   [value]="purchasePossessUnits"
                   (click)="$event.stopPropagation()"
                   (input)="onUnitsInput($event)"
-                  />
+                />
               </div>
             }
           </div>
         }
-    
-        <div class="ppWrap">
-          <label class="row" (click)="$event.preventDefault(); toggle('RENEW')">
+
+        <div class="txnWrap">
+          <label class="txnRow" (click)="$event.preventDefault(); toggle('RENEW')">
             <input
               type="checkbox"
-              class="cb"
+              class="txnCb"
               [checked]="isChecked('RENEW')"
               tabindex="-1"
               aria-hidden="true"
-              />
-            <span class="box" [class.on]="isChecked('RENEW')"></span>
-            <span class="txt">Renew</span>
+            />
+            <span class="txnBox" [class.on]="isChecked('RENEW')"></span>
+            <span class="txnText">Renew</span>
           </label>
-    
+
           @if (showStandaloneUnits && isChecked('RENEW')) {
-            <div class="unitsRow">
-              <label class="unitsLabel" for="txnUnitsRenew">Unit:</label>
+            <div class="txnUnitsRow">
+              <label class="txnUnitsLabel" for="txnUnitsRenew">Unit:</label>
               <input
                 id="txnUnitsRenew"
                 type="number"
-                class="unitsInput"
+                class="txnUnitsInput"
                 min="1"
                 step="1"
                 [value]="standaloneUnits"
                 (click)="$event.stopPropagation()"
                 (input)="onStandaloneUnitsInput($event)"
-                />
+              />
             </div>
           }
         </div>
-    
+
         @if (showDuplicate) {
-          <label
-            class="row"
-            (click)="$event.preventDefault(); toggle('DUPLICATE')"
-            >
+          <label class="txnRow" (click)="$event.preventDefault(); toggle('DUPLICATE')">
             <input
               type="checkbox"
-              class="cb"
+              class="txnCb"
               [checked]="isChecked('DUPLICATE')"
               tabindex="-1"
               aria-hidden="true"
-              />
-            <span class="box" [class.on]="isChecked('DUPLICATE')"></span>
-            <span class="txt">Duplicate</span>
+            />
+            <span class="txnBox" [class.on]="isChecked('DUPLICATE')"></span>
+            <span class="txnText">Duplicate</span>
           </label>
         }
-    
+
         @if (showSellTransfer) {
-          <div class="ppWrap">
-            <label class="row" (click)="$event.preventDefault(); toggleSellTransfer()">
+          <div class="txnWrap">
+            <label class="txnRow" (click)="$event.preventDefault(); toggleSellTransfer()">
               <input
                 type="checkbox"
-                class="cb"
+                class="txnCb"
                 [checked]="sellTransfer"
                 tabindex="-1"
                 aria-hidden="true"
-                />
-              <span class="box" [class.on]="sellTransfer"></span>
-              <span class="txt">Permit to Sell/Transfer</span>
+              />
+              <span class="txnBox" [class.on]="sellTransfer"></span>
+              <span class="txnText">Permit to Sell/Transfer</span>
             </label>
             @if (sellTransfer) {
-              <div class="unitsRow">
-                <label class="unitsLabel" for="stUnits">Unit:</label>
+              <div class="txnUnitsRow">
+                <label class="txnUnitsLabel" for="stUnits">Unit:</label>
                 <input
                   id="stUnits"
                   type="number"
-                  class="unitsInput"
+                  class="txnUnitsInput"
                   min="1"
                   step="1"
                   [value]="sellTransferUnits"
                   (click)="$event.stopPropagation()"
                   (input)="onSellTransferUnitsInput($event)"
-                  />
+                />
               </div>
             }
           </div>
         }
-    
+
         @if (showPossessStorage) {
-          <div class="ppWrap">
-            <label class="row" (click)="$event.preventDefault(); togglePossessStorage()">
+          <div class="txnWrap">
+            <label class="txnRow" (click)="$event.preventDefault(); togglePossessStorage()">
               <input
                 type="checkbox"
-                class="cb"
+                class="txnCb"
                 [checked]="possessStorage"
                 tabindex="-1"
                 aria-hidden="true"
-                />
-              <span class="box" [class.on]="possessStorage"></span>
-              <span class="txt">Possess(Storage)</span>
+              />
+              <span class="txnBox" [class.on]="possessStorage"></span>
+              <span class="txnText">Possess(Storage)</span>
             </label>
             @if (possessStorage) {
-              <div class="unitsRow">
-                <label class="unitsLabel" for="psUnits">Unit:</label>
+              <div class="txnUnitsRow">
+                <label class="txnUnitsLabel" for="psUnits">Unit:</label>
                 <input
                   id="psUnits"
                   type="number"
-                  class="unitsInput"
+                  class="txnUnitsInput"
                   min="1"
                   step="1"
                   [value]="possessStorageUnits"
                   (click)="$event.stopPropagation()"
                   (input)="onPossessStorageUnitsInput($event)"
-                  />
+                />
               </div>
             }
           </div>
         }
-    
-        <div class="ppWrap">
-          <label class="row" (click)="$event.preventDefault(); toggle('MOD')">
+
+        <div class="txnWrap">
+          <label class="txnRow" (click)="$event.preventDefault(); toggle('MOD')">
             <input
               type="checkbox"
-              class="cb"
+              class="txnCb"
               [checked]="isChecked('MOD')"
               tabindex="-1"
               aria-hidden="true"
-              />
-            <span class="box" [class.on]="isChecked('MOD')"></span>
-            <span class="txt">Modification</span>
+            />
+            <span class="txnBox" [class.on]="isChecked('MOD')"></span>
+            <span class="txnText">Modification</span>
           </label>
-    
+
           @if (showStandaloneUnits && isChecked('MOD')) {
-            <div class="unitsRow">
-              <label class="unitsLabel" for="txnUnitsMod">Unit:</label>
+            <div class="txnUnitsRow">
+              <label class="txnUnitsLabel" for="txnUnitsMod">Unit:</label>
               <input
                 id="txnUnitsMod"
                 type="number"
-                class="unitsInput"
+                class="txnUnitsInput"
                 min="1"
                 step="1"
                 [value]="standaloneUnits"
                 (click)="$event.stopPropagation()"
                 (input)="onStandaloneUnitsInput($event)"
-                />
+              />
             </div>
           }
         </div>
       </div>
-    
-      <div class="dlgFoot">
+
+      <div class="txnFoot">
         @if (showBack) {
-          <button type="button" class="btn" (click)="back()">Back</button>
+          <button type="button" class="txnBtn" (click)="back()">Back</button>
         }
-        <button type="button" class="btn" (click)="close()">Cancel</button>
+        <button type="button" class="txnBtn" (click)="close()">Cancel</button>
         <button
           type="button"
-          class="btn primary"
+          class="txnBtn txnBtnPrimary"
           [disabled]="!canSubmit()"
           (click)="submit()"
-          >
+        >
           Submit
         </button>
       </div>
     </div>
     `,
     styles: [`
-    .dlg {
+    .txnDlg {
       width: 100%;
-      max-width: 100%;
-      padding: 14px;
+      max-width: 760px;
+      padding: 18px 18px 16px;
       font-family: Arial, sans-serif;
       background: #fff;
       box-sizing: border-box;
-      overflow-x: hidden;
+      overflow: hidden;
     }
 
-    .dlgHead {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 10px;
+    .txnDlgHead {
+      font-size: 24px;
+      font-weight: 800;
+      color: #111;
+      margin-bottom: 8px;
     }
 
-    .contextTitle {
+    .txnContextTitle {
       text-align: center;
-      font-size: 13px;
+      font-size: 15px;
       font-weight: 700;
-      margin-bottom: 10px;
+      color: #1d1d1d;
+      margin-bottom: 16px;
     }
 
-    .list {
+    .txnList {
       display: grid;
-      gap: 6px 18px;
-      padding-left: 2px;
-    }
-
-    .list.twoCol {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 10px 28px;
       align-items: start;
     }
 
-    .row {
+    .txnList.twoCol {
+      grid-template-columns: repeat(2, minmax(240px, 1fr));
+      align-items: start;
+    }
+
+    .txnRow {
       display: flex;
       align-items: center;
       gap: 8px;
       cursor: pointer;
-      font-weight: 700;
+      font-weight: 800;
       font-size: 14px;
-      line-height: 1.2;
+      line-height: 1.25;
       user-select: none;
       padding: 0;
       border: none;
@@ -309,39 +305,40 @@ type TxnTypeDialogData = {
       min-width: 0;
     }
 
-    .ppWrap {
+    .txnWrap {
       display: grid;
       gap: 6px;
       align-content: start;
       min-width: 0;
     }
 
-    .unitsRow {
+    .txnUnitsRow {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding-left: 22px;
-      margin-top: -2px;
+      padding-left: 28px;
+      margin-top: -1px;
       min-width: 0;
     }
 
-    .unitsLabel {
+    .txnUnitsLabel {
       font-size: 13px;
       font-weight: 700;
-      min-width: 34px;
+      min-width: 36px;
+      color: #42536a;
     }
 
-    .unitsInput {
-      width: 90px;
-      height: 28px;
-      border: 1px solid #999;
-      border-radius: 4px;
+    .txnUnitsInput {
+      width: 96px;
+      height: 34px;
+      border: 1px solid #b8c0cc;
+      border-radius: 8px;
       padding: 0 8px;
-      font-size: 13px;
+      font-size: 14px;
       box-sizing: border-box;
     }
 
-    .cb {
+    .txnCb {
       position: absolute;
       opacity: 0;
       width: 0;
@@ -349,10 +346,10 @@ type TxnTypeDialogData = {
       pointer-events: none;
     }
 
-    .box {
+    .txnBox {
       width: 14px;
       height: 14px;
-      border: 1px solid #333;
+      border: 1px solid #727272;
       border-radius: 2px;
       background: #fff;
       display: inline-block;
@@ -360,45 +357,57 @@ type TxnTypeDialogData = {
       flex: 0 0 14px;
     }
 
-    .box.on::after {
+    .txnBox.on::after {
       content: "";
       position: absolute;
       left: 3px;
-      top: 3px;
-      width: 7px;
-      height: 4px;
-      border-left: 2px solid #2f74ff;
+      top: 1px;
+      width: 4px;
+      height: 8px;
+      border-right: 2px solid #2f74ff;
       border-bottom: 2px solid #2f74ff;
-      transform: rotate(-45deg);
+      transform: rotate(45deg);
     }
 
-    .dlgFoot {
-      margin-top: 14px;
+    .txnText {
+      display: inline-block;
+      cursor: pointer;
+    }
+
+    .txnFoot {
+      margin-top: 20px;
       display: flex;
       justify-content: flex-end;
-      gap: 8px;
+      gap: 10px;
       flex-wrap: wrap;
     }
 
-    .btn {
-      height: 34px;
-      padding: 0 12px;
-      border: 1px solid #999;
+    .txnBtn {
+      height: 36px;
+      padding: 0 16px;
+      border: 1px solid #b5bcc6;
       background: #fff;
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
       flex: 0 0 auto;
+      font-size: 14px;
     }
 
-    .btn.primary {
-      border-color: #2f74ff;
-      background: #2f74ff;
+    .txnBtnPrimary {
+      border-color: #8db2ff;
+      background: #8db2ff;
       color: #fff;
     }
 
-    .btn:disabled {
+    .txnBtn:disabled {
       opacity: .55;
       cursor: not-allowed;
+    }
+
+    @media (max-width: 620px) {
+      .txnList.twoCol {
+        grid-template-columns: 1fr;
+      }
     }
   `]
 })

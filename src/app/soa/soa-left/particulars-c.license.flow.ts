@@ -62,7 +62,9 @@ export function openCoastalLicenseParticularsFlow(
 
       // 3) TXN last (NEW / RENEW / MOD)
       const refTxn = dialog.open(TxnTypeDialogComponent, {
-        width: '460px',
+        width: '760px',
+        maxWidth: '94vw',
+        panelClass: 'soa-dlg',
         disableClose: true,
         autoFocus: false,
         restoreFocus: false,

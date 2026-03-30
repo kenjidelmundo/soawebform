@@ -27,181 +27,285 @@ export type CoastalTelegraphyOptionsResult = {
     selector: 'app-coastal-telegraphy-options-dialog',
     imports: [],
     template: `
-    <div class="dlg">
-      <div class="title">Coastal Station License</div>
-      <div class="sub">Choose service + transaction + powered/band</div>
-      <div class="context">Coastal Station License</div>
-    
-      <div class="grid">
-        <!-- LEFT -->
-        <div class="col">
-          <div class="head">Transaction</div>
-    
-          <label class="row">
-            <input class="cb" type="checkbox" [checked]="isCheckedTxn('NEW')" (change)="onTxnChange('NEW', $event)" />
-            <span class="txt">New</span>
+    <div class="coastalTxnDlg">
+      <div class="coastalTxnTitle">Coastal Station License</div>
+      <div class="coastalTxnSub">Choose service + transaction + powered/band</div>
+      <div class="coastalTxnContext">Coastal Station License</div>
+
+      <div class="coastalTxnGrid">
+        <div class="coastalTxnCol">
+          <div class="coastalTxnHead">Transaction</div>
+
+          <label class="coastalTxnRow" (click)="$event.preventDefault(); toggleTxn('NEW')">
+            <input class="coastalTxnCb" type="checkbox" [checked]="isCheckedTxn('NEW')" tabindex="-1" aria-hidden="true" />
+            <span class="coastalTxnBox" [class.on]="isCheckedTxn('NEW')"></span>
+            <span class="coastalTxnText">New</span>
           </label>
-    
-          <label class="row">
-            <input class="cb" type="checkbox" [checked]="isCheckedTxn('RENEW')" (change)="onTxnChange('RENEW', $event)" />
-            <span class="txt">Renew</span>
+
+          <label class="coastalTxnRow" (click)="$event.preventDefault(); toggleTxn('RENEW')">
+            <input class="coastalTxnCb" type="checkbox" [checked]="isCheckedTxn('RENEW')" tabindex="-1" aria-hidden="true" />
+            <span class="coastalTxnBox" [class.on]="isCheckedTxn('RENEW')"></span>
+            <span class="coastalTxnText">Renew</span>
           </label>
-    
-          <label class="row">
-            <input class="cb" type="checkbox" [checked]="isCheckedTxn('MOD')" (change)="onTxnChange('MOD', $event)" />
-            <span class="txt">Mod</span>
+
+          <label class="coastalTxnRow" (click)="$event.preventDefault(); toggleTxn('MOD')">
+            <input class="coastalTxnCb" type="checkbox" [checked]="isCheckedTxn('MOD')" tabindex="-1" aria-hidden="true" />
+            <span class="coastalTxnBox" [class.on]="isCheckedTxn('MOD')"></span>
+            <span class="coastalTxnText">Mod</span>
           </label>
-    
-          <label class="row">
-            <input class="cb" type="checkbox" [checked]="duplicate" (change)="toggleDuplicate()" />
-            <span class="txt">Duplicate</span>
+
+          <label class="coastalTxnRow" (click)="$event.preventDefault(); toggleDuplicate()">
+            <input class="coastalTxnCb" type="checkbox" [checked]="duplicate" tabindex="-1" aria-hidden="true" />
+            <span class="coastalTxnBox" [class.on]="duplicate"></span>
+            <span class="coastalTxnText">Duplicate</span>
           </label>
-    
-          <label class="row">
-            <input class="cb" type="checkbox" [checked]="purchasePossess" (change)="togglePurchasePossess()" />
-            <span class="txt">Permit to Purchase/Possess</span>
+
+          <label class="coastalTxnRow" (click)="$event.preventDefault(); togglePurchasePossess()">
+            <input class="coastalTxnCb" type="checkbox" [checked]="purchasePossess" tabindex="-1" aria-hidden="true" />
+            <span class="coastalTxnBox" [class.on]="purchasePossess"></span>
+            <span class="coastalTxnText">Permit to Purchase/Possess</span>
           </label>
           @if (purchasePossess) {
-            <div class="unitsRow">
-              <span class="unitsLabel">Units:</span>
-              <input class="unitsInput" type="number" min="1" step="1" [value]="purchaseUnits"
-                (click)="$event.stopPropagation()" (input)="onPurchaseUnits($event)" />
+            <div class="coastalTxnUnitsRow">
+              <span class="coastalTxnUnitsLabel">Units:</span>
+              <input
+                class="coastalTxnUnitsInput"
+                type="number"
+                min="1"
+                step="1"
+                [value]="purchaseUnits"
+                (click)="$event.stopPropagation()"
+                (input)="onPurchaseUnits($event)"
+              />
             </div>
           }
-    
-          <label class="row">
-            <input class="cb" type="checkbox" [checked]="sellTransfer" (change)="toggleSellTransfer()" />
-            <span class="txt">Permit to Sell/Transfer</span>
+
+          <label class="coastalTxnRow" (click)="$event.preventDefault(); toggleSellTransfer()">
+            <input class="coastalTxnCb" type="checkbox" [checked]="sellTransfer" tabindex="-1" aria-hidden="true" />
+            <span class="coastalTxnBox" [class.on]="sellTransfer"></span>
+            <span class="coastalTxnText">Permit to Sell/Transfer</span>
           </label>
           @if (sellTransfer) {
-            <div class="unitsRow">
-              <span class="unitsLabel">Units:</span>
-              <input class="unitsInput" type="number" min="1" step="1" [value]="sellTransferUnits"
-                (click)="$event.stopPropagation()" (input)="onSellUnits($event)" />
+            <div class="coastalTxnUnitsRow">
+              <span class="coastalTxnUnitsLabel">Units:</span>
+              <input
+                class="coastalTxnUnitsInput"
+                type="number"
+                min="1"
+                step="1"
+                [value]="sellTransferUnits"
+                (click)="$event.stopPropagation()"
+                (input)="onSellUnits($event)"
+              />
             </div>
           }
         </div>
-    
-        <!-- POWER / BAND -->
-        <div class="col">
-          <div class="head">{{ service === 'RADIO_TELEGRAPHY' ? 'Powered' : 'Band' }}</div>
-    
+
+        <div class="coastalTxnCol">
+          <div class="coastalTxnHead">{{ service === 'RADIO_TELEGRAPHY' ? 'Powered' : 'Band' }}</div>
+
           @if (service === 'RADIO_TELEGRAPHY') {
-            <label class="row">
-              <input class="cb" type="checkbox" [checked]="power==='HIGH_POWERED'" (change)="pickPower('HIGH_POWERED')" />
-              <span class="txt">High Powered</span>
+            <label class="coastalTxnRow" (click)="pickPower('HIGH_POWERED')">
+              <input class="coastalTxnCb" type="checkbox" [checked]="power==='HIGH_POWERED'" tabindex="-1" aria-hidden="true" />
+              <span class="coastalTxnBox" [class.on]="power==='HIGH_POWERED'"></span>
+              <span class="coastalTxnText">High Powered</span>
             </label>
-            <label class="row">
-              <input class="cb" type="checkbox" [checked]="power==='MEDIUM_POWERED'" (change)="pickPower('MEDIUM_POWERED')" />
-              <span class="txt">Medium Powered</span>
+            <label class="coastalTxnRow" (click)="pickPower('MEDIUM_POWERED')">
+              <input class="coastalTxnCb" type="checkbox" [checked]="power==='MEDIUM_POWERED'" tabindex="-1" aria-hidden="true" />
+              <span class="coastalTxnBox" [class.on]="power==='MEDIUM_POWERED'"></span>
+              <span class="coastalTxnText">Medium Powered</span>
             </label>
-            <label class="row">
-              <input class="cb" type="checkbox" [checked]="power==='LOW_POWERED'" (change)="pickPower('LOW_POWERED')" />
-              <span class="txt">Low Powered</span>
+            <label class="coastalTxnRow" (click)="pickPower('LOW_POWERED')">
+              <input class="coastalTxnCb" type="checkbox" [checked]="power==='LOW_POWERED'" tabindex="-1" aria-hidden="true" />
+              <span class="coastalTxnBox" [class.on]="power==='LOW_POWERED'"></span>
+              <span class="coastalTxnText">Low Powered</span>
             </label>
           } @else {
-            <label class="row">
-              <input class="cb" type="checkbox" [checked]="power==='HF'" (change)="pickPower('HF')" />
-              <span class="txt">HF</span>
+            <label class="coastalTxnRow" (click)="pickPower('HF')">
+              <input class="coastalTxnCb" type="checkbox" [checked]="power==='HF'" tabindex="-1" aria-hidden="true" />
+              <span class="coastalTxnBox" [class.on]="power==='HF'"></span>
+              <span class="coastalTxnText">HF</span>
             </label>
-            <label class="row">
-              <input class="cb" type="checkbox" [checked]="power==='VHF'" (change)="pickPower('VHF')" />
-              <span class="txt">VHF</span>
+            <label class="coastalTxnRow" (click)="pickPower('VHF')">
+              <input class="coastalTxnCb" type="checkbox" [checked]="power==='VHF'" tabindex="-1" aria-hidden="true" />
+              <span class="coastalTxnBox" [class.on]="power==='VHF'"></span>
+              <span class="coastalTxnText">VHF</span>
             </label>
           }
-    
         </div>
-    
-        <!-- SERVICE -->
-        <div class="col">
-          <div class="head">Service</div>
-    
-          <label class="row">
-            <input class="cb" type="checkbox" [checked]="service==='RADIO_TELEGRAPHY'" (change)="pickService('RADIO_TELEGRAPHY')" />
-            <span class="txt">Radio Telegraphy</span>
+
+        <div class="coastalTxnCol">
+          <div class="coastalTxnHead">Service</div>
+
+          <label class="coastalTxnRow" (click)="pickService('RADIO_TELEGRAPHY')">
+            <input class="coastalTxnCb" type="checkbox" [checked]="service==='RADIO_TELEGRAPHY'" tabindex="-1" aria-hidden="true" />
+            <span class="coastalTxnBox" [class.on]="service==='RADIO_TELEGRAPHY'"></span>
+            <span class="coastalTxnText">Radio Telegraphy</span>
           </label>
-    
-          <label class="row">
-            <input class="cb" type="checkbox" [checked]="service==='RADIO_TELEPHONY'" (change)="pickService('RADIO_TELEPHONY')" />
-            <span class="txt">Radio Telephony</span>
+
+          <label class="coastalTxnRow" (click)="pickService('RADIO_TELEPHONY')">
+            <input class="coastalTxnCb" type="checkbox" [checked]="service==='RADIO_TELEPHONY'" tabindex="-1" aria-hidden="true" />
+            <span class="coastalTxnBox" [class.on]="service==='RADIO_TELEPHONY'"></span>
+            <span class="coastalTxnText">Radio Telephony</span>
           </label>
         </div>
       </div>
-    
-      <div class="foot">
-        <button type="button" class="btn" (click)="close()">Cancel</button>
-        <button type="button" class="btn primary" [disabled]="(!txnNew && !txnRenew && !txnMod) || !power" (click)="submit()">
+
+      <div class="coastalTxnFoot">
+        <button type="button" class="coastalTxnBtn" (click)="close()">Cancel</button>
+        <button type="button" class="coastalTxnBtn coastalTxnBtnPrimary" [disabled]="(!txnNew && !txnRenew && !txnMod) || !power" (click)="submit()">
           Submit
         </button>
       </div>
     </div>
     `,
     styles: [`
-    .dlg{
+    .coastalTxnDlg{
       width: 100%;
-      max-width: 92vw;
+      max-width: 900px;
       overflow: hidden;
-      padding: 14px 16px;
+      padding: 18px 20px 16px;
       box-sizing: border-box;
       font-family: Arial, sans-serif;
       background: #fff;
     }
-    .title{ font-size: 22px; font-weight: 800; margin: 2px 0; }
-    .sub{ font-size: 13px; margin: 0 0 10px; opacity:.9; }
-    .context{ text-align:center; font-size:13px; font-weight:700; margin:-4px 0 10px; }
 
-    .grid{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; align-items:start; }
-    .col{ display:grid; gap: 6px; }
-    .head{ font-weight: 800; font-size: 14px; margin-bottom: 6px; }
-    .row{
+    .coastalTxnTitle{
+      font-size: 22px;
+      font-weight: 800;
+      margin: 0 0 2px;
+      color:#101010;
+    }
+
+    .coastalTxnSub{
+      font-size: 13px;
+      margin: 0 0 8px;
+      color:#4c4c4c;
+    }
+
+    .coastalTxnContext{
+      text-align:center;
+      font-size:14px;
+      font-weight:700;
+      color:#243852;
+      margin: 0 0 14px;
+    }
+
+    .coastalTxnGrid{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 34px;
+      align-items:start;
+    }
+
+    .coastalTxnCol{
+      display:grid;
+      gap: 10px;
+    }
+
+    .coastalTxnHead{
+      font-weight: 800;
+      font-size: 15px;
+      color:#1e2f4b;
+      margin-bottom: 2px;
+    }
+
+    .coastalTxnRow{
       display:flex;
       align-items:center;
-      gap: 6px;
+      gap: 10px;
       cursor:pointer;
       user-select:none;
-      font-weight:700;
-      font-size:14px;
+      font-weight:800;
+      font-size:15px;
       line-height:1.2;
+      min-width: 0;
     }
-    .unitsRow{ display:flex; align-items:center; gap:8px; padding-left:22px; }
-    .unitsLabel{ font-weight:700; font-size:13px; }
-    .unitsInput{ width:80px; height:28px; border:1px solid #999; border-radius:4px; padding:0 8px; font-size:13px; }
 
-    /* custom checkbox styling to match reference */
-    .cb{
-      position:relative;
-      width:18px;
-      height:18px;
-      margin:0 6px 0 0;
-      cursor:pointer;
-      appearance:none;
-      -webkit-appearance:none;
-      border:2px solid #5f6368;
-      border-radius:3px;
+    .coastalTxnText{
+      white-space: nowrap;
+      color: #223754;
+    }
+
+    .coastalTxnUnitsRow{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding-left:28px;
+    }
+
+    .coastalTxnUnitsLabel{
+      font-weight:700;
+      font-size:13px;
+    }
+
+    .coastalTxnUnitsInput{
+      width:84px;
+      height:32px;
+      border:1px solid #b8c0cc;
+      border-radius:8px;
+      padding:0 8px;
+      font-size:13px;
+    }
+
+    .coastalTxnCb{
+      position:absolute;
+      opacity:0;
+      width:0;
+      height:0;
+      pointer-events:none;
+    }
+
+    .coastalTxnBox{
+      width:14px;
+      height:14px;
+      border:1px solid #727272;
+      border-radius:2px;
       background:#fff;
-      vertical-align:middle;
-      flex:0 0 auto;
+      display:inline-block;
+      position:relative;
+      flex:0 0 14px;
     }
-    .cb:checked{
-      border-color:#1e88e5;
-    }
-    .cb:checked::after{
+
+    .coastalTxnBox.on::after{
       content:"";
       position:absolute;
-      left:4px;
-      top:0px;
-      width:6px;
-      height:12px;
-      border:2px solid #1e88e5;
-      border-top:0;
-      border-left:0;
-      transform:rotate(45deg);
+      left:3px;
+      top:1px;
+      width:4px;
+      height:8px;
+      border-right:2px solid #2f74ff;
+      border-bottom:2px solid #2f74ff;
+      transform: rotate(45deg);
     }
 
-    .foot{ margin-top: 16px; display:flex; justify-content:flex-end; gap: 10px; }
-    .btn{ height:34px; padding:0 14px; border:1px solid #999; background:#fff; border-radius:6px; cursor:pointer; }
-    .btn.primary{ border-color:#2f74ff; background:#2f74ff; color:#fff; }
-    .btn:disabled{ opacity:.55; cursor:not-allowed; }
+    .coastalTxnFoot{
+      margin-top: 20px;
+      display:flex;
+      justify-content:flex-end;
+      gap: 10px;
+    }
+
+    .coastalTxnBtn{
+      height:36px;
+      padding:0 16px;
+      border:1px solid #b5bcc6;
+      background:#fff;
+      border-radius:8px;
+      cursor:pointer;
+      font-size:14px;
+    }
+
+    .coastalTxnBtnPrimary{
+      border-color:#2f74ff;
+      background:#8db2ff;
+      color:#fff;
+    }
+
+    .coastalTxnBtn:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+    }
   `]
 })
 export class CoastalTelegraphyOptionsDialogComponent {
@@ -221,19 +325,18 @@ export class CoastalTelegraphyOptionsDialogComponent {
     private ref: MatDialogRef<CoastalTelegraphyOptionsDialogComponent, CoastalTelegraphyOptionsResult>
   ) {}
 
-  onTxnChange(v: ShipTxn, ev: Event) {
-    const checked = (ev.target as HTMLInputElement)?.checked;
+  toggleTxn(v: ShipTxn) {
     if (v === 'MOD') {
-      this.txnMod = !!checked;
+      this.txnMod = !this.txnMod;
       return;
     }
     if (v === 'NEW') {
-      this.txnNew = !!checked;
+      this.txnNew = !this.txnNew;
       if (this.txnNew) this.txnRenew = false;
       return;
     }
     if (v === 'RENEW') {
-      this.txnRenew = !!checked;
+      this.txnRenew = !this.txnRenew;
       if (this.txnRenew) this.txnNew = false;
       return;
     }

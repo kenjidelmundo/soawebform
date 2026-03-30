@@ -88,7 +88,7 @@ export function openVhfUhfParticularsFlow(
   const openTxnDialog = (picked: VhfUhfSubtypeResult): void => {
     const baseText = `VHF/UHF RADIO STATIONS - ${picked.baseRadio} - ${picked.power}`;
     const refTxn = dialog.open(TxnTypeDialogComponent, {
-      width: '420px',
+      width: '760px',
       maxWidth: '92vw',
       disableClose: true,
       autoFocus: false,

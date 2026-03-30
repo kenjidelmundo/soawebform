@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { shareReplay } from 'rxjs/operators';
-import { AddressProvince } from './soa-left/address-dialog.component'; // ✅ adjust path to your dialog file
+import { AddressProvince } from './soa-left/address-dialog.component';
 
 @Injectable({ providedIn: 'root' })
 export class SoaService {

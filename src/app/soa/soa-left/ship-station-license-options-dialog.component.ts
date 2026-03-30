@@ -22,6 +22,7 @@ export type ShipStationLicenseOptionsResult = {
   txns: ShipTxn[];
   power: ShipPower;
   scope: ShipLicenseScope;
+  intlCode?: 'SESCL' | 'LRIT' | 'SSAS' | 'SESFB';
   purchasePossessUnits?: number;
   sellTransferUnits?: number;
   possessStorageUnits?: number;
@@ -33,218 +34,213 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
     selector: 'app-ship-station-license-options-dialog',
     imports: [],
     template: `
-    <div class="dlg">
-      <div class="title">Ship Station License</div>
-      <div class="sub">Choose transaction + power / option + scope</div>
-    
-      <div class="grid">
-        <!-- TRANSACTION -->
-        <div class="col">
-          <div class="head">Transaction</div>
-    
-          <label class="row" (click)="onTxnClick($event, 'NEW')">
-            <input class="cb" type="checkbox" [checked]="isTxnChecked('NEW')" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="isTxnChecked('NEW')"></span>
-            <span class="txt">New</span>
+    <div class="shipTxnDlg">
+      <div class="shipTxnTitle">Ship Station License</div>
+      <div class="shipTxnSub">Choose transaction + power / option + scope</div>
+
+      <div class="shipTxnGrid">
+        <div class="shipTxnCol">
+          <div class="shipTxnHead">Transaction</div>
+
+          <label class="shipTxnRow" (click)="onTxnClick($event, 'NEW')">
+            <input class="shipTxnCb" type="checkbox" [checked]="isTxnChecked('NEW')" tabindex="-1" aria-hidden="true" />
+            <span class="shipTxnBox" [class.on]="isTxnChecked('NEW')"></span>
+            <span class="shipTxnText">New</span>
           </label>
-    
-          <label class="row" (click)="onTxnClick($event, 'RENEW')">
-            <input class="cb" type="checkbox" [checked]="isTxnChecked('RENEW')" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="isTxnChecked('RENEW')"></span>
-            <span class="txt">Renew</span>
+
+          <label class="shipTxnRow" (click)="onTxnClick($event, 'RENEW')">
+            <input class="shipTxnCb" type="checkbox" [checked]="isTxnChecked('RENEW')" tabindex="-1" aria-hidden="true" />
+            <span class="shipTxnBox" [class.on]="isTxnChecked('RENEW')"></span>
+            <span class="shipTxnText">Renew</span>
           </label>
-    
-          <label class="row" (click)="onTxnClick($event, 'MOD')">
-            <input class="cb" type="checkbox" [checked]="isTxnChecked('MOD')" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="isTxnChecked('MOD')"></span>
-            <span class="txt">Mod</span>
+
+          <label class="shipTxnRow" (click)="onTxnClick($event, 'MOD')">
+            <input class="shipTxnCb" type="checkbox" [checked]="isTxnChecked('MOD')" tabindex="-1" aria-hidden="true" />
+            <span class="shipTxnBox" [class.on]="isTxnChecked('MOD')"></span>
+            <span class="shipTxnText">Mod</span>
           </label>
-    
-          <label class="row" (click)="onTxnClick($event, 'DUPLICATE')">
-            <input class="cb" type="checkbox" [checked]="isTxnChecked('DUPLICATE')" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="isTxnChecked('DUPLICATE')"></span>
-            <span class="txt">Duplicate</span>
+
+          <label class="shipTxnRow" (click)="onTxnClick($event, 'DUPLICATE')">
+            <input class="shipTxnCb" type="checkbox" [checked]="isTxnChecked('DUPLICATE')" tabindex="-1" aria-hidden="true" />
+            <span class="shipTxnBox" [class.on]="isTxnChecked('DUPLICATE')"></span>
+            <span class="shipTxnText">Duplicate</span>
           </label>
-    
-          <label class="row" (click)="onTxnClick($event, 'PURCHASE_POSSESS')">
-            <input class="cb" type="checkbox" [checked]="isTxnChecked('PURCHASE_POSSESS')" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="isTxnChecked('PURCHASE_POSSESS')"></span>
-            <span class="txt">Permit to Purchase / Possess</span>
+
+          <label class="shipTxnRow" (click)="onTxnClick($event, 'PURCHASE_POSSESS')">
+            <input class="shipTxnCb" type="checkbox" [checked]="isTxnChecked('PURCHASE_POSSESS')" tabindex="-1" aria-hidden="true" />
+            <span class="shipTxnBox" [class.on]="isTxnChecked('PURCHASE_POSSESS')"></span>
+            <span class="shipTxnText">Permit to Purchase / Possess</span>
           </label>
           @if (isTxnChecked('PURCHASE_POSSESS')) {
-            <div class="unitRow">
-              <span class="unitLabel">Unit:</span>
+            <div class="shipTxnUnitRow">
+              <span class="shipTxnUnitLabel">Unit:</span>
               <input
-                class="unitInput"
+                class="shipTxnUnitInput"
                 type="number"
                 min="1"
                 step="1"
                 [value]="purchasePossessUnits"
                 (click)="$event.stopPropagation()"
                 (input)="onUnitsInput($event, 'PURCHASE_POSSESS')"
-                />
+              />
             </div>
           }
-    
-          <label class="row" (click)="onTxnClick($event, 'SELL_TRANSFER')">
-            <input class="cb" type="checkbox" [checked]="isTxnChecked('SELL_TRANSFER')" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="isTxnChecked('SELL_TRANSFER')"></span>
-            <span class="txt">Permit to Sell / Transfer</span>
+
+          <label class="shipTxnRow" (click)="onTxnClick($event, 'SELL_TRANSFER')">
+            <input class="shipTxnCb" type="checkbox" [checked]="isTxnChecked('SELL_TRANSFER')" tabindex="-1" aria-hidden="true" />
+            <span class="shipTxnBox" [class.on]="isTxnChecked('SELL_TRANSFER')"></span>
+            <span class="shipTxnText">Permit to Sell / Transfer</span>
           </label>
           @if (isTxnChecked('SELL_TRANSFER')) {
-            <div class="unitRow">
-              <span class="unitLabel">Unit:</span>
+            <div class="shipTxnUnitRow">
+              <span class="shipTxnUnitLabel">Unit:</span>
               <input
-                class="unitInput"
+                class="shipTxnUnitInput"
                 type="number"
                 min="1"
                 step="1"
                 [value]="sellTransferUnits"
                 (click)="$event.stopPropagation()"
                 (input)="onUnitsInput($event, 'SELL_TRANSFER')"
-                />
+              />
             </div>
           }
-    
-          <label class="row" (click)="onTxnClick($event, 'POSSESS_STORAGE')">
-            <input class="cb" type="checkbox" [checked]="isTxnChecked('POSSESS_STORAGE')" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="isTxnChecked('POSSESS_STORAGE')"></span>
-            <span class="txt">Possess (Storage)</span>
+
+          <label class="shipTxnRow" (click)="onTxnClick($event, 'POSSESS_STORAGE')">
+            <input class="shipTxnCb" type="checkbox" [checked]="isTxnChecked('POSSESS_STORAGE')" tabindex="-1" aria-hidden="true" />
+            <span class="shipTxnBox" [class.on]="isTxnChecked('POSSESS_STORAGE')"></span>
+            <span class="shipTxnText">Possess (Storage)</span>
           </label>
           @if (isTxnChecked('POSSESS_STORAGE')) {
-            <div class="unitRow">
-              <span class="unitLabel">Unit:</span>
+            <div class="shipTxnUnitRow">
+              <span class="shipTxnUnitLabel">Unit:</span>
               <input
-                class="unitInput"
+                class="shipTxnUnitInput"
                 type="number"
                 min="1"
                 step="1"
                 [value]="possessStorageUnits"
                 (click)="$event.stopPropagation()"
                 (input)="onUnitsInput($event, 'POSSESS_STORAGE')"
-                />
+              />
             </div>
           }
-    
         </div>
-    
-        <!-- POWER / OPTION -->
-        <div class="col">
-          <div class="head">Powered / Option</div>
-    
-          <label class="row" (click)="pickPower('HIGH_POWERED')">
-            <input class="cb" type="checkbox" [checked]="power==='HIGH_POWERED'" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="power==='HIGH_POWERED'"></span>
-            <span class="txt">High Powered</span>
+
+        <div class="shipTxnCol">
+          <div class="shipTxnHead">Powered / Option</div>
+
+          <label class="shipTxnRow" (click)="pickPower('HIGH_POWERED')">
+            <input class="shipTxnCb" type="checkbox" [checked]="power==='HIGH_POWERED'" tabindex="-1" aria-hidden="true" />
+            <span class="shipTxnBox" [class.on]="power==='HIGH_POWERED'"></span>
+            <span class="shipTxnText">High Powered</span>
           </label>
-    
-          <label class="row" (click)="pickPower('MEDIUM_POWERED')">
-            <input class="cb" type="checkbox" [checked]="power==='MEDIUM_POWERED'" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="power==='MEDIUM_POWERED'"></span>
-            <span class="txt">Medium Powered</span>
+
+          <label class="shipTxnRow" (click)="pickPower('MEDIUM_POWERED')">
+            <input class="shipTxnCb" type="checkbox" [checked]="power==='MEDIUM_POWERED'" tabindex="-1" aria-hidden="true" />
+            <span class="shipTxnBox" [class.on]="power==='MEDIUM_POWERED'"></span>
+            <span class="shipTxnText">Medium Powered</span>
           </label>
-    
-          <label class="row" (click)="pickPower('LOW_POWERED')">
-            <input class="cb" type="checkbox" [checked]="power==='LOW_POWERED'" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="power==='LOW_POWERED'"></span>
-            <span class="txt">Low Powered</span>
+
+          <label class="shipTxnRow" (click)="pickPower('LOW_POWERED')">
+            <input class="shipTxnCb" type="checkbox" [checked]="power==='LOW_POWERED'" tabindex="-1" aria-hidden="true" />
+            <span class="shipTxnBox" [class.on]="power==='LOW_POWERED'"></span>
+            <span class="shipTxnText">Low Powered</span>
           </label>
-    
-          <div class="divider"></div>
-    
-          <label
-            class="row"
-            [class.disabled]="scope==='DOMESTIC'"
-            (click)="pickPower('SESCL_LRIT_SSAS_SESFB')"
-            >
+
+          <div class="shipTxnDivider"></div>
+
+          <label class="shipTxnRow" [class.disabled]="scope==='DOMESTIC'" (click)="pickPower('SESCL_LRIT_SSAS_SESFB')">
             <input
-              class="cb"
+              class="shipTxnCb"
               type="checkbox"
               [checked]="power==='SESCL_LRIT_SSAS_SESFB'"
               tabindex="-1"
               aria-hidden="true"
               [disabled]="scope==='DOMESTIC'"
-              />
-            <span class="box" [class.on]="power==='SESCL_LRIT_SSAS_SESFB'"></span>
-            <span class="txt">SESCL / LRIT / SSAS / SESFB</span>
+            />
+            <span class="shipTxnBox" [class.on]="power==='SESCL_LRIT_SSAS_SESFB'"></span>
+            <span class="shipTxnText">SESCL / LRIT / SSAS / SESFB</span>
           </label>
         </div>
-    
-        <!-- SCOPE -->
-        <div class="col">
-          <div class="head">Scope</div>
-    
-          <label class="row" (click)="pickScope('DOMESTIC')">
-            <input class="cb" type="checkbox" [checked]="scope==='DOMESTIC'" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="scope==='DOMESTIC'"></span>
-            <span class="txt">Domestic</span>
+
+        <div class="shipTxnCol">
+          <div class="shipTxnHead">Scope</div>
+
+          <label class="shipTxnRow" (click)="pickScope('DOMESTIC')">
+            <input class="shipTxnCb" type="checkbox" [checked]="scope==='DOMESTIC'" tabindex="-1" aria-hidden="true" />
+            <span class="shipTxnBox" [class.on]="scope==='DOMESTIC'"></span>
+            <span class="shipTxnText">Domestic</span>
           </label>
-    
-          <label class="row" (click)="pickScope('INTERNATIONAL')">
-            <input class="cb" type="checkbox" [checked]="scope==='INTERNATIONAL'" tabindex="-1" aria-hidden="true" />
-            <span class="box" [class.on]="scope==='INTERNATIONAL'"></span>
-            <span class="txt">International</span>
+
+          <label class="shipTxnRow" (click)="pickScope('INTERNATIONAL')">
+            <input class="shipTxnCb" type="checkbox" [checked]="scope==='INTERNATIONAL'" tabindex="-1" aria-hidden="true" />
+            <span class="shipTxnBox" [class.on]="scope==='INTERNATIONAL'"></span>
+            <span class="shipTxnText">International</span>
           </label>
         </div>
       </div>
-    
-      <div class="foot">
-        <button type="button" class="btn" (click)="close()">Cancel</button>
-        <button type="button" class="btn primary" [disabled]="!hasPrimaryTxn() || !power || !scope || !unitsOk()" (click)="submit()">Submit</button>
+
+      <div class="shipTxnFoot">
+        <button type="button" class="shipTxnBtn" (click)="close()">Cancel</button>
+        <button type="button" class="shipTxnBtn shipTxnBtnPrimary" [disabled]="!hasPrimaryTxn() || !power || !scope || !unitsOk()" (click)="submit()">Submit</button>
       </div>
     </div>
     `,
     styles: [`
-    .dlg{
+    .shipTxnDlg{
       width: 100%;
-      max-width: 860px;
-      padding: 16px 18px;
+      max-width: 900px;
+      padding: 18px 20px 16px;
       box-sizing: border-box;
       font-family: Arial, sans-serif;
       background:#fff;
       overflow: hidden;
     }
 
-    .title{
-      font-size: 26px;
+    .shipTxnTitle{
+      font-size: 24px;
       font-weight: 800;
-      margin: 0;
+      color: #101010;
+      margin: 0 0 2px;
     }
 
-    .sub{
+    .shipTxnSub{
       font-size: 13px;
-      color:#333;
-      margin: 2px 0 10px;
+      color:#585858;
+      margin: 0 0 16px;
     }
 
-    .grid{
+    .shipTxnGrid{
       display:grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      column-gap: 24px;
-      row-gap: 10px;
+      grid-template-columns: minmax(300px, 1.2fr) minmax(250px, 1fr) minmax(180px, .85fr);
+      column-gap: 42px;
+      row-gap: 14px;
       align-items:start;
       margin-top: 4px;
     }
 
-    .head{
+    .shipTxnHead{
       font-weight: 800;
       font-size: 15px;
-      margin: 0 0 6px;
+      color: #171717;
+      margin: 0 0 10px;
     }
 
-    .col{
+    .shipTxnCol{
       display:grid;
-      gap: 8px;
+      gap: 9px;
       min-width: 0;
+      align-content: start;
     }
 
-    .row{
+    .shipTxnRow{
       display:flex;
       align-items:center;
-      gap: 10px;
+      gap: 8px;
       cursor:pointer;
       user-select:none;
-      font-weight: 700;
+      font-weight: 800;
       font-size: 14px;
       line-height: 1.1;
       margin: 0;
@@ -252,19 +248,18 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
       min-width: 0;
     }
 
-    .row.disabled{
+    .shipTxnRow.disabled{
       opacity: 0.48;
       cursor: not-allowed;
       pointer-events: none;
     }
 
-    .txt{
+    .shipTxnText{
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      color: #222;
     }
 
-    .cb{
+    .shipTxnCb{
       position:absolute;
       opacity:0;
       width:0;
@@ -272,10 +267,10 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
       pointer-events:none;
     }
 
-    .box{
+    .shipTxnBox{
       width: 14px;
       height: 14px;
-      border: 1px solid #333;
+      border: 1px solid #727272;
       border-radius: 2px;
       background:#fff;
       display:inline-block;
@@ -283,85 +278,86 @@ export type ShipStationLicenseOptionsDialogResult = ShipStationLicenseOptionsRes
       flex: 0 0 14px;
     }
 
-    .box.on::after{
+    .shipTxnBox.on::after{
       content:"";
       position:absolute;
       left: 3px;
-      top: 3px;
-      width: 7px;
-      height: 4px;
-      border-left: 2px solid #2f74ff;
+      top: 1px;
+      width: 4px;
+      height: 8px;
+      border-right: 2px solid #2f74ff;
       border-bottom: 2px solid #2f74ff;
-      transform: rotate(-45deg);
+      transform: rotate(45deg);
     }
 
-    .unitRow{
+    .shipTxnUnitRow{
       display:flex;
       align-items:center;
-      gap: 6px;
+      gap: 8px;
       padding-left: 24px;
-      margin-top: -4px;
+      margin-top: -2px;
       margin-bottom: 4px;
     }
 
-    .unitLabel{
+    .shipTxnUnitLabel{
       font-size: 13px;
       font-weight: 700;
       color: #333;
       min-width: 34px;
     }
 
-    .unitInput{
-      width: 80px;
-      height: 28px;
+    .shipTxnUnitInput{
+      width: 74px;
+      height: 32px;
       padding: 2px 6px;
       border: 1px solid #c3c3c3;
-      border-radius: 4px;
+      border-radius: 6px;
       font-size: 13px;
       box-sizing: border-box;
     }
 
-    .divider{
+    .shipTxnDivider{
       height: 1px;
       background: #d9d9d9;
       margin: 6px 0 4px;
     }
 
-    .foot{
+    .shipTxnFoot{
       display:flex;
       justify-content:flex-end;
       gap: 10px;
-      margin-top: 10px;
+      margin-top: 22px;
     }
 
-    .btn{
-      height: 34px;
+    .shipTxnBtn{
+      height: 36px;
       padding: 0 16px;
-      border: 1px solid #999;
+      border: 1px solid #b5bcc6;
       background:#fff;
-      border-radius: 6px;
+      border-radius: 8px;
       cursor:pointer;
+      font-size: 14px;
     }
 
-    .btn.primary{
-      border-color:#2f74ff;
-      background:#2f74ff;
+    .shipTxnBtnPrimary{
+      border-color:#8db2ff;
+      background:#8db2ff;
       color:#fff;
     }
 
-    .btn:disabled{
+    .shipTxnBtn:disabled{
       opacity:.55;
       cursor:not-allowed;
     }
 
     @media (max-width: 900px){
-      .grid{
+      .shipTxnGrid{
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
     @media (max-width: 600px){
-      .grid{
+      .shipTxnGrid{
         grid-template-columns: 1fr;
       }
     }

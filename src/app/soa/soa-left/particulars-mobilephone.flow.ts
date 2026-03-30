@@ -76,7 +76,9 @@ export function openMobilePhoneParticularsFlow(
     const subtype: MobilePhoneSubtype = r1.value;
 
     const ref2 = dialog.open(TxnTypeDialogComponent, {
-      width: '460px',
+      width: '760px',
+      maxWidth: '94vw',
+      panelClass: 'soa-dlg',
       disableClose: true,
       autoFocus: false,
       restoreFocus: false,

@@ -9,6 +9,11 @@ import {
   ShipPower,
   ShipStationLicenseOptionsResult,
 } from './ship-station-license-options-dialog.component';
+import {
+  ShipIntlCode,
+  ShipIntlCodeResult,
+  ShipStationIntlCodeDialogComponent,
+} from './ship-station-international-code-dialog.component';
 
 // =====================
 // RETURN TYPE
@@ -17,6 +22,7 @@ export type ShipStationLicensePicked = {
   scope: ShipLicenseScope;
   txns: ShipTxn[];
   power: ShipPower;
+  intlCode?: ShipIntlCode;
   purchasePossessUnits?: number;
   sellTransferUnits?: number;
   possessStorageUnits?: number;
@@ -42,13 +48,40 @@ export function openShipStationLicenseFlow(
       return;
     }
 
-    done({
-      scope: r.scope as ShipLicenseScope,
-      txns: r.txns as ShipTxn[],
-      power: r.power as ShipPower,
-      purchasePossessUnits: r.purchasePossessUnits,
-      sellTransferUnits: r.sellTransferUnits,
-      possessStorageUnits: r.possessStorageUnits,
-    });
+    const finish = (intlCode?: ShipIntlCode) => {
+      done({
+        scope: r.scope as ShipLicenseScope,
+        txns: r.txns as ShipTxn[],
+        power: r.power as ShipPower,
+        intlCode,
+        purchasePossessUnits: r.purchasePossessUnits,
+        sellTransferUnits: r.sellTransferUnits,
+        possessStorageUnits: r.possessStorageUnits,
+      });
+    };
+
+    if (r.scope === 'INTERNATIONAL' && r.power === 'SESCL_LRIT_SSAS_SESFB') {
+      const codeRef = dialog.open(ShipStationIntlCodeDialogComponent, {
+        width: '460px',
+        maxWidth: '94vw',
+        panelClass: 'soa-dlg',
+        disableClose: true,
+        autoFocus: false,
+        restoreFocus: false,
+      });
+
+      codeRef.afterClosed().subscribe((code: ShipIntlCodeResult | undefined) => {
+        if (!code?.value) {
+          cancel();
+          return;
+        }
+
+        finish(code.value);
+      });
+
+      return;
+    }
+
+    finish(r.intlCode);
   });
 }

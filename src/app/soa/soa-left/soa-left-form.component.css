@@ -2,6 +2,7 @@
    INFO TOP BOX
    ========================= */
 .info{
+  --field-inset-x: 8px;
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.34);
   border-radius: 12px;
@@ -34,15 +35,19 @@
 }
 
 .val{
-  padding: 2px 6px;
-  display: flex;
+  padding: 2px var(--field-inset-x);
+  display: grid;
   align-items: center;
   min-width: 0;
   overflow: hidden;
 }
 
 .row--date .val{
-  padding: 3px 6px;
+  padding: 3px var(--field-inset-x);
+}
+
+.val > *{
+  min-width: 0;
 }
 
 .val.payeeWrap{
@@ -63,6 +68,7 @@
 .payeeSel{
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   height: 21px;
   padding: 0 28px 0 10px; /* space for arrow */
   border: 1px solid rgba(136, 163, 193, 0.34);
@@ -77,6 +83,8 @@
   -webkit-appearance: none;
   -moz-appearance: none;
   outline: 0;
+  justify-self: stretch;
+  margin-inline: 0;
 }
 
 /* arrow */
@@ -119,17 +127,18 @@
 }
 
 .dateIn{
-  width: min(calc(100% - 12px), 240px);
+  width: min(100%, 240px);
   max-width: 240px;
-  flex: 0 0 240px;
-  margin-inline: 6px;
+  justify-self: start;
+  margin-inline: 0;
 }
 
-.infoField{
-  width: calc(100% - 12px);
+.val .infoField{
+  width: auto;
   max-width: none;
-  flex: 1 1 auto;
-  margin-inline: 6px;
+  min-width: 0;
+  justify-self: stretch;
+  margin-inline: 0;
 }
 
 .val input[readonly]{
@@ -149,7 +158,7 @@
    ========================= */
 
 .periodRow .val{
-  padding: 3px 6px;
+  padding: 3px var(--field-inset-x);
   box-sizing: border-box;
 }
 
@@ -157,12 +166,12 @@
 .periodRow .pcGrid3{
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 72px;
-  width: min(calc(100% - 12px), 378px);
-  flex: 0 1 378px;
+  width: min(100%, 378px);
   gap: 6px;
   align-items: end;
   min-width: 0;
-  margin-inline: 6px;
+  justify-self: start;
+  margin-inline: 0;
 }
 
 /* each column stack */
